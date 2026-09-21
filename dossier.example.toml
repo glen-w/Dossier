@@ -5,9 +5,11 @@
 [llm]
 provider = "ollama" # ollama | litellm | off
 model = "qwen3.8:latest"
+embed_model = "nomic-embed-text"
 base_url = "http://127.0.0.1:11434"
 allow_remote = false
 max_calls = 6
+timeout = 300 # seconds per Ollama generate call
 # api_base = "https://example.invalid/v1"
 
 [ask]
@@ -19,21 +21,38 @@ passages = true
 hops = 1
 decompose = "auto" # off | auto | on
 planner = "off" # off | rich
+embed = true # cosine neighbors when `dossier index` has vectors
+pubs = false # one /search per ask; hits are not written into the corpus
+
+[tailor]
+# name = "Your Name"
+
+[employer]
+# paths = ["/absolute/path/to/one/employer/folder"]
+
+[git]
+# user = "your-git-author"
+# paths = ["/absolute/path/to/one/repo"]
 
 [extract]
 llm = true
+chunk_chars = 4000 # max chars per LLM extract window
+max_chunks = 4 # cap LLM calls per record
 
 [run]
 adapters = [] # empty: every detected adapter
 pack = "career"
 # posting = "/absolute/path/to/posting.txt"
 
-# Own-pubs HTTP retrieve (sibling zotero-rag-pubs). Live ingest stays gated.
-# pubs_url = "http://127.0.0.1:8012"
-# pubs_seed = "publications"
-# pubs_top_k = 50
-
 # Retrieval expansions. When this key is absent, built-in lens words
 # (delivered, skills, contributions, publications, roles) expand on their own.
 # An empty list turns those extras off. A list replaces them.
 # lexicon = ["workshop", "brief"]
+
+[pubs]
+# Own-pubs HTTP retrieve (sibling zotero-rag-pubs). Live ingest stays gated.
+# collection = "your-zotero-collection"
+# seed = "publications"
+# top_k = 50
+# url = "http://127.0.0.1:8012"
+# zotero_db = "/absolute/path/to/zotero.sqlite"

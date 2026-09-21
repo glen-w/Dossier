@@ -1,12 +1,15 @@
 # Prior art
 
+Type: PRODUCT
+Authority: What this repo borrows. It does not define Dossier behavior.
+
 Take the rule that fits. Leave the product that does not.
 
-**CareerForge** ([MasRama/careerforge](https://github.com/MasRama/careerforge)). Evidence in, claims out, refuse a claim the records will not carry. Local, no account. Its collectors are git history and coding sessions. Dossier keeps the refuse rule and uses other sources.
+**CareerForge** ([MasRama/careerforge](https://github.com/MasRama/careerforge)). Evidence in, claims out, refuse a claim the records will not carry. Local, no account. Its collectors are git history and coding sessions. Dossier keeps the refuse rule. Git history here is subjects, dates, and file names from repos you list, not a résumé.
 
 **vibe-resume** ([easyvibecoding/vibe-resume](https://github.com/easyvibecoding/vibe-resume)). Extractors for Cursor transcripts and ChatGPT exports, then a résumé. Useful shapes for those two sources. The résumé step is not this repo.
 
-**Recallr** ([Flowdesktech/recallr](https://github.com/flowdesktech/recallr), MIT). mbox and Slack exports into SQLite hybrid search, plus MCP. Dossier’s ask path is local FTS and passages inside `evidence.db`, not Recallr. Hybrid or embedding search remains a later backend candidate. Not claim cards.
+**Recallr** ([Flowdesktech/recallr](https://github.com/flowdesktech/recallr), MIT). mbox and Slack exports into SQLite hybrid search, plus MCP. Dossier keeps the pattern — full text plus passage vectors inside `evidence.db` — and does not depend on Recallr. Not claim cards.
 
 **LEANN** ([yichuan-w/LEANN](https://github.com/yichuan-w/LEANN)). Laptop RAG over files, mail, and ChatGPT exports. Retrieval, not a buffet of approved claims.
 

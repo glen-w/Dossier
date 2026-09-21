@@ -75,20 +75,52 @@
           </p>
           <ol class="steps">
             <li>
-              <strong>Ingest</strong> — Slack, mail (capped), LinkedIn, ChatGPT,
-              applications, transcripts, meetings, own pubs when the index is ready.
+              <span class="mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 4v9" />
+                  <path d="m8 10 4 4 4-4" />
+                  <path d="M5 19.5h14" />
+                </svg>
+              </span>
+              <span>
+                <strong>Ingest</strong> — Slack, mail (capped), LinkedIn, ChatGPT,
+                applications, transcripts, meetings, own pubs when the index is ready.
+              </span>
             </li>
             <li>
-              <strong>Extract</strong> — deterministic drafts first; optional
-              local model for the rest. Uncited claims stay refused.
+              <span class="mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="6" y="3.5" width="12" height="17" rx="1.5" />
+                  <path d="M9 9h6M9 12.5h6M9 16h3.5" />
+                </svg>
+              </span>
+              <span>
+                <strong>Extract</strong> — deterministic drafts first; optional
+                local model for the rest. Uncited claims stay refused.
+              </span>
             </li>
             <li>
-              <strong>Approve</strong> — the human gate. Nothing is copied into a
-              CV by the tool.
+              <span class="mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="8" />
+                  <path d="m8.5 12.2 2.3 2.3 4.7-5" />
+                </svg>
+              </span>
+              <span>
+                <strong>Approve</strong> — the human gate. Nothing is copied into a
+                CV by the tool.
+              </span>
             </li>
             <li>
-              <strong>Ask / packet</strong> — cited answers, or a refusal. Span
-              stores the carrying sentence.
+              <span class="mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 6.5h14v8.5H9.2L5 18.5z" />
+                </svg>
+              </span>
+              <span>
+                <strong>Ask / packet</strong> — cited answers, or a refusal. Span
+                stores the carrying sentence.
+              </span>
             </li>
           </ol>
         </div>
@@ -98,13 +130,14 @@
         <div class="wrap">
           <h2>What you get</h2>
           <p class="section-lead">
-            A buffet of pending and approved cards, markdown briefs and packets,
-            and a read-only referee shortlist — still never auto-attached.
+            A buffet of pending and approved cards, markdown briefs, packets, and
+            a posting-shaped CV or letter, plus a read-only referee shortlist
+            that is never auto-attached.
           </p>
           <ul class="outcomes">
             <li>Claim cards with citation URIs in a local SQLite corpus</li>
             <li><code>dossier ask</code> with exact / auto / rich modes</li>
-            <li><code>span</code>, <code>defend</code>, <code>gaps</code>, <code>packet</code></li>
+            <li><code>span</code>, <code>defend</code>, <code>gaps</code>, <code>packet</code>, <code>tailor</code></li>
             <li><code>referees</code> from a JSON people file or Twenty read</li>
           </ul>
         </div>

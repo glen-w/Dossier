@@ -254,7 +254,8 @@ def test_toml_loads_zero_four_knobs(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / "dossier.toml").write_text(
         "[ask]\ncards_first = false\nhops = 0\ndecompose = \"on\"\n"
         "planner = \"rich\"\npassages = false\n"
-        "[llm]\nmax_calls = 2\n"
+        "[llm]\nmax_calls = 2\ntimeout = 450\n"
+        "[extract]\nchunk_chars = 2000\nmax_chunks = 3\n"
         '[run]\nposting = "/tmp/posting.txt"\n',
         encoding="utf-8",
     )
@@ -265,9 +266,14 @@ def test_toml_loads_zero_four_knobs(tmp_path: Path, monkeypatch) -> None:
     assert cfg.ask_planner == "rich"
     assert cfg.ask_passages is False
     assert cfg.llm_max_calls == 2
+    assert cfg.llm_timeout_seconds == 450.0
+    assert cfg.extract_chunk_chars == 2000
+    assert cfg.extract_max_chunks == 3
     assert cfg.run_posting == "/tmp/posting.txt"
     monkeypatch.setenv("DOSSIER_ASK_HOPS", "3")
     assert Config.from_env().ask_hops == 3
+    monkeypatch.setenv("DOSSIER_LLM_TIMEOUT", "600")
+    assert Config.from_env().llm_timeout_seconds == 600.0
 
 
 def test_compound_question_stitches_without_a_model(corpus: Corpus) -> None:
@@ -392,6 +398,9 @@ def test_run_prints_ledger(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.setenv("DOSSIER_CURSOR_PROJECTS", str(tmp_path / "no-cursor"))
     monkeypatch.setenv("DOSSIER_GROK_BLOBS", str(tmp_path / "no-grok"))
     monkeypatch.setenv("DOSSIER_MAIL_ROOT", str(tmp_path / "no-mail"))
+    monkeypatch.delenv("DOSSIER_EMPLOYER_PATHS", raising=False)
+    monkeypatch.delenv("DOSSIER_CHATGPT_EXPORT", raising=False)
+    monkeypatch.delenv("DOSSIER_SLACK_EXPORT", raising=False)
     monkeypatch.setattr("dossier.sources.pubs.HttpPubsRetriever.ping", lambda self: False)
     corpus = Corpus(tmp_path / "evidence.db")
     corpus.upsert_record(
@@ -418,6 +427,11 @@ def test_doctor_prints_fts(tmp_path: Path, monkeypatch, capsys) -> None:
     out = capsys.readouterr().out
     assert "fts5:" in out
     assert "provider:" in out
+    assert "embed_model:" in out
+    assert "vectors: 0" in out
+    assert "ask.pubs: no" in out
+    assert "tailor: 0" in out
+    assert "approve and defend before tailor will quote" in out
     assert "adapter pubs:" in out
 
 

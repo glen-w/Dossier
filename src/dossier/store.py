@@ -93,6 +93,7 @@ class Corpus:
         self._conn.commit()
         self._ensure_fts()
         self._ensure_passages()
+        self._ensure_vectors()
 
     def upsert_record(self, record: Record) -> None:
         self._conn.execute(
@@ -425,6 +426,7 @@ class Corpus:
 
         chunks = split_passages(record.text)
         self._conn.execute("DELETE FROM passages WHERE record_uri = ?", (record.uri,))
+        self._drop_vectors(record.uri)
         if self.passages_fts_ok:
             self._delete_passage_fts(record.uri)
         for ordinal, chunk in enumerate(chunks):
@@ -451,6 +453,103 @@ class Corpus:
                     "DELETE FROM passages_fts WHERE rowid = ?",
                     (row["rowid"],),
                 )
+
+    def _ensure_vectors(self) -> None:
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS passage_vec (
+                record_uri TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                model TEXT NOT NULL,
+                vector BLOB NOT NULL,
+                PRIMARY KEY (record_uri, ordinal, model)
+            )
+            """
+        )
+        self._conn.commit()
+
+    def vector_count(self, model: str) -> int:
+        row = self._conn.execute(
+            "SELECT count(*) FROM passage_vec WHERE model = ?",
+            (model,),
+        ).fetchone()
+        return int(row[0] if row else 0)
+
+    def drop_other_vectors(self, model: str) -> None:
+        self._conn.execute("DELETE FROM passage_vec WHERE model != ?", (model,))
+        self._conn.commit()
+
+    def passages_missing_vector(self, model: str) -> list[tuple[str, int, str]]:
+        rows = self._conn.execute(
+            """
+            SELECT p.record_uri, p.ordinal, p.text
+            FROM passages p
+            WHERE length(trim(p.text)) > 0
+              AND NOT EXISTS (
+                SELECT 1 FROM passage_vec v
+                WHERE v.record_uri = p.record_uri
+                  AND v.ordinal = p.ordinal
+                  AND v.model = ?
+              )
+            ORDER BY p.record_uri, p.ordinal
+            """,
+            (model,),
+        ).fetchall()
+        return [(str(row["record_uri"]), int(row["ordinal"]), str(row["text"])) for row in rows]
+
+    def upsert_vector(self, uri: str, ordinal: int, model: str, values: list[float]) -> None:
+        from dossier.embed import pack_vector
+
+        self._conn.execute(
+            """
+            INSERT INTO passage_vec (record_uri, ordinal, model, vector)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(record_uri, ordinal, model) DO UPDATE SET
+                vector=excluded.vector
+            """,
+            (uri, ordinal, model, pack_vector(values)),
+        )
+        self._conn.commit()
+
+    def nearest_passages(
+        self,
+        vector: list[float],
+        model: str,
+        *,
+        limit: int,
+    ) -> list[tuple[str, str, float]]:
+        """Best (uri, passage text, cosine) for this model."""
+        from dossier.embed import cosine, unpack_vector
+
+        if limit < 1 or not vector:
+            return []
+        rows = self._conn.execute(
+            """
+            SELECT v.record_uri, v.vector, p.text
+            FROM passage_vec v
+            JOIN passages p
+              ON p.record_uri = v.record_uri AND p.ordinal = v.ordinal
+            WHERE v.model = ?
+            """,
+            (model,),
+        ).fetchall()
+        best: dict[str, tuple[str, float]] = {}
+        for row in rows:
+            score = cosine(vector, unpack_vector(row["vector"]))
+            uri = str(row["record_uri"])
+            prev = best.get(uri)
+            if prev is None or score > prev[1]:
+                best[uri] = (str(row["text"]), score)
+        ranked = sorted(best.items(), key=lambda item: (-item[1][1], item[0]))
+        return [(uri, text, score) for uri, (text, score) in ranked[:limit]]
+
+    def _drop_vectors(self, uri: str) -> None:
+        row = self._conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'passage_vec'"
+        ).fetchone()
+        if row is None:
+            return
+        self._conn.execute("DELETE FROM passage_vec WHERE record_uri = ?", (uri,))
 
     def _index_record(self, record: Record) -> None:
         if not getattr(self, "fts_ok", False):

@@ -249,16 +249,21 @@ def _sent_docs_elsewhere(conn: duckdb.DuckDBPyConnection, has_signals: bool) -> 
     return out
 
 
-def hunt_mbox_folder(root: Path, *, max_bytes: int) -> list[Hit]:
+def hunt_mbox_folder(root: Path, *, max_bytes: int, max_files: int | None = None) -> list[Hit]:
     """Thin-user path: score headers in a small exported folder. Never IDDRI."""
-    from dossier.fetch.mbox import iter_mbox_files, mbox_openable, parse_headers
+    from dossier.fetch.mbox import iter_mbox_files, mbox_max_files, mbox_openable, parse_headers
 
+    file_cap = mbox_max_files() if max_files is None else max_files
     hits: list[Hit] = []
+    opened = 0
     for mbox_path, folder_name in iter_mbox_files(root):
         if skip_folder(folder_name) or noise_folder(folder_name):
             continue
         if not mbox_openable(mbox_path, folder_name, max_bytes):
             continue
+        if opened >= file_cap:
+            break
+        opened += 1
         allow_body = activity_folder(folder_name)
         for hdr in parse_headers(mbox_path):
             if not _thin_keep(hdr, folder_name):

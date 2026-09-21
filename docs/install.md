@@ -1,5 +1,8 @@
 # Install
 
+Type: GUIDE
+Authority: How to install and which interpreter has FTS5. Command behavior lives in [status](status.md).
+
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```text
@@ -18,6 +21,9 @@ overlap is the fallback when this interpreter was built without the module.
 - `python:` — the executable in use
 - `sqlite:` — SQLite version
 - `fts5: yes|no`
+- `embed_model:` and `vectors:` — passage vectors from `dossier index`
+- `employer_paths:` and `git_paths:` — how many folders you listed
+- `tailor:` — how many spanned approved cards a posting draft can quote. What that draft contains is in [status](status.md).
 
 Prefer an interpreter that reports `fts5: yes`. On this Mac the stock
 `uv` venv may report `fts5: no` while Homebrew Python 3.13 reports yes:

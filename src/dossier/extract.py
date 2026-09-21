@@ -3,12 +3,29 @@
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from dossier.cards import ClaimCard, ProposedClaim, adjudicate, card_id
 from dossier.drafts import draft_record
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
 from dossier.store import Corpus, Record
+
+
+@dataclass(frozen=True)
+class ExtractProgress:
+    """One beat of extract_corpus for UI callbacks."""
+
+    phase: str  # start | draft | llm | llm_done | pass | done
+    index: int = 0
+    total: int = 0
+    skipped: int = 0
+    cards_added: int = 0
+    source: str = ""
+    title: str = ""
+    use_llm: bool = False
 
 EXTRACT_PROMPT = """You extract professional claim sentences for a CV locker.
 Return JSON only: {"claims": [{"claim": "...", "citations": ["@@URI@@"]}]}
@@ -28,6 +45,10 @@ Optional keys per claim: "lens" (delivered|skills|contributions), "kind",
 "skills" (list of strings), "org", "period". Prefer the Lens/Kind/Org/Year
 header when present. Still refuse anything the text will not carry.
 """
+
+DEFAULT_CHUNK_CHARS = 4000
+DEFAULT_MAX_CHUNKS = 4
+DEFAULT_TIMEOUT_SECONDS = 300.0
 
 
 def lock_claims(
@@ -83,27 +104,73 @@ def proposals_from_json(data: dict[str, Any], default_uri: str) -> list[Proposed
     return out
 
 
-def propose_with_llm(
-    record: Record, client: LLMClient, model: str
-) -> list[ProposedClaim]:
-    prompt = (
-        EXTRACT_PROMPT.replace("@@URI@@", record.uri)
-        .replace("@@TITLE@@", record.title)
-        .replace("@@TEXT@@", record.text[:12_000])
-    )
-    if record.source in {"slack", "mbox", "meetings"}:
-        prompt = prompt + SEEKER_PROMPT_TAIL
-    req = CompletionRequest(
-        model=model,
-        prompt=prompt,
-        json_mode=True,
-        num_ctx=ctx_tokens_for(prompt),
-    )
-    try:
-        data = client.complete_json(req)
-    except LLMClientError:
+def text_chunks(
+    text: str,
+    *,
+    chunk_chars: int = DEFAULT_CHUNK_CHARS,
+    max_chunks: int = DEFAULT_MAX_CHUNKS,
+) -> list[str]:
+    """Split record text into paragraph-aware windows for LLM extract."""
+    raw = text.strip()
+    if not raw:
         return []
-    return proposals_from_json(data, record.uri)
+    limit = max(500, int(chunk_chars))
+    cap = max(1, int(max_chunks))
+    if len(raw) <= limit:
+        return [raw]
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", raw) if part.strip()]
+    if not paragraphs:
+        paragraphs = [raw]
+    out: list[str] = []
+    buf = ""
+    for para in paragraphs:
+        pieces = _hard_split(para, limit) if len(para) > limit else [para]
+        for piece in pieces:
+            if buf and len(buf) + 2 + len(piece) > limit:
+                out.append(buf)
+                if len(out) >= cap:
+                    return out
+                buf = piece
+            else:
+                buf = f"{buf}\n\n{piece}".strip() if buf else piece
+    if buf and len(out) < cap:
+        out.append(buf)
+    return out[:cap] or [raw[:limit]]
+
+
+def propose_with_llm(
+    record: Record,
+    client: LLMClient,
+    model: str,
+    *,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    chunk_chars: int = DEFAULT_CHUNK_CHARS,
+    max_chunks: int = DEFAULT_MAX_CHUNKS,
+) -> list[ProposedClaim]:
+    out: list[ProposedClaim] = []
+    for piece in text_chunks(
+        record.text, chunk_chars=chunk_chars, max_chunks=max_chunks
+    ):
+        prompt = (
+            EXTRACT_PROMPT.replace("@@URI@@", record.uri)
+            .replace("@@TITLE@@", record.title)
+            .replace("@@TEXT@@", piece)
+        )
+        if record.source in {"slack", "mbox", "meetings"}:
+            prompt = prompt + SEEKER_PROMPT_TAIL
+        req = CompletionRequest(
+            model=model,
+            prompt=prompt,
+            json_mode=True,
+            num_ctx=ctx_tokens_for(prompt),
+            timeout_seconds=timeout_seconds,
+        )
+        try:
+            data = client.complete_json(req)
+        except LLMClientError:
+            continue
+        out.extend(proposals_from_json(data, record.uri))
+    return out
 
 
 def extract_record(
@@ -111,8 +178,19 @@ def extract_record(
     corpus: Corpus,
     client: LLMClient,
     model: str,
+    *,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    chunk_chars: int = DEFAULT_CHUNK_CHARS,
+    max_chunks: int = DEFAULT_MAX_CHUNKS,
 ) -> list[ClaimCard]:
-    proposals = propose_with_llm(record, client, model)
+    proposals = propose_with_llm(
+        record,
+        client,
+        model,
+        timeout_seconds=timeout_seconds,
+        chunk_chars=chunk_chars,
+        max_chunks=max_chunks,
+    )
     evidence = corpus.evidence_by_uri()
     if record.uri not in evidence:
         evidence = {**evidence, record.uri: record.text}
@@ -130,20 +208,104 @@ def extract_corpus(
     limit: int | None = None,
     *,
     use_llm: bool = True,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    chunk_chars: int = DEFAULT_CHUNK_CHARS,
+    max_chunks: int = DEFAULT_MAX_CHUNKS,
+    on_progress: Callable[[ExtractProgress], None] | None = None,
 ) -> list[ClaimCard]:
     records = corpus.records(source)
     if limit is not None:
         records = records[:limit]
+    work = [rec for rec in records if not corpus.record_has_open_card(rec.id)]
+    skipped = len(records) - len(work)
+    if on_progress is not None:
+        on_progress(
+            ExtractProgress(
+                phase="start",
+                total=len(work),
+                skipped=skipped,
+                use_llm=use_llm,
+            )
+        )
     out: list[ClaimCard] = []
-    for rec in records:
-        if corpus.record_has_open_card(rec.id):
-            continue
+    for index, rec in enumerate(work, start=1):
         drafted = draft_record(rec, corpus)
         if drafted:
             out.extend(drafted)
+            if on_progress is not None:
+                on_progress(
+                    ExtractProgress(
+                        phase="draft",
+                        index=index,
+                        total=len(work),
+                        skipped=skipped,
+                        cards_added=len(drafted),
+                        source=rec.source,
+                        title=rec.title,
+                        use_llm=use_llm,
+                    )
+                )
             continue
         if use_llm:
-            out.extend(extract_record(rec, corpus, client, model))
+            if on_progress is not None:
+                on_progress(
+                    ExtractProgress(
+                        phase="llm",
+                        index=index,
+                        total=len(work),
+                        skipped=skipped,
+                        source=rec.source,
+                        title=rec.title,
+                        use_llm=True,
+                    )
+                )
+            cards = extract_record(
+                rec,
+                corpus,
+                client,
+                model,
+                timeout_seconds=timeout_seconds,
+                chunk_chars=chunk_chars,
+                max_chunks=max_chunks,
+            )
+            out.extend(cards)
+            if on_progress is not None:
+                on_progress(
+                    ExtractProgress(
+                        phase="llm_done",
+                        index=index,
+                        total=len(work),
+                        skipped=skipped,
+                        cards_added=len(cards),
+                        source=rec.source,
+                        title=rec.title,
+                        use_llm=True,
+                    )
+                )
+            continue
+        if on_progress is not None:
+            on_progress(
+                ExtractProgress(
+                    phase="pass",
+                    index=index,
+                    total=len(work),
+                    skipped=skipped,
+                    source=rec.source,
+                    title=rec.title,
+                    use_llm=False,
+                )
+            )
+    if on_progress is not None:
+        on_progress(
+            ExtractProgress(
+                phase="done",
+                index=len(work),
+                total=len(work),
+                skipped=skipped,
+                cards_added=len(out),
+                use_llm=use_llm,
+            )
+        )
     return out
 
 
@@ -151,6 +313,12 @@ def dump_proposals(proposals: list[ProposedClaim]) -> str:
     return json.dumps(
         {"claims": [{"claim": p.claim, "citations": p.citations} for p in proposals]}
     )
+
+
+def _hard_split(text: str, limit: int) -> list[str]:
+    if len(text) <= limit:
+        return [text]
+    return [text[i : i + limit] for i in range(0, len(text), limit)]
 
 
 def _extras_from_item(item: dict[str, Any]) -> dict[str, str]:

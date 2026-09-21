@@ -41,6 +41,8 @@ def conduct(
     lens: str | None = None,
     kind: str | None = None,
     prior: list[str] | None = None,
+    embedder: object | None = None,
+    extra_hits: list[Hit] | None = None,
 ) -> Answer:
     """Answer one question. exact never calls the model."""
     if mode not in {"exact", "auto", "rich"}:
@@ -51,6 +53,8 @@ def conduct(
         card = approved_answer(corpus, question)
         if card is not None:
             return card
+    query_vec = _query_vector(embedder, question) if cfg.ask_embed else None
+    embed_model = str(getattr(embedder, "model", "") or "") if query_vec else ""
     subs = _subquestions(question, cfg, client, mode)
     parts: list[Answer] = []
     pooled: list[Hit] = []
@@ -64,11 +68,19 @@ def conduct(
             source=source,
             lens=lens,
             kind=kind,
+            query_vec=query_vec,
+            embed_model=embed_model,
         )
         parts.append(answer)
         pooled.extend(hits)
     if mode != "rich" and parts and all(not part.refused for part in parts):
         return parts[0] if len(parts) == 1 else _stitch(parts)
+    if extra_hits and len(parts) == 1 and parts[0].refused and mode != "rich":
+        again = _quote_any(question, extra_hits)
+        if not again.refused:
+            return again
+    if extra_hits:
+        pooled.extend(extra_hits)
     if mode == "exact":
         return parts[0] if len(parts) == 1 else _partial(parts)
     merged = _dedupe(pooled)[: min(limit, MAX_HITS)]
@@ -142,6 +154,8 @@ def _without_model(
     source: str | None,
     lens: str | None,
     kind: str | None,
+    query_vec: list[float] | None = None,
+    embed_model: str = "",
 ) -> tuple[Answer, list[Hit]]:
     if cfg.ask_cards_first and mode != "rich":
         card = approved_answer(corpus, question)
@@ -155,6 +169,8 @@ def _without_model(
         source=source,
         lens=lens,
         kind=kind,
+        query_vec=query_vec,
+        embed_model=embed_model,
     )
     if mode == "auto" and _needs_many(hits):
         missed = Answer(
@@ -169,9 +185,13 @@ def _without_model(
     if not exact.refused:
         return exact, hits
     if cfg.ask_hops >= 1 and hits:
-        extra = header_values(hits[0].text, "Lens") + header_values(hits[0].text, "Kind")
-        if extra:
-            base = expand_tokens(question, cfg.lexicon)
+        base = expand_tokens(question, cfg.lexicon)
+        current = hits
+        for _hop in range(cfg.ask_hops):
+            extra = header_values(current[0].text, "Lens") + header_values(current[0].text, "Kind")
+            if not extra:
+                break
+            base = _append(base, extra)
             hopped = collect_hits(
                 corpus,
                 question,
@@ -180,13 +200,17 @@ def _without_model(
                 source=source,
                 lens=lens,
                 kind=kind,
-                tokens=_append(base, extra),
+                tokens=base,
+                query_vec=query_vec,
+                embed_model=embed_model,
             )
-            if hopped:
-                again = _quote_any(question, hopped)
-                if not again.refused:
-                    return again, hopped
-                hits = hopped
+            if not hopped:
+                break
+            again = _quote_any(question, hopped)
+            if not again.refused:
+                return again, hopped
+            current = hopped
+            hits = hopped
     if not hits:
         return (
             Answer(
@@ -199,6 +223,25 @@ def _without_model(
             [],
         )
     return exact, hits
+
+
+def _query_vector(embedder: object | None, question: str) -> list[float] | None:
+    """One query embedding per ask. A failure leaves retrieval on full text."""
+    if embedder is None or not question.strip():
+        return None
+    embed = getattr(embedder, "embed", None)
+    if not callable(embed):
+        return None
+    try:
+        rows = embed([question])
+    except Exception:
+        return None
+    if not rows or not isinstance(rows[0], list) or not rows[0]:
+        return None
+    try:
+        return [float(value) for value in rows[0]]
+    except (TypeError, ValueError):
+        return None
 
 
 def _quote(question: str, hits: list[Hit]) -> Answer:

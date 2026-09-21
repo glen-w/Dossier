@@ -1,6 +1,9 @@
 # Privacy
 
-- Do not commit dumps, DuckDB files, LanceDB, `evidence.db`, `.env`, mbox, or PDFs.
+Type: GUIDE
+Authority: What stays off git and off the network. The refuse list is defined in [roadmap](roadmap.md).
+
+- Do not commit dumps, DuckDB files, LanceDB, `evidence.db` (including passage vectors), `.env`, mbox, exports, or PDFs.
 - Work stays on loopback unless you opt into a remote model. The egress notice
   is the warning, not a block.
 - No Twenty writes (Tasks, Opportunities, Notes, last-contacted).

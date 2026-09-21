@@ -24,7 +24,7 @@ class LLMClientError(Exception):
 class CompletionRequest:
     model: str
     prompt: str
-    timeout_seconds: float = 120.0
+    timeout_seconds: float = 300.0
     temperature: float = 0.2
     max_tokens: int | None = None
     json_mode: bool = False

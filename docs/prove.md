@@ -1,4 +1,7 @@
-# Prove (0.6)
+# Prove
+
+Type: GUIDE
+Authority: How to run the disposable corpus pass. It shipped in 0.6 and still does not approve cards.
 
 `dossier prove` fills a disposable locker from adapters already on disk,
 drafts cards, writes an exact-mode brief, runs defend / gaps / packet, and

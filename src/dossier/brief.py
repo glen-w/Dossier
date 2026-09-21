@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from dossier.config import Config
 from dossier.interview import conduct
 from dossier.llm.client import LLMClient
 from dossier.packs import PackQuestion, follow_up
+from dossier.sources.pubs import optional_pubs_hits
 from dossier.store import Corpus
 
 
@@ -41,6 +43,8 @@ def run_pack(
     client: LLMClient,
     *,
     mode: str,
+    on_progress: Callable[[int, int, PackQuestion, Answer], None] | None = None,
+    embedder: object | None = None,
 ) -> list[tuple[PackQuestion, Answer]]:
     queue = list(questions)
     out: list[tuple[PackQuestion, Answer]] = []
@@ -48,6 +52,11 @@ def run_pack(
     blobs = [f"{rec.title}\n{rec.text}" for rec in corpus.records()]
     while index < len(queue):
         item = queue[index]
+        extra = optional_pubs_hits(
+            item.question,
+            enabled=cfg.ask_pubs,
+            limit=cfg.ask_limit,
+        )
         result = conduct(
             corpus,
             item.question,
@@ -57,6 +66,8 @@ def run_pack(
             limit=cfg.ask_limit,
             source=item.source,
             lens=item.lens,
+            embedder=embedder,
+            extra_hits=extra or None,
         )
         corpus.add_answer(
             question=item.question,
@@ -67,6 +78,8 @@ def run_pack(
             reason=result.reason,
         )
         out.append((item, result))
+        if on_progress is not None:
+            on_progress(index + 1, len(queue), item, result)
         if result.refused:
             nxt = follow_up(
                 item.id,

@@ -13,7 +13,7 @@ from dossier.brief import run_pack, write_brief
 from dossier.cards import STATUS_APPROVED
 from dossier.config import Config
 from dossier.contributions import CONTRIBUTIONS, contribution
-from dossier.extract import extract_corpus
+from dossier.extract import ExtractProgress, extract_corpus
 from dossier.interview import conduct
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
@@ -23,13 +23,21 @@ from dossier.prove import DEFAULT_ADAPTERS, run_prove
 from dossier.show import defend_cards, find_span, gap_report, write_packet
 from dossier.paths import (
     applications_dir,
+    chatgpt_export,
     cursor_projects_root,
+    employer_paths,
     evidence_db,
+    git_paths,
+    git_user,
     grok_blobs_dir,
+    pubs_collection,
+    slack_export,
     transcriptx_library,
     warehouse_db,
 )
+from dossier.sources.pubs import optional_pubs_hits
 from dossier.store import Corpus
+from dossier.ui import Progress, HUES, note, ok, paint, stage, trunc
 
 _YELLOW = "\033[33m"
 _RESET = "\033[0m"
@@ -45,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     p_ing = sub.add_parser("ingest", help="Load one adapter into the local corpus")
     p_ing.add_argument(
         "--adapter",
-        help="pubs, chatgpt, linkedin, applications, transcripts, slack, mbox, meetings",
+        help="pubs, chatgpt, linkedin, applications, transcripts, slack, mbox, meetings, employer, git",
     )
     p_ing.add_argument("path", nargs="?", type=Path, help="Override the default path")
 
@@ -98,8 +106,23 @@ def main(argv: list[str] | None = None) -> int:
         "defend",
         help="Store the carrying sentence on pending and approved cards",
     )
-    sub.add_parser("gaps", help="Show lens coverage and single-sourced approved cards")
+    sub.add_parser(
+        "gaps",
+        help="Show empty lenses, unspanned cards, and records still waiting on extract",
+    )
     sub.add_parser("packet", help="Write a markdown packet of spanned approved cards")
+    p_tailor = sub.add_parser(
+        "tailor",
+        help="Write CV or letter markdown from spanned approved cards",
+    )
+    p_tailor.add_argument("--posting", type=Path, required=True)
+    p_tailor.add_argument("--kind", choices=("cv", "letter"), default="cv")
+    p_tailor.add_argument(
+        "--arrange",
+        action="store_true",
+        help="Letter only: one completion that may only reuse the selected spans",
+    )
+    sub.add_parser("index", help="Embed passages into evidence.db with the local model")
 
     p_doc = sub.add_parser("doctor", help="Print local readiness without writing")
 
@@ -193,6 +216,10 @@ def main(argv: list[str] | None = None) -> int:
             return _gaps(corpus)
         if args.cmd == "packet":
             return _packet(cfg, corpus)
+        if args.cmd == "tailor":
+            return _tailor(args, cfg, corpus)
+        if args.cmd == "index":
+            return _index(cfg, corpus)
     finally:
         corpus.close()
     return 2
@@ -210,7 +237,7 @@ def _ingest(args: argparse.Namespace, corpus: Corpus) -> int:
             print(f"{item.name}: no path", file=sys.stderr)
             return 2
         targets = [(item, path)]
-        if item.name == "transcripts" and args.path is None:
+        if args.path is None:
             for extra in _extra_paths(item.name):
                 if item.source.detect(extra):
                     targets.append((item, extra))
@@ -233,11 +260,13 @@ def _ingest(args: argparse.Namespace, corpus: Corpus) -> int:
             print("nothing to ingest (no default source detected)", file=sys.stderr)
             return 1
     n_before = len(corpus.records())
+    stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
     for item, path in targets:
         print(f"ingest {item.name} from {path}")
         item.source.load(path, corpus)
     n_after = len(corpus.records())
     print(f"records: {n_after} (+{n_after - n_before})")
+    ok(f"ingest done · {n_after} records (+{n_after - n_before})")
     return 0
 
 
@@ -295,8 +324,8 @@ def _extract_cards(
         if llm_egress_is_remote(cfg):
             _note_egress(cfg)
         client = get_client(cfg)
-        ok, msg = client.check_config(cfg.llm_model)
-        if not ok:
+        ok_cfg, msg = client.check_config(cfg.llm_model)
+        if not ok_cfg:
             drafted = extract_corpus(
                 corpus,
                 NullLLMClient(),
@@ -304,6 +333,10 @@ def _extract_cards(
                 source=source,
                 limit=limit,
                 use_llm=False,
+                timeout_seconds=cfg.llm_timeout_seconds,
+                chunk_chars=cfg.extract_chunk_chars,
+                max_chunks=cfg.extract_max_chunks,
+                on_progress=_extract_progress(use_llm=False, model=cfg.llm_model),
             )
             _print_extract(drafted)
             print(msg, file=sys.stderr)
@@ -315,9 +348,66 @@ def _extract_cards(
         source=source,
         limit=limit,
         use_llm=use_llm,
+        timeout_seconds=cfg.llm_timeout_seconds,
+        chunk_chars=cfg.extract_chunk_chars,
+        max_chunks=cfg.extract_max_chunks,
+        on_progress=_extract_progress(use_llm=use_llm, model=cfg.llm_model),
     )
     _print_extract(cards)
     return 0
+
+
+def _extract_progress(*, use_llm: bool, model: str):
+    bar: Progress | None = None
+    drafted = 0
+    llm_n = 0
+    passed = 0
+    cards_n = 0
+
+    def on_progress(ev: ExtractProgress) -> None:
+        nonlocal bar, drafted, llm_n, passed, cards_n
+        if ev.phase == "start":
+            mode = f"llm={model}" if use_llm else "llm=off (drafts only)"
+            detail = f"{mode} · {ev.total} to draft"
+            if ev.skipped:
+                detail = f"{detail} · {ev.skipped} already open"
+            stage("extract", detail)
+            if ev.total == 0:
+                note("nothing new to extract")
+                return
+            bar = Progress(ev.total, label="extract")
+            return
+        if ev.phase == "llm":
+            if bar is not None:
+                bar.status(
+                    paint(
+                        f"model ← {ev.source}/{trunc(ev.title)}",
+                        HUES["yellow"],
+                    )
+                )
+            return
+        if ev.phase == "draft":
+            drafted += 1
+            cards_n += ev.cards_added
+        elif ev.phase == "llm_done":
+            llm_n += 1
+            cards_n += ev.cards_added
+        elif ev.phase == "pass":
+            passed += 1
+        if bar is not None and ev.phase in {"draft", "llm_done", "pass"}:
+            bar.tick(drafted=drafted, llm=llm_n, cards=cards_n)
+        if ev.phase == "done" and bar is not None:
+            bar.finish(drafted=drafted, llm=llm_n, cards=cards_n)
+            bits = [f"{cards_n} cards"]
+            if drafted:
+                bits.append(f"{drafted} drafted")
+            if llm_n:
+                bits.append(f"{llm_n} via model")
+            if passed:
+                bits.append(f"{passed} empty")
+            ok("extract · " + " · ".join(bits))
+
+    return on_progress
 
 
 def _print_extract(cards: list) -> None:
@@ -345,7 +435,10 @@ def _buffet(args: argparse.Namespace, corpus: Corpus) -> int:
 
 
 def _referees(args: argparse.Namespace) -> int:
-    from dossier.referees.rank import format_suggestion, rank
+    from dataclasses import replace
+
+    from dossier.referees.rank import format_suggestion, note_pubs_coauthors, rank
+    from dossier.tailor import CV_CAP, select_cards, speak_to
 
     try:
         posting = _posting_text(args)
@@ -368,15 +461,32 @@ def _referees(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    shortlist = rank(
-        posting,
-        people,
-        policy,
-        employer=args.employer,
-        include_students=args.students,
-    )
-    for index, suggestion in enumerate(shortlist, start=1):
-        print(format_suggestion(suggestion, index))
+    cfg = Config.from_env()
+    db = evidence_db(Path(cfg.data_dir))
+    corpus = Corpus(db) if db.is_file() else None
+    try:
+        if corpus is not None and cfg.referee_pubs:
+            blobs = [f"{rec.title}\n{rec.text}" for rec in corpus.records("pubs")]
+            people = note_pubs_coauthors(people, blobs)
+        picked = select_cards(corpus, posting, limit=CV_CAP)[0] if corpus is not None else []
+        shortlist = rank(
+            posting,
+            people,
+            policy,
+            employer=args.employer,
+            include_students=args.students,
+        )
+        for index, suggestion in enumerate(shortlist, start=1):
+            person = next((item for item in people if item.name == suggestion.name), None)
+            profile = ""
+            if person is not None:
+                profile = " ".join((person.job_title, person.keywords, person.company))
+            claims = speak_to(profile, picked)
+            shown = replace(suggestion, speaks=tuple(claims)) if claims else suggestion
+            print(format_suggestion(shown, index))
+    finally:
+        if corpus is not None:
+            corpus.close()
     return 0
 
 
@@ -449,6 +559,7 @@ def _ask(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
             return code
         client = budget.wrap(client)
     prior = corpus.recent_accepted_texts(3) if args.follow else None
+    extra = optional_pubs_hits(args.question, enabled=cfg.ask_pubs, limit=limit)
     result = conduct(
         corpus,
         args.question,
@@ -460,6 +571,8 @@ def _ask(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
         lens=args.lens,
         kind=args.kind,
         prior=prior,
+        embedder=_query_embedder(cfg, corpus),
+        extra_hits=extra or None,
     )
     corpus.add_answer(
         question=args.question,
@@ -496,9 +609,37 @@ def _brief(
     client, code = _client_for_mode(cfg, mode)
     if code is not None:
         return code
-    items = run_pack(corpus, questions, cfg, spent.wrap(client), mode=mode)
+    stage("brief", f"{len(questions)} questions · mode={mode}")
+    bar = Progress(len(questions), label="brief")
+    cited = 0
+    refused = 0
+
+    def on_progress(done: int, total: int, item, result) -> None:  # noqa: ANN001
+        nonlocal cited, refused
+        bar.set_total(total)
+        if result.refused:
+            refused += 1
+        else:
+            cited += 1
+        bar.tick(
+            cited=cited,
+            refused=refused,
+        )
+        bar.status(trunc(item.question, 40))
+
+    items = run_pack(
+        corpus,
+        questions,
+        cfg,
+        spent.wrap(client),
+        mode=mode,
+        on_progress=on_progress,
+        embedder=_query_embedder(cfg, corpus),
+    )
+    bar.finish(cited=cited, refused=refused)
     path = write_brief(items, Path(cfg.data_dir) / "briefs")
     print(path)
+    ok(f"brief · {cited} cited · {refused} refused")
     return 0
 
 
@@ -521,12 +662,15 @@ def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
     if not targets and not corpus.records():
         print("nothing to ingest (no default source detected)")
     n_before = len(corpus.records())
+    if targets:
+        stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
     for item, path in targets:
         print(f"ingest {item.name} from {path}")
         item.source.load(path, corpus)
     n_after = len(corpus.records())
     if targets:
         print(f"records: {n_after} (+{n_after - n_before})")
+        ok(f"ingest done · {n_after} records (+{n_after - n_before})")
     budget = CallBudget(cfg.llm_max_calls)
     _extract_cards(cfg, corpus, source=None, limit=None, strict_llm=False)
     code = _brief(args, cfg, corpus, budget=budget)
@@ -580,6 +724,59 @@ def _gaps(corpus: Corpus) -> int:
         print("empty: " + ", ".join(report.empty_lenses))
     for line in report.singles:
         print(f"single {line.lens}/{line.kind} {line.card.id}  {line.card.claim}")
+    for lens, hint in report.hints:
+        print(f"hint {lens}: {hint}")
+    for card in report.unspanned_approved:
+        print(f"unspanned {card.id}  {card.claim}")
+    for uri in report.extract_targets:
+        print(f"extract {uri}")
+    return 0
+
+
+def _tailor(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
+    from dossier.tailor import (
+        CV_CAP,
+        LETTER_CAP,
+        arrange_letter,
+        linkedin_subtitle,
+        render_draft,
+        select_cards,
+        write_draft,
+    )
+
+    try:
+        posting = args.posting.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if not posting.strip():
+        print("posting is empty", file=sys.stderr)
+        return 2
+    limit = LETTER_CAP if args.kind == "letter" else CV_CAP
+    picked, bare = select_cards(corpus, posting, limit=limit)
+    paragraphs = None
+    if args.arrange and args.kind == "letter" and picked and cfg.llm_enabled:
+        if llm_egress_is_remote(cfg):
+            _note_egress(cfg)
+        client = CallBudget(cfg.llm_max_calls).wrap(get_client(cfg))
+        spans = [item.card.extras["span"] for item in picked]
+        paragraphs = arrange_letter(spans, client, cfg.llm_model)
+        if paragraphs is None:
+            print("arrange refused; kept the selected spans", file=sys.stderr)
+    text = render_draft(
+        kind=args.kind,
+        posting=posting,
+        picked=picked,
+        bare=bare,
+        name=cfg.cv_name,
+        subtitle=linkedin_subtitle(corpus),
+        paragraphs=paragraphs,
+    )
+    path = write_draft(text, Path(cfg.data_dir) / "drafts")
+    print(path)
+    if not picked:
+        print("nothing to quote; approve and defend first", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -606,7 +803,24 @@ def _doctor(cfg: Config) -> int:
         print(f"ask.hops: {cfg.ask_hops}")
         print(f"ask.decompose: {cfg.ask_decompose}")
         print(f"ask.planner: {cfg.ask_planner}")
+        print(f"embed_model: {cfg.embed_model}")
+        print(f"vectors: {corpus.vector_count(cfg.embed_model)}")
+        print(f"ask.pubs: {'yes' if cfg.ask_pubs else 'no'}")
         print(f"pubs_url: {cfg.pubs_url}")
+        spanned = sum(
+            1
+            for card in corpus.cards(STATUS_APPROVED)
+            if (card.extras.get("span") or "").strip()
+        )
+        print(f"tailor: {spanned}")
+        if spanned == 0:
+            print("tailor: approve and defend before tailor will quote")
+        if collection := pubs_collection():
+            print(f"pubs_collection: {collection}")
+        print(f"employer_paths: {len(employer_paths())}")
+        print(f"git_paths: {len(git_paths())}")
+        if user := git_user():
+            print(f"git_user: {user}")
         for item in CONTRIBUTIONS:
             default = _default_path(item.name)
             seen = default is not None and item.source.detect(default)
@@ -663,8 +877,67 @@ def _detected_targets(
     return targets, skipped
 
 
+def _index(cfg: Config, corpus: Corpus) -> int:
+    from dossier.embed import EmbedError, OllamaEmbedder, index_passages
+    from dossier.llm.validate import LlmConfigError, validate_ollama_url
+
+    if not cfg.llm_enabled:
+        print("index: skipped (provider off)")
+        return 0
+    remote = False
+    try:
+        validate_ollama_url(cfg.llm_base_url, False)
+    except LlmConfigError:
+        if not cfg.llm_allow_remote:
+            print("index: skipped (remote embeddings are not allowed)")
+            return 0
+        remote = True
+    if remote:
+        _note_egress(cfg)
+    embedder = OllamaEmbedder(cfg.llm_base_url, cfg.llm_allow_remote, cfg.embed_model)
+    ready, msg = embedder.check()
+    if not ready:
+        print(f"index: skipped ({msg})")
+        return 0
+    try:
+        count = index_passages(corpus, embedder)
+    except (EmbedError, LlmConfigError) as exc:
+        print(f"index: skipped ({exc})")
+        return 0
+    print(f"vectors: {count}")
+    return 0
+
+
+def _query_embedder(cfg: Config, corpus: Corpus):
+    """Embed the question only when this model already has vectors."""
+    from dossier.embed import OllamaEmbedder
+    from dossier.llm.validate import LlmConfigError, validate_ollama_url
+
+    if not cfg.ask_embed or not cfg.llm_enabled:
+        return None
+    if corpus.vector_count(cfg.embed_model) < 1:
+        return None
+    try:
+        validate_ollama_url(cfg.llm_base_url, False)
+    except LlmConfigError:
+        if not cfg.llm_allow_remote:
+            return None
+        _note_egress(cfg)
+    return OllamaEmbedder(cfg.llm_base_url, cfg.llm_allow_remote, cfg.embed_model)
+
+
 def _default_path(name: str) -> Path | None:
-    if name in {"chatgpt", "linkedin", "slack", "mbox"}:
+    if name == "chatgpt":
+        return chatgpt_export() or warehouse_db()
+    if name == "slack":
+        return slack_export() or warehouse_db()
+    if name == "employer":
+        paths = employer_paths()
+        return paths[0] if paths else None
+    if name == "git":
+        paths = git_paths()
+        return paths[0] if paths else None
+    if name in {"linkedin", "mbox"}:
         return warehouse_db()
     if name == "applications":
         return applications_dir()
@@ -681,6 +954,10 @@ def _default_path(name: str) -> Path | None:
 def _extra_paths(name: str) -> list[Path]:
     if name == "transcripts":
         return [grok_blobs_dir()]
+    if name == "employer":
+        return list(employer_paths()[1:])
+    if name == "git":
+        return list(git_paths()[1:])
     return []
 
 

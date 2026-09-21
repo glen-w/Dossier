@@ -1,4 +1,4 @@
-"""Slack workspace export already in the data_dumps warehouse. Seek, do not re-ingest."""
+"""Slack from an export zip or the data_dumps warehouse. Seek, do not copy the tree."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from dossier.fetch.snippet import record_from_hit
 from dossier.seekers.quota import apply_quotas
 from dossier.seekers.hits import merge_hits
 from dossier.seekers.slack import hunt_slack, resolve_slack_user_ids
+from dossier.sources.slack_export import is_slack_export, load_slack_export
 from dossier.sources.warehouse import connect_readonly, has_table, resolve_warehouse
 from dossier.store import Corpus
 
@@ -26,6 +27,8 @@ class SlackSource:
     name = "slack"
 
     def detect(self, path: Path) -> bool:
+        if is_slack_export(path):
+            return True
         db = resolve_warehouse(path)
         if not db.is_file():
             return False
@@ -39,6 +42,9 @@ class SlackSource:
             conn.close()
 
     def load(self, path: Path, corpus: Corpus) -> None:
+        if is_slack_export(path):
+            load_slack_export(path, corpus)
+            return
         conn = connect_readonly(path)
         try:
             hits = apply_quotas(merge_hits(hunt_slack(conn)))

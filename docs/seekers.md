@@ -1,5 +1,8 @@
 # Seekers (mail, Slack, and meetings)
 
+Type: GUIDE
+Authority: How mail, Slack, and meetings are sought. Caps and refuse lines live in [status](status.md) and [roadmap](roadmap.md).
+
 Seek, then fetch a diverse snippet buffet, then let Ollama word claims. Do not scan or embed a full history.
 
 ```text
@@ -11,6 +14,8 @@ warehouse metadata (Slack text, Thunderbird Gloda)
                     → extract (drafts, then Ollama on snippets only) → human gate
                     → ask / brief (quote, hop, optional completion)
 ```
+
+A thin user skips the warehouse. Slack can start from an export zip, and mail from one exported folder. Quotas still apply.
 
 ## Lenses
 
@@ -24,9 +29,9 @@ IDDRI mail is research/teaching. REN21 Slack is GSR/GFR production. Quotas exist
 
 ## Slack
 
-Read `slack.*` in the data_dumps warehouse. Do not unzip the export.
+Glen: read `slack.*` in the data_dumps warehouse. Thin user: a Slack export zip or folder (`users.json` plus channel JSON), via `DOSSIER_SLACK_EXPORT` or the path you pass. Quotas apply to both. The export is not copied into git.
 
-Identity: `U05E73N5733` and `UUDS0NJ9W`, or `DOSSIER_SLACK_USER_IDS`. Hunts stay on Glen-touched rows: file posts, long messages, hot threads, file-conversations, files that mention him or sit in a thread he replied to, samples from GSR/research/events channels.
+Identity: `U05E73N5733` and `UUDS0NJ9W`, or `DOSSIER_SLACK_USER_IDS` (ids or a display name). Warehouse hunts stay on Glen-touched rows: file posts, long messages, hot threads, file-conversations, files that mention him or sit in a thread he replied to, samples from GSR/research/events channels. The export path keeps messages from those ids.
 
 ## Mail
 

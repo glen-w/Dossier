@@ -1,9 +1,10 @@
-"""ChatGPT messages from the data_dumps warehouse. Read-only. No zip loader."""
+"""ChatGPT messages from an export or the data_dumps warehouse. Read-only."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from dossier.sources.chatgpt_export import is_chatgpt_export, load_chatgpt_export
 from dossier.sources.warehouse import connect_readonly, has_table, resolve_warehouse
 from dossier.store import Corpus, Record
 from dossier.util import record_id
@@ -16,6 +17,8 @@ class ChatGPTSource:
     name = "chatgpt"
 
     def detect(self, path: Path) -> bool:
+        if is_chatgpt_export(path):
+            return True
         db = resolve_warehouse(path)
         if not db.is_file():
             return False
@@ -29,6 +32,9 @@ class ChatGPTSource:
             conn.close()
 
     def load(self, path: Path, corpus: Corpus) -> None:
+        if is_chatgpt_export(path):
+            load_chatgpt_export(path, corpus)
+            return
         conn = connect_readonly(path)
         try:
             join_title = has_table(conn, "chatgpt.conversations")

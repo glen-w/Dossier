@@ -11,6 +11,7 @@ from dossier.cards import (
     content_tokens,
     evidence_carries,
     header_values,
+    sentences,
 )
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
 from dossier.store import Corpus, Record
@@ -29,6 +30,9 @@ Records:
 """
 
 MAX_HITS = 8
+COSINE_NEIGHBOR = 0.34
+COSINE_QUOTE = 0.82
+_RRF_K = 60
 ASK_MODES = ("exact", "auto", "rich")
 _TRIGGERS: dict[str, tuple[str, ...]] = {
     "delivered": ("report", "paper", "chapter", "workshop"),
@@ -47,6 +51,7 @@ class Hit:
     title: str
     text: str
     score: int
+    cosine: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -138,6 +143,8 @@ def collect_hits(
     lens: str | None = None,
     kind: str | None = None,
     tokens: list[str] | None = None,
+    query_vec: list[float] | None = None,
+    embed_model: str = "",
 ) -> list[Hit]:
     """Rank records, or their passages when that knob is on."""
     lexicon = getattr(cfg, "lexicon", None)
@@ -146,12 +153,20 @@ def collect_hits(
     passages_on = bool(getattr(cfg, "ask_passages", True))
     fts_on = bool(getattr(cfg, "ask_fts", True))
     if not passages_on:
-        return retrieve(
+        lexical = retrieve(
             records,
             question,
             limit=limit,
             tokens=used,
             fts_rank=_fts_rank(corpus.search_fts, match_query(used), limit, fts_on),
+        )
+        return _with_vectors(
+            corpus,
+            lexical,
+            records,
+            query_vec=query_vec if getattr(cfg, "ask_embed", True) else None,
+            embed_model=embed_model,
+            limit=min(limit, MAX_HITS),
         )
     by_uri = {rec.uri: rec for rec in records}
     rows = [(uri, text) for uri, text in corpus.passage_rows() if uri in by_uri]
@@ -184,7 +199,14 @@ def collect_hits(
             continue
         seen.add(hit.uri)
         unique.append(hit)
-    return unique
+    return _with_vectors(
+        corpus,
+        unique,
+        records,
+        query_vec=query_vec if getattr(cfg, "ask_embed", True) else None,
+        embed_model=embed_model,
+        limit=min(limit, MAX_HITS),
+    )
 
 
 def approved_answer(corpus: Corpus, question: str) -> Answer | None:
@@ -376,6 +398,81 @@ def _needs_many(hits: list[Hit]) -> bool:
 def _exact(question: str, hits: list[Hit]) -> Answer:
     top = hits[0]
     span = carrying_span(question, top.text)
+    if not span and top.cosine >= COSINE_QUOTE:
+        span = _paraphrase_span(top.text)
     if not span:
         return Answer(text="", citations=[], refused=True, reason="no direct span")
     return Answer(text=span[:240], citations=[top.uri], refused=False, reason="")
+
+
+def _paraphrase_span(text: str) -> str:
+    """Nearest-neighbor quote. Used only when cosine already cleared the bar."""
+    for sentence in sentences(text):
+        if content_tokens(sentence):
+            return sentence
+    return ""
+
+
+def _with_vectors(
+    corpus: Corpus,
+    lexical: list[Hit],
+    records: list[Record],
+    *,
+    query_vec: list[float] | None,
+    embed_model: str,
+    limit: int,
+) -> list[Hit]:
+    """Full text first. Vectors fill an empty or thin set. They do not replace a rich one."""
+    if query_vec is None or not embed_model or len(lexical) >= 2 or limit < 1:
+        return lexical
+    if corpus.vector_count(embed_model) < 1:
+        return lexical
+    neighbors = _vector_hits(corpus, query_vec, embed_model, records, limit)
+    if not neighbors:
+        return lexical
+    if not lexical:
+        return neighbors[:limit]
+    return _fuse(lexical, neighbors, limit)
+
+
+def _vector_hits(
+    corpus: Corpus,
+    vector: list[float],
+    model: str,
+    records: list[Record],
+    limit: int,
+) -> list[Hit]:
+    by_uri = {rec.uri: rec for rec in records}
+    found = corpus.nearest_passages(vector, model, limit=max(limit * 5, 30))
+    hits: list[Hit] = []
+    for uri, text, score in found:
+        if uri not in by_uri or score < COSINE_NEIGHBOR:
+            continue
+        rec = by_uri[uri]
+        hits.append(
+            Hit(
+                uri=uri,
+                title=rec.title,
+                text=text,
+                score=max(1, int(score * 100)),
+                cosine=score,
+            )
+        )
+    return hits
+
+
+def _fuse(lexical: list[Hit], vector: list[Hit], limit: int) -> list[Hit]:
+    scores: dict[str, float] = {}
+    best: dict[str, Hit] = {}
+    for rank, hit in enumerate(lexical):
+        scores[hit.uri] = 1.0 / (_RRF_K + rank + 1)
+        best[hit.uri] = hit
+    for rank, hit in enumerate(vector):
+        scores[hit.uri] = scores.get(hit.uri, 0.0) + 1.0 / (_RRF_K + rank + 1)
+        prev = best.get(hit.uri)
+        if prev is None:
+            best[hit.uri] = hit
+        elif hit.cosine > prev.cosine:
+            best[hit.uri] = replace(prev, cosine=hit.cosine, text=hit.text)
+    ordered = sorted(best, key=lambda uri: (-scores[uri], -best[uri].score, uri))
+    return [best[uri] for uri in ordered[:limit]]

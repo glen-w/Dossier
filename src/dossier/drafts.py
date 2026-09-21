@@ -14,6 +14,7 @@ from dossier.cards import (
 )
 from dossier.store import Corpus, Record
 
+_PLAIN_SOURCES = frozenset({"employer", "git", "chatgpt"})
 _LINKEDIN_TABLES = frozenset(
     {
         "linkedin.positions",
@@ -59,6 +60,21 @@ def _proposal(record: Record) -> ProposedClaim | None:
     headers = _headers(record.text)
     if "lens" in headers and "kind" in headers:
         return _seeker(record, headers)
+    if record.source in _PLAIN_SOURCES:
+        return _plain(record)
+    return None
+
+
+def _plain(record: Record) -> ProposedClaim | None:
+    """A sentence already in an export, employer file, or commit subject."""
+    if "Binary body not ingested" in record.text:
+        return None
+    sentence = _first_body(record.text)
+    if sentence and evidence_carries(sentence, record.text):
+        return ProposedClaim(claim=sentence, citations=[record.uri])
+    title = record.title.strip()
+    if title and evidence_carries(title, record.text):
+        return ProposedClaim(claim=title, citations=[record.uri])
     return None
 
 

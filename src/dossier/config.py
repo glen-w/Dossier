@@ -33,16 +33,24 @@ class Config:
     ask_limit: int = 5
     ask_fts: bool = True
     extract_llm: bool = True
+    extract_chunk_chars: int = 4000
+    extract_max_chunks: int = 4
     run_adapters: tuple[str, ...] = ()
     run_pack: str = "career"
     run_posting: str = ""
     lexicon: tuple[str, ...] | None = None
     llm_max_calls: int = 6
+    llm_timeout_seconds: float = 300.0
     ask_cards_first: bool = True
     ask_passages: bool = True
     ask_hops: int = 1
     ask_decompose: str = "auto"
     ask_planner: str = "off"
+    embed_model: str = "nomic-embed-text"
+    ask_embed: bool = True
+    ask_pubs: bool = False
+    cv_name: str = ""
+    referee_pubs: bool = True
 
     @classmethod
     def from_env(cls) -> Config:
@@ -52,6 +60,7 @@ class Config:
         ask = file_cfg.get("ask") if isinstance(file_cfg.get("ask"), dict) else {}
         extract = file_cfg.get("extract") if isinstance(file_cfg.get("extract"), dict) else {}
         run = file_cfg.get("run") if isinstance(file_cfg.get("run"), dict) else {}
+        tailor = file_cfg.get("tailor") if isinstance(file_cfg.get("tailor"), dict) else {}
 
         provider = _env_str(
             "DOSSIER_LLM_PROVIDER",
@@ -95,6 +104,20 @@ class Config:
             ask_limit=_env_int("DOSSIER_ASK_LIMIT", _as_int(ask.get("limit"), 5)),
             ask_fts=_env_bool("DOSSIER_ASK_FTS", bool(ask.get("fts", True))),
             extract_llm=_env_bool("DOSSIER_EXTRACT_LLM", bool(extract.get("llm", True))),
+            extract_chunk_chars=max(
+                500,
+                _env_int(
+                    "DOSSIER_EXTRACT_CHUNK_CHARS",
+                    _as_int(extract.get("chunk_chars"), 4000),
+                ),
+            ),
+            extract_max_chunks=max(
+                1,
+                _env_int(
+                    "DOSSIER_EXTRACT_MAX_CHUNKS",
+                    _as_int(extract.get("max_chunks"), 4),
+                ),
+            ),
             run_adapters=adapters,
             run_pack=_env_str("DOSSIER_RUN_PACK", str(run.get("pack") or "career")).strip()
             or "career",
@@ -106,6 +129,13 @@ class Config:
             llm_max_calls=max(
                 0,
                 _env_int("DOSSIER_LLM_MAX_CALLS", _as_int(llm.get("max_calls"), 6)),
+            ),
+            llm_timeout_seconds=max(
+                30.0,
+                _env_float(
+                    "DOSSIER_LLM_TIMEOUT",
+                    _as_float(llm.get("timeout"), 300.0),
+                ),
             ),
             ask_cards_first=_env_bool(
                 "DOSSIER_ASK_CARDS_FIRST",
@@ -126,6 +156,15 @@ class Config:
                 PLANNER_MODES,
                 "off",
             ),
+            embed_model=_env_str(
+                "DOSSIER_EMBED_MODEL",
+                str(llm.get("embed_model") or "nomic-embed-text"),
+            ).strip()
+            or "nomic-embed-text",
+            ask_embed=_env_bool("DOSSIER_ASK_EMBED", bool(ask.get("embed", True))),
+            ask_pubs=_env_bool("DOSSIER_ASK_PUBS", bool(ask.get("pubs", False))),
+            cv_name=_env_str("DOSSIER_CV_NAME", str(tailor.get("name") or "")).strip(),
+            referee_pubs=_env_bool("DOSSIER_REFEREE_PUBS", True),
         )
 
 
@@ -171,6 +210,15 @@ def _as_int(value: object, default: int) -> int:
         return default
 
 
+def _as_float(value: object, default: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
+
+
 def _env_str(name: str, default: str) -> str:
     if name not in os.environ:
         return default
@@ -187,3 +235,9 @@ def _env_int(name: str, default: int) -> int:
     if name not in os.environ or not os.environ.get(name, "").strip():
         return default
     return _as_int(os.environ.get(name), default)
+
+
+def _env_float(name: str, default: float) -> float:
+    if name not in os.environ or not os.environ.get(name, "").strip():
+        return default
+    return _as_float(os.environ.get(name), default)

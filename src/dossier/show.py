@@ -39,6 +39,17 @@ class GapReport:
     kind_counts: dict[str, int]
     empty_lenses: tuple[str, ...]
     singles: tuple[GapLine, ...]
+    hints: tuple[tuple[str, str], ...] = ()
+    unspanned_approved: tuple[ClaimCard, ...] = ()
+    extract_targets: tuple[str, ...] = ()
+
+
+_LENS_HINTS = {
+    "delivered": "ingest employer, git, or chatgpt",
+    "skills": "ingest meetings or slack",
+    "contributions": "ingest git, meetings, or pubs",
+}
+_GAP_CAP = 12
 
 
 def find_span(
@@ -113,11 +124,27 @@ def gap_report(corpus: Corpus) -> GapReport:
         for (lens, kind), cards in sorted(groups.items())
         if len(cards) == 1
     )
+    unspanned = tuple(
+        card
+        for card in corpus.cards(STATUS_APPROVED)
+        if not (card.extras.get("span") or "").strip()
+    )[:_GAP_CAP]
+    targets: list[str] = []
+    for rec in corpus.records():
+        if corpus.record_has_open_card(rec.id):
+            continue
+        targets.append(rec.uri)
+        if len(targets) >= _GAP_CAP:
+            break
+    hints = tuple((name, _LENS_HINTS[name]) for name in empty if name in _LENS_HINTS)
     return GapReport(
         lens_counts=lens_counts,
         kind_counts=kind_counts,
         empty_lenses=empty,
         singles=singles,
+        hints=hints,
+        unspanned_approved=unspanned,
+        extract_targets=tuple(targets),
     )
 
 

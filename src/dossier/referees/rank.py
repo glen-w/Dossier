@@ -52,6 +52,24 @@ class Suggestion:
     why: str
     warning: str
     score: int
+    speaks: tuple[str, ...] = ()
+
+
+def note_pubs_coauthors(people: list[Person], blobs: list[str]) -> list[Person]:
+    """Same coauthor point when the name is already on an ingested pubs record."""
+    from dataclasses import replace
+
+    haystack = "\n".join(blobs).casefold()
+    if not haystack.strip():
+        return list(people)
+    out: list[Person] = []
+    for person in people:
+        name = person.name.casefold().strip()
+        if person.co_author_with_glen > 0 or not name or name not in haystack:
+            out.append(person)
+            continue
+        out.append(replace(person, co_author_with_glen=1))
+    return out
 
 
 def rank(
@@ -82,6 +100,8 @@ def format_suggestion(suggestion: Suggestion, index: int) -> str:
     if suggestion.company:
         head += f" — {suggestion.company}"
     line = f"{head} — {suggestion.why}"
+    if suggestion.speaks:
+        line += " — could speak to: " + "; ".join(suggestion.speaks)
     if suggestion.warning:
         line += f" — warning: {suggestion.warning}"
     return f"{line} — {CONFIRM}"

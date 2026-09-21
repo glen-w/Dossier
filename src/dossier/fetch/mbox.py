@@ -33,6 +33,20 @@ _SIDECAR_NAMES = {
 }
 
 
+DEFAULT_MAX_FILES = 40
+
+
+def mbox_max_files() -> int:
+    """Cap on mbox files opened in one exported folder. Not a tree walk."""
+    raw = os.environ.get("DOSSIER_MBOX_MAX_FILES", "").strip()
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    return DEFAULT_MAX_FILES
+
+
 def mbox_max_bytes() -> int:
     raw = os.environ.get("DOSSIER_MBOX_MAX_BYTES", "").strip()
     if raw:

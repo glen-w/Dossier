@@ -190,6 +190,8 @@ def _run_prove_body(
                 return code
             client = budget.wrap(live)
 
+        from dossier.cli import _extract_progress
+
         cards = extract_corpus(
             corpus,
             client,  # type: ignore[arg-type]
@@ -197,6 +199,13 @@ def _run_prove_body(
             source=None,
             limit=None,
             use_llm=bool(use_llm and cfg.extract_llm),
+            timeout_seconds=cfg.llm_timeout_seconds,
+            chunk_chars=cfg.extract_chunk_chars,
+            max_chunks=cfg.extract_max_chunks,
+            on_progress=_extract_progress(
+                use_llm=bool(use_llm and cfg.extract_llm),
+                model=cfg.llm_model,
+            ),
         )
         print(f"extract: {len(cards)} cards")
 

@@ -18,13 +18,18 @@ from pathlib import Path
 
 
 def main() -> int:
-    raw = os.environ.get("ZOTERO_DB", "").strip()
-    db = Path(raw).expanduser() if raw else Path.home() / "Zotero" / "zotero.sqlite"
+    try:
+        from dossier.paths import zotero_db
+
+        db = zotero_db()
+    except ImportError:
+        raw = os.environ.get("ZOTERO_DB", "").strip()
+        db = Path(raw).expanduser() if raw else Path.home() / "Zotero" / "zotero.sqlite"
     if not db.is_file():
         print(f"no Zotero database at {db}", file=sys.stderr)
         print("set ZOTERO_DB to the zotero.sqlite path", file=sys.stderr)
         return 1
-    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"file:{db}?mode=ro&immutable=1", uri=True)
     try:
         rows = conn.execute(
             """

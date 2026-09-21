@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Protocol
 
 import httpx
 
-from dossier.paths import pubs_url
+from dossier.paths import pubs_seed, pubs_top_k, pubs_url
 from dossier.store import Corpus, Record
 from dossier.util import record_id
 
@@ -18,6 +17,8 @@ class PubsRetriever(Protocol):
     def ping(self) -> bool: ...
 
     def records(self) -> list[Record]: ...
+
+    def search(self, query: str, *, top_k: int = 5) -> list[Record]: ...
 
 
 class StubPubsRetriever:
@@ -31,6 +32,22 @@ class StubPubsRetriever:
 
     def records(self) -> list[Record]:
         return list(self._items)
+
+    def search(self, query: str, *, top_k: int = 5) -> list[Record]:
+        from dossier.cards import content_token_set, content_tokens
+
+        cap = max(1, top_k)
+        tokens = content_tokens(query)
+        if not tokens:
+            return list(self._items)[:cap]
+        out: list[Record] = []
+        for rec in self._items:
+            blob = content_token_set(f"{rec.title}\n{rec.text}")
+            if any(token in blob for token in tokens):
+                out.append(rec)
+            if len(out) >= cap:
+                break
+        return out
 
 
 class HttpPubsRetriever:
@@ -56,17 +73,17 @@ class HttpPubsRetriever:
         return False
 
     def records(self) -> list[Record]:
-        seed = os.environ.get("DOSSIER_PUBS_SEED", "publications").strip() or "publications"
-        raw_k = os.environ.get("DOSSIER_PUBS_TOP_K", "50").strip() or "50"
-        try:
-            top_k = max(1, int(raw_k))
-        except ValueError:
-            top_k = 50
+        return self.search(pubs_seed(), top_k=pubs_top_k())
+
+    def search(self, query: str, *, top_k: int = 5) -> list[Record]:
+        text = query.strip()
+        if not text:
+            return []
         try:
             with httpx.Client(timeout=30.0) as client:
                 resp = client.post(
                     f"{self.url}/search",
-                    json={"query": seed, "top_k": top_k},
+                    json={"query": text, "top_k": max(1, top_k)},
                 )
             if resp.status_code >= 400:
                 return []
@@ -119,6 +136,20 @@ class PubsSource:
 
     def tables(self) -> list[str]:
         return ["pubs.records"]
+
+
+def optional_pubs_hits(question: str, *, enabled: bool, limit: int) -> list:
+    """Hits for one ask. Nothing is written to the corpus."""
+    from dossier.ask import Hit
+
+    if not enabled or not question.strip():
+        return []
+    rows = HttpPubsRetriever().search(question, top_k=max(1, min(int(limit), 8)))
+    return [
+        Hit(uri=rec.uri, title=rec.title, text=rec.text, score=1)
+        for rec in rows
+        if rec.uri and rec.text.strip()
+    ]
 
 
 def _is_pubs_fixture(path: Path) -> bool:
