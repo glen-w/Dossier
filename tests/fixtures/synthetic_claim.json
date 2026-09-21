@@ -1,0 +1,5 @@
+{
+  "id": "fixture-1",
+  "claim": "Synthetic claim for tests. Not a real job.",
+  "citations": ["fixture://note-1"]
+}

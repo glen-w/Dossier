@@ -1,0 +1,22 @@
+# Corpus and secrets stay off git
+.env
+.env.*
+private/
+data/
+warehouse/
+*.duckdb
+*.lance
+lancedb/
+evidence.db
+*.mbox
+*.pdf
+data_dumps_raw/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist/
+build/

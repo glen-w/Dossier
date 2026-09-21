@@ -1,0 +1,23 @@
+[project]
+name = "dossier"
+version = "0.0.0"
+description = "Local-first work-evidence locker and RAG"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Glen" }]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dossier"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
