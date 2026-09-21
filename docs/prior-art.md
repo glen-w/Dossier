@@ -6,7 +6,7 @@ Take the rule that fits. Leave the product that does not.
 
 **vibe-resume** ([easyvibecoding/vibe-resume](https://github.com/easyvibecoding/vibe-resume)). Extractors for Cursor transcripts and ChatGPT exports, then a résumé. Useful shapes for those two sources. The résumé step is not this repo.
 
-**Recallr** ([Flowdesktech/recallr](https://github.com/flowdesktech/recallr), MIT). mbox and Slack exports into SQLite hybrid search, plus MCP. A candidate search backend for ask-the-corpus. Not claim cards.
+**Recallr** ([Flowdesktech/recallr](https://github.com/flowdesktech/recallr), MIT). mbox and Slack exports into SQLite hybrid search, plus MCP. Dossier’s ask path is local FTS and passages inside `evidence.db`, not Recallr. Hybrid or embedding search remains a later backend candidate. Not claim cards.
 
 **LEANN** ([yichuan-w/LEANN](https://github.com/yichuan-w/LEANN)). Laptop RAG over files, mail, and ChatGPT exports. Retrieval, not a buffet of approved claims.
 

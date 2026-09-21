@@ -4,7 +4,7 @@ Dossier is a local-first locker for professional evidence. It turns records you 
 
 Exports, mail, and PDFs stay on your machine. They are not part of this git tree.
 
-Ask-the-corpus chat — “what did I actually do?” — is `dossier ask`. It answers from records already in the locker and prints the citation URIs. How far that goes is under [Status](docs/status.md).
+Ask-the-corpus — “what did I actually do?” — is `dossier ask`. It answers from records already in the locker and prints the citation URIs. Version **0.4** adds passages, approved-card answers, one seeker hop, compound split, and a model call budget. How far that goes is under [Status](docs/status.md). What comes next is under [Roadmap](docs/roadmap.md).
 
 ## How a card gets made
 
@@ -12,8 +12,8 @@ Ask-the-corpus chat — “what did I actually do?” — is `dossier ask`. It a
 2. **Extract** drafts a card when the record already carries the sentence, then asks a local model for the rest.
 3. Empty citations, missing records, or text that does not support the sentence are stored as **refused**.
 4. **Buffet** lists the cards. **Approve** is the human gate. Nothing is copied into a CV by the tool.
-5. **Ask** quotes a matching span when that span carries the question. Otherwise one local completion, still cited or refused.
-6. **Brief** and **run** answer a fixed question pack into `data/briefs/`. They do not approve cards.
+5. **Ask** quotes a matching span when that span carries the question. An approved claim can answer first. Otherwise one local completion, still cited or refused.
+6. **Brief** and **run** answer a fixed question pack into `data/briefs/`. They do not approve cards. **Doctor** prints whether this interpreter has full text and which adapters detect.
 
 Adapters are an explicit list in `src/dossier/contributions.py`. There is no plugin directory and no entry-point scan. Turn on only the sources you have.
 
@@ -41,7 +41,9 @@ uv run dossier approve <card-id>
 uv run dossier ask "what did I write about coastal governance?"
 uv run dossier ask --mode exact --source pubs "coastal governance"
 uv run dossier brief
+uv run dossier brief --posting ./posting.txt
 uv run dossier run
+uv run dossier doctor
 uv run dossier referees --posting ./posting.txt --employer "Hiring Org"
 ```
 
@@ -53,9 +55,16 @@ uv run dossier referees --posting ./posting.txt --employer "Hiring Org"
 | --- | --- |
 | `DOSSIER_LLM_MODEL` | Ollama tag (default `qwen3.8:latest`) |
 | `DOSSIER_ASK_MODE` | `exact`, `auto` (default), or `rich` |
-| `DOSSIER_ASK_FTS` | Use SQLite full text (`true` by default) |
+| `DOSSIER_ASK_FTS` | Use SQLite full text on title, text, and passages (`true` by default). Whole-word overlap is used when this Python has no FTS5 module |
+| `DOSSIER_ASK_CARDS_FIRST` | Prefer an approved claim that carries the question (`true` by default) |
+| `DOSSIER_ASK_PASSAGES` | Search passage rows and cite the parent record (`true` by default) |
+| `DOSSIER_ASK_HOPS` | After a miss, hop once on Lens/Kind (default `1`) |
+| `DOSSIER_ASK_DECOMPOSE` | Split compound questions: `off`, `auto` (default), or `on` |
+| `DOSSIER_ASK_PLANNER` | `off` (default) or `rich` to spend one call on sub-questions |
+| `DOSSIER_LLM_MAX_CALLS` | Cap completions per process (default `6`) |
 | `DOSSIER_EXTRACT_LLM` | Ask the model after drafts (`true` by default) |
 | `DOSSIER_RUN_PACK` | Question pack for `brief` and `run` (default `career`) |
+| `DOSSIER_RUN_POSTING` | Local posting path for the posting pack |
 | `DOSSIER_RUN_ADAPTERS` | Comma-separated adapter allowlist for `run` |
 | `DOSSIER_LLM_BASE_URL` | Ollama root |
 | `DOSSIER_LLM_ALLOW_REMOTE` | Allow a non-loopback Ollama URL |
@@ -81,6 +90,7 @@ Work stays on loopback unless you opt into a remote model. The egress notice is 
 ## Docs
 
 - [Status](docs/status.md) — what is implemented, stubbed, and unbuilt
+- [Roadmap](docs/roadmap.md) — now / next / later, and hard boundaries
 - [Architecture](docs/architecture.md) — pipeline and adapter protocol
 - [Seekers](docs/seekers.md) — mail and Slack: seek, quotas, targeted fetch
 - [Prior art](docs/prior-art.md) — what this borrows

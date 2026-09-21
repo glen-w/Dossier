@@ -67,6 +67,16 @@ _EVENT_KINDS = frozenset(
 _DOC_EXT = re.compile(r"\.(pdf|docx?|pptx?|xlsx?|csv)$", re.I)
 
 
+def kinds_mentioned(text: str) -> tuple[str, ...]:
+    """Kinds whose names or patterns appear in a local posting. No model."""
+    blob = text.lower()
+    found: list[str] = []
+    for kind, pattern in _KIND_PATTERNS:
+        if pattern.search(blob) and kind not in found:
+            found.append(kind)
+    return tuple(found)
+
+
 def infer_kind(
     *,
     folder: str = "",

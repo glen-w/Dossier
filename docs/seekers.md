@@ -8,7 +8,8 @@ warehouse metadata (Slack text, Thunderbird Gloda)
         → diversity quotas (lens × kind × year × source)
             → targeted fetch (Slack rows + thread; one small mbox message)
                 → corpus records
-                    → extract (Ollama on snippets only) → human gate
+                    → extract (drafts, then Ollama on snippets only) → human gate
+                    → ask / brief (quote, hop, optional completion)
 ```
 
 ## Lenses

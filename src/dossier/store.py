@@ -34,6 +34,7 @@ class Corpus:
         self._conn = sqlite3.connect(self.db_path)
         self._conn.row_factory = sqlite3.Row
         self.fts_ok = False
+        self.passages_fts_ok = False
         self._init()
 
     def close(self) -> None:
@@ -91,6 +92,7 @@ class Corpus:
         )
         self._conn.commit()
         self._ensure_fts()
+        self._ensure_passages()
 
     def upsert_record(self, record: Record) -> None:
         self._conn.execute(
@@ -114,6 +116,7 @@ class Corpus:
             ),
         )
         self._index_record(record)
+        self._replace_passages(record)
         self._conn.commit()
 
     def get_record(self, uri: str) -> Record | None:
@@ -296,12 +299,20 @@ class Corpus:
         return [str(row["text"]) for row in reversed(rows)]
 
     def _ensure_fts(self) -> None:
+        existing = self._conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'records_fts'"
+        ).fetchone()
+        if existing is not None:
+            sql = (existing[0] or "").lower()
+            # Title and text only. An older index also stored source and a searchable URI.
+            if "source" in sql or "unindexed" not in sql:
+                self._conn.execute("DROP TABLE records_fts")
+                self._conn.commit()
         try:
             self._conn.execute(
                 """
                 CREATE VIRTUAL TABLE IF NOT EXISTS records_fts USING fts5(
-                    uri,
-                    source,
+                    uri UNINDEXED,
                     title,
                     text,
                     tokenize='unicode61'
@@ -318,22 +329,121 @@ class Corpus:
             return
         self._conn.execute("DELETE FROM records_fts")
         rows = self._conn.execute(
-            "SELECT uri, source, title, text FROM records"
+            "SELECT uri, title, text FROM records"
         ).fetchall()
         for row in rows:
             self._conn.execute(
-                "INSERT INTO records_fts (uri, source, title, text) VALUES (?, ?, ?, ?)",
-                (row["uri"], row["source"], row["title"], row["text"]),
+                "INSERT INTO records_fts (uri, title, text) VALUES (?, ?, ?)",
+                (row["uri"], row["title"], row["text"]),
             )
         self._conn.commit()
+
+    def search_passages(self, match: str, *, limit: int) -> list[tuple[str, float]] | None:
+        """Best (record uri, rank) per record. None when FTS5 cannot run."""
+        if not self.passages_fts_ok or not match.strip() or limit < 1:
+            return None if not self.passages_fts_ok else []
+        try:
+            rows = self._conn.execute(
+                """
+                SELECT record_uri, rank FROM passages_fts
+                WHERE passages_fts MATCH ?
+                ORDER BY rank
+                LIMIT ?
+                """,
+                (match, limit),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return None
+        best: dict[str, float] = {}
+        for row in rows:
+            uri = str(row["record_uri"])
+            rank = float(row["rank"])
+            if uri not in best or rank < best[uri]:
+                best[uri] = rank
+        return sorted(best.items(), key=lambda item: (item[1], item[0]))
+
+    def passage_rows(self) -> list[tuple[str, str]]:
+        rows = self._conn.execute(
+            "SELECT record_uri, text FROM passages ORDER BY record_uri, ordinal"
+        ).fetchall()
+        return [(str(row["record_uri"]), str(row["text"])) for row in rows]
+
+    def _ensure_passages(self) -> None:
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS passages (
+                record_uri TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                PRIMARY KEY (record_uri, ordinal)
+            )
+            """
+        )
+        self.passages_fts_ok = False
+        if self.fts_ok:
+            try:
+                self._conn.execute(
+                    """
+                    CREATE VIRTUAL TABLE IF NOT EXISTS passages_fts USING fts5(
+                        record_uri UNINDEXED,
+                        ordinal UNINDEXED,
+                        text,
+                        tokenize='unicode61'
+                    )
+                    """
+                )
+                self.passages_fts_ok = True
+            except sqlite3.OperationalError:
+                self.passages_fts_ok = False
+        self._conn.commit()
+        n_rec = self._conn.execute("SELECT count(*) FROM records").fetchone()[0]
+        n_uri = self._conn.execute(
+            "SELECT count(DISTINCT record_uri) FROM passages"
+        ).fetchone()[0]
+        if n_rec != n_uri:
+            for record in self.records():
+                self._replace_passages(record)
+            self._conn.commit()
+
+    def _replace_passages(self, record: Record) -> None:
+        from dossier.passages import split_passages
+
+        chunks = split_passages(record.text)
+        self._conn.execute("DELETE FROM passages WHERE record_uri = ?", (record.uri,))
+        if self.passages_fts_ok:
+            self._delete_passage_fts(record.uri)
+        for ordinal, chunk in enumerate(chunks):
+            self._conn.execute(
+                "INSERT INTO passages (record_uri, ordinal, text) VALUES (?, ?, ?)",
+                (record.uri, ordinal, chunk),
+            )
+            if self.passages_fts_ok:
+                self._conn.execute(
+                    """
+                    INSERT INTO passages_fts (record_uri, ordinal, text)
+                    VALUES (?, ?, ?)
+                    """,
+                    (record.uri, ordinal, chunk),
+                )
+
+    def _delete_passage_fts(self, uri: str) -> None:
+        rows = self._conn.execute(
+            "SELECT rowid, record_uri FROM passages_fts"
+        ).fetchall()
+        for row in rows:
+            if str(row["record_uri"]) == uri:
+                self._conn.execute(
+                    "DELETE FROM passages_fts WHERE rowid = ?",
+                    (row["rowid"],),
+                )
 
     def _index_record(self, record: Record) -> None:
         if not getattr(self, "fts_ok", False):
             return
         self._conn.execute("DELETE FROM records_fts WHERE uri = ?", (record.uri,))
         self._conn.execute(
-            "INSERT INTO records_fts (uri, source, title, text) VALUES (?, ?, ?, ?)",
-            (record.uri, record.source, record.title, record.text),
+            "INSERT INTO records_fts (uri, title, text) VALUES (?, ?, ?)",
+            (record.uri, record.title, record.text),
         )
 
 

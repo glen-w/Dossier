@@ -7,12 +7,18 @@ provider = "ollama" # ollama | litellm | off
 model = "qwen3.8:latest"
 base_url = "http://127.0.0.1:11434"
 allow_remote = false
+max_calls = 6
 # api_base = "https://example.invalid/v1"
 
 [ask]
 mode = "auto" # exact | auto | rich
 limit = 5
 fts = true
+cards_first = true
+passages = true
+hops = 1
+decompose = "auto" # off | auto | on
+planner = "off" # off | rich
 
 [extract]
 llm = true
@@ -20,6 +26,7 @@ llm = true
 [run]
 adapters = [] # empty: every detected adapter
 pack = "career"
+# posting = "/absolute/path/to/posting.txt"
 
 # Retrieval expansions. When this key is absent, built-in lens words
 # (delivered, skills, contributions, publications, roles) expand on their own.

@@ -7,15 +7,17 @@ import os
 import sys
 from pathlib import Path
 
-from dossier.ask import ASK_MODES, respond
-from dossier.brief import ask_hits, run_pack, write_brief
+from dossier.ask import ASK_MODES
+from dossier.brief import run_pack, write_brief
 from dossier.cards import STATUS_APPROVED
 from dossier.config import Config
 from dossier.contributions import CONTRIBUTIONS, contribution
 from dossier.extract import extract_corpus
+from dossier.interview import conduct
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
+from dossier.llm.budget import CallBudget
 from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
-from dossier.packs import load_pack
+from dossier.packs import load_pack, posting_pack
 from dossier.paths import (
     applications_dir,
     cursor_projects_root,
@@ -72,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_brief = sub.add_parser("brief", help="Answer a question pack into data/briefs")
     p_brief.add_argument("--pack", default=None, help="career, or a path to a JSON pack")
+    p_brief.add_argument("--posting", type=Path, help="Local posting text for the posting pack")
     p_brief.add_argument("--mode", choices=ASK_MODES, default=None)
 
     p_run = sub.add_parser(
@@ -79,7 +82,10 @@ def main(argv: list[str] | None = None) -> int:
         help="Ingest detected adapters, draft claims, then write a brief",
     )
     p_run.add_argument("--pack", default=None, help="career, or a path to a JSON pack")
+    p_run.add_argument("--posting", type=Path, help="Local posting text for the posting pack")
     p_run.add_argument("--mode", choices=ASK_MODES, default=None)
+
+    p_doc = sub.add_parser("doctor", help="Print local readiness without writing")
 
     p_ref = sub.add_parser("referees", help="Read-only referee shortlist")
     posting = p_ref.add_mutually_exclusive_group(required=True)
@@ -99,6 +105,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "referees":
         return _referees(args)
     cfg = Config.from_env()
+    if args.cmd == "doctor":
+        return _doctor(cfg)
     db = evidence_db(Path(cfg.data_dir))
     corpus = Corpus(db)
     try:
@@ -361,25 +369,29 @@ def _approve(args: argparse.Namespace, corpus: Corpus) -> int:
 def _ask(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
     mode = args.mode or cfg.ask_mode
     limit = cfg.ask_limit if args.limit is None else args.limit
-    hits = ask_hits(
-        corpus,
-        args.question,
-        cfg,
-        limit=limit,
-        source=args.source,
-        lens=args.lens,
-        kind=args.kind,
-    )
-    if not hits or mode == "exact":
-        client = NullLLMClient()
+    budget = CallBudget(cfg.llm_max_calls)
+    if mode == "exact" or not cfg.llm_enabled:
+        client: LLMClient = NullLLMClient()
     elif mode == "auto":
-        client = _LazyClient(cfg)
+        client = budget.wrap(_LazyClient(cfg))
     else:
         client, code = _client_for_mode(cfg, mode)
         if code is not None:
             return code
+        client = budget.wrap(client)
     prior = corpus.recent_accepted_texts(3) if args.follow else None
-    result = respond(args.question, hits, client, cfg.llm_model, mode=mode, prior=prior)
+    result = conduct(
+        corpus,
+        args.question,
+        cfg,
+        client,
+        mode=mode,
+        limit=limit,
+        source=args.source,
+        lens=args.lens,
+        kind=args.kind,
+        prior=prior,
+    )
     corpus.add_answer(
         question=args.question,
         mode=mode,
@@ -398,20 +410,39 @@ def _ask(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
     return 0
 
 
-def _brief(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
+def _brief(
+    args: argparse.Namespace,
+    cfg: Config,
+    corpus: Corpus,
+    *,
+    budget: CallBudget | None = None,
+) -> int:
     mode = args.mode or cfg.ask_mode
     try:
-        questions = load_pack(args.pack or cfg.run_pack)
+        questions = _pack_questions(args, cfg)
     except (OSError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
+    spent = budget or CallBudget(cfg.llm_max_calls)
     client, code = _client_for_mode(cfg, mode)
     if code is not None:
         return code
-    items = run_pack(corpus, questions, cfg, client, mode=mode)
+    items = run_pack(corpus, questions, cfg, spent.wrap(client), mode=mode)
     path = write_brief(items, Path(cfg.data_dir) / "briefs")
     print(path)
     return 0
+
+
+def _pack_questions(args: argparse.Namespace, cfg: Config) -> list:
+    posting = getattr(args, "posting", None) or (
+        Path(cfg.run_posting) if cfg.run_posting else None
+    )
+    pack = getattr(args, "pack", None) or cfg.run_pack
+    if posting is not None or pack == "posting":
+        if posting is None:
+            raise ValueError("posting pack needs --posting or DOSSIER_RUN_POSTING")
+        return posting_pack(posting.read_text(encoding="utf-8"))
+    return load_pack(pack)
 
 
 def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
@@ -427,8 +458,40 @@ def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
     n_after = len(corpus.records())
     if targets:
         print(f"records: {n_after} (+{n_after - n_before})")
+    budget = CallBudget(cfg.llm_max_calls)
     _extract_cards(cfg, corpus, source=None, limit=None, strict_llm=False)
-    return _brief(args, cfg, corpus)
+    code = _brief(args, cfg, corpus, budget=budget)
+    print(
+        f"ledger: records={len(corpus.records())} "
+        f"adapters_skipped={len(skipped)} "
+        f"model_calls={budget.calls} "
+        f"egress={'yes' if llm_egress_is_remote(cfg) else 'no'}"
+    )
+    return code
+
+
+def _doctor(cfg: Config) -> int:
+    db = evidence_db(Path(cfg.data_dir))
+    corpus = Corpus(db)
+    try:
+        print(f"data_dir: {cfg.data_dir}")
+        print(f"evidence_db: {db}")
+        print(f"fts5: {'yes' if corpus.fts_ok else 'no'}")
+        print(f"provider: {cfg.llm_provider}")
+        print(f"max_calls: {cfg.llm_max_calls}")
+        print(f"ask.mode: {cfg.ask_mode}")
+        print(f"ask.cards_first: {cfg.ask_cards_first}")
+        print(f"ask.passages: {cfg.ask_passages}")
+        print(f"ask.hops: {cfg.ask_hops}")
+        print(f"ask.decompose: {cfg.ask_decompose}")
+        print(f"ask.planner: {cfg.ask_planner}")
+        for item in CONTRIBUTIONS:
+            default = _default_path(item.name)
+            seen = default is not None and item.source.detect(default)
+            print(f"adapter {item.name}: {'detected' if seen else 'not detected'}")
+    finally:
+        corpus.close()
+    return 0
 
 
 def _client_for_mode(cfg: Config, mode: str) -> tuple[LLMClient, int | None]:

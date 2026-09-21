@@ -1,16 +1,17 @@
 # Status
 
-Dossier 0.3 is a locker plus local ask over the same SQLite records. Retrieval is SQLite full text, with whole-word overlap as a fallback. A direct quote is preferred. The model is only asked to compose when that quote is not enough. It has been tested on synthetic fixtures. It has not been run as a full extract or ask over a real corpus in this repository’s history.
+Dossier 0.4 is a locker that interviews its own corpus. Retrieval still prefers a quote. When one span is not enough, it can stitch compound questions, hop once on seeker headers, and call a local model only inside a call budget. It has been tested on synthetic fixtures. It has not been run as a full extract or ask over a real corpus in this repository’s history.
 
 ## Works
 
-- SQLite corpus and claim cards (`pending`, `approved`, `refused`) under `data/evidence.db`. Accepted and refused answers are stored in the same file and are not claim cards.
+- SQLite corpus and claim cards (`pending`, `approved`, `refused`) under `data/evidence.db`. Accepted and refused answers are stored in the same file and are not claim cards. Long records are split into passages stored beside them.
 - Refuse rule: no citation, a citation that is not in the corpus, or evidence text that does not carry the sentence.
-- CLI: `ingest`, `extract`, `buffet`, `approve`, `ask`, `brief`, `run`, `referees`.
-- Optional `$DOSSIER_DATA/dossier.toml` (gitignored). Environment variables override it. `dossier.example.toml` lists the knobs. Defaults: Ollama on loopback, `ask.mode = auto`, full text on, extract may call the model.
+- CLI: `ingest`, `extract`, `buffet`, `approve`, `ask`, `brief`, `run`, `doctor`, `referees`.
+- Optional `$DOSSIER_DATA/dossier.toml` (gitignored). Environment variables override it. `dossier.example.toml` lists the knobs. Defaults: Ollama on loopback, `ask.mode = auto`, full text on, extract may call the model, at most six model calls per process.
 - `extract` writes a pending card from LinkedIn rows and from seeker records that already carry a Lens and Kind header, using only words in that record. Records that already have a pending or approved card are left alone. The model sees only what is left, and only when extraction is on and the provider is not `off`.
-- `ask` modes: `exact` quotes a span and never calls a model; `auto` (default) tries that quote, then one completion when several hits tie or the span will not carry the question; `rich` always composes when there are hits. Retrieval uses SQLite FTS5 when that module is built in, and whole-word overlap otherwise. Overlap also breaks FTS ties. A token inside a longer word does not count. The answer is printed only when every citation is one of the hits and the cited text can carry the sentence. No hits, an empty question, a citation outside the hits, or an unsupported sentence is a refusal. `--source`, `--lens`, and `--kind` limit the search. At most 8 hits go into the prompt. `--follow` adds up to three earlier accepted answers as context. Those lines are not citations.
-- `brief` runs the built-in `career` pack, or a JSON pack you pass, and writes `data/briefs/<stamp>.md`. `run` ingests adapters it can already detect, drafts cards, optionally extracts, then writes that brief. Neither command approves a card.
+- `ask` modes: `exact` quotes a span and never calls a model; `auto` (default) tries an approved claim, then a quote, then one hop on `Lens`/`Kind` that may open sibling records and quote any of them, then one completion when several hits tie or the span will not carry the question; `rich` always composes when there are hits unless an approved claim already carries the question. Retrieval uses SQLite FTS5 on title, text, and passages when that module is built in. Whole-word overlap is the fallback when full text cannot run, and it breaks ties when it can. An empty full-text result stays empty. A token inside a longer word does not count. Compound questions can split into at most four parts. The answer is printed only when every citation is one of the hits and the cited text can carry the sentence. No hits, an empty question, a citation outside the hits, or an unsupported sentence is a refusal. `--source`, `--lens`, and `--kind` limit the search. At most 8 hits go into the prompt. `--follow` adds up to three earlier accepted answers as context. Those lines are not citations.
+- `brief` runs the built-in `career` pack, a local `posting` pack, or a JSON pack you pass, and writes `data/briefs/<stamp>.md`. After a refusal it may add one closed follow-up. `run` ingests adapters it can already detect, drafts cards, optionally extracts, writes that brief, and prints a ledger of records, skipped adapters, model calls, and whether egress was possible. Neither command approves a card.
+- `doctor` prints the data directory, whether FTS5 is available in this interpreter, the provider, the call budget, and which adapters detect. It does not write.
 - `referees` prints at most seven people for a posting. Rank is local (hiring-firm overlap, shared words, note, timeline, existing last-contact time). It does not call a model. People come from `--people` / `DOSSIER_PEOPLE`, or from Twenty when both API env vars are set. No people source exits without ranking. A policy file can skip names, warn on scarce names, and alias employers. Every line says to confirm before listing. The command does not write the corpus or Twenty, and it does not send mail.
 - Ollama on loopback by default. LiteLLM is optional and prints an egress notice when a completion can leave the machine.
 - Seven adapters, registered by hand in `src/dossier/contributions.py`.
@@ -31,10 +32,13 @@ ChatGPT, LinkedIn, and Slack expect the warehouse schema produced elsewhere (see
 
 ## Not in this version
 
-- Embeddings, LanceDB, or a call from `ask` into the publications server. Full text stays inside `evidence.db`.
-- A CV or letter renderer. Briefs are markdown under `data/`.
+See [roadmap](roadmap.md) for next vs later. Still out of 0.4:
+
+- Embeddings, LanceDB, or a call from `ask` into the publications server. Full text and passages stay inside `evidence.db`.
+- A CV or letter renderer. Briefs are markdown under `data/`. Posting packs answer questions; they do not write a tailored CV.
 - Employer-folder walking, git history, or meeting-export adapters.
 - A plugin loader.
+- Live pubs ingest (fixture and ping only until the collection name and scope are confirmed).
 
 ## Tests
 

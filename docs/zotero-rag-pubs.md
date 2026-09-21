@@ -12,4 +12,4 @@ Confirm the collection name in Zotero before any ingest. A large library and a p
 
 ## What the adapter does now
 
-`PubsSource` can load a JSON fixture (`{"records": [{"uri", "title", "text"}]}`) for tests. `HttpPubsRetriever` may ping `DOSSIER_PUBS_URL`. Its `records()` method returns an empty list. Wiring real hits from that index is still to do, and this repo does not start the other service.
+`PubsSource` can load a JSON fixture (`{"records": [{"uri", "title", "text"}]}`) for tests. `HttpPubsRetriever` may ping `DOSSIER_PUBS_URL`. Its `records()` method returns an empty list. Wiring real hits from that index is still to do, and this repo does not start the other service. See [roadmap](roadmap.md) (Next: own-pubs retrieve that returns rows).

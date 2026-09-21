@@ -14,6 +14,8 @@ from pathlib import Path
 from dossier.paths import data_dir, pubs_url, warehouse_db
 
 ASK_MODES = ("exact", "auto", "rich")
+DECOMPOSE_MODES = ("off", "auto", "on")
+PLANNER_MODES = ("off", "rich")
 
 
 @dataclass(frozen=True)
@@ -33,7 +35,14 @@ class Config:
     extract_llm: bool = True
     run_adapters: tuple[str, ...] = ()
     run_pack: str = "career"
+    run_posting: str = ""
     lexicon: tuple[str, ...] | None = None
+    llm_max_calls: int = 6
+    ask_cards_first: bool = True
+    ask_passages: bool = True
+    ask_hops: int = 1
+    ask_decompose: str = "auto"
+    ask_planner: str = "off"
 
     @classmethod
     def from_env(cls) -> Config:
@@ -89,8 +98,42 @@ class Config:
             run_adapters=adapters,
             run_pack=_env_str("DOSSIER_RUN_PACK", str(run.get("pack") or "career")).strip()
             or "career",
+            run_posting=_env_str(
+                "DOSSIER_RUN_POSTING",
+                str(run.get("posting") or ""),
+            ).strip(),
             lexicon=lexicon,
+            llm_max_calls=max(
+                0,
+                _env_int("DOSSIER_LLM_MAX_CALLS", _as_int(llm.get("max_calls"), 6)),
+            ),
+            ask_cards_first=_env_bool(
+                "DOSSIER_ASK_CARDS_FIRST",
+                bool(ask.get("cards_first", True)),
+            ),
+            ask_passages=_env_bool(
+                "DOSSIER_ASK_PASSAGES",
+                bool(ask.get("passages", True)),
+            ),
+            ask_hops=max(0, _env_int("DOSSIER_ASK_HOPS", _as_int(ask.get("hops"), 1))),
+            ask_decompose=_choice(
+                _env_str("DOSSIER_ASK_DECOMPOSE", str(ask.get("decompose") or "auto")),
+                DECOMPOSE_MODES,
+                "auto",
+            ),
+            ask_planner=_choice(
+                _env_str("DOSSIER_ASK_PLANNER", str(ask.get("planner") or "off")),
+                PLANNER_MODES,
+                "off",
+            ),
         )
+
+
+def _choice(value: str, allowed: tuple[str, ...], default: str) -> str:
+    cleaned = value.strip().lower()
+    if cleaned in allowed:
+        return cleaned
+    return default
 
 
 def _load_toml(path: Path) -> dict:

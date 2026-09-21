@@ -6,12 +6,12 @@ adapters you enable
         → deterministic drafts, then the model for what is left
             → human approve
                 → buffet of cards you can paste
-        → full-text ask (exact quote, then one completion)
+        → interview ask (approved claim, passages, one hop, then one completion)
             → cited answer, or a refusal
             → data/briefs when you run a question pack
 ```
 
-`dossier ask` searches records already in the corpus. SQLite FTS5 ranks them when it is available; whole-word overlap is the fallback and the tie-break. It does not embed them, and it does not query the publications server. `exact` never calls a model. See [status](status.md).
+`dossier ask` searches records already in the corpus. An approved claim that carries the question is preferred. SQLite FTS5 ranks title, text, and passages when it is available. A missing FTS module falls back to whole-word overlap, and overlap breaks ties among full-text hits. URIs and source names are not part of the index. After a miss, one hop can add the top hit’s `Lens` and `Kind` tokens and quote a span from any of the hopped hits. Compound questions may split and stitch without a model. Completions stay inside a per-process call budget. It does not embed records, and it does not query the publications server. `exact` never calls a model. See [status](status.md) and [roadmap](roadmap.md).
 
 ## Source protocol
 
@@ -39,8 +39,6 @@ Extraction writes a draft card when the sentence is already in a LinkedIn row or
 
 People come from a JSON file, or from a GraphQL read when `DOSSIER_TWENTY_API_URL` and `DOSSIER_TWENTY_API_KEY` are both set. That read loads People, company name, note text, and whether a timeline event exists. It does not write Tasks, Opportunities, Notes, or a last-contacted field. Skips and scarce-name warnings live in a local policy file, not in this repo. Each printed line ends with “confirm before listing.” The command does not attach a name to a PDF and it does not send mail.
 
-## Later
+## Roadmap
 
-- **Ask-the-corpus, beyond full text.** `dossier ask` cites hits from `evidence.db`. A hybrid or embedding index is a later backend. It is not required for the command to exist.
-- **More sources.** Employer-named folders (an explicit allowlist), git history, and meeting exports. Mail and Slack adapters already exist; they seek selected rows and do not ingest a whole mailbox or workspace.
-- **Tailoring.** A posting in, a CV or letter out, using approved cards only. A PDF renderer stays out of the locker.
+Next and later work, including own-pubs ingest, a real-corpus pass, employer-folder allowlist, hybrid search, and CV/letter tailoring: [roadmap](roadmap.md).

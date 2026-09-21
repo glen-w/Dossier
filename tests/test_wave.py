@@ -1,7 +1,11 @@
 import json
+import sqlite3
 from pathlib import Path
 
+import pytest
+
 from dossier.ask import expand_tokens, respond, retrieve
+from dossier.brief import ask_hits
 from dossier.cards import STATUS_PENDING, ClaimCard
 from dossier.cli import main
 from dossier.config import Config
@@ -297,6 +301,8 @@ def test_lens_filter_uses_the_header() -> None:
     )
     hits = retrieve([delivered, skills], "ocean chapter", lens="delivered")
     assert [hit.uri for hit in hits] == ["slack://delivered"]
+    by_kind = retrieve([delivered, skills], "ocean chapter", kind="teaching")
+    assert [hit.uri for hit in by_kind] == ["slack://skills"]
 
 
 def test_lexicon_expands_a_lens_word() -> None:
@@ -372,3 +378,196 @@ def test_run_does_not_approve(tmp_path: Path, monkeypatch) -> None:
     again.close()
     assert any(card.claim == "Analyst at Oceans" for card in pending)
     assert list((tmp_path / "briefs").glob("*.md"))
+
+
+def test_empty_fts_does_not_fall_back_to_overlap() -> None:
+    hits = retrieve([_coastal()], "coastal governance", fts_rank={})
+    assert hits == []
+
+
+def test_ask_hits_uses_empty_fts_result(corpus: Corpus) -> None:
+    corpus.upsert_record(_coastal())
+    corpus.search_fts = lambda match, limit: []  # type: ignore[method-assign]
+    corpus.search_passages = lambda match, limit: []  # type: ignore[method-assign]
+    hits = ask_hits(
+        corpus,
+        "coastal governance paper",
+        Config(ask_fts=True, lexicon=()),
+        limit=5,
+    )
+    assert hits == []
+    overlap = ask_hits(
+        corpus,
+        "coastal governance paper",
+        Config(ask_fts=False, lexicon=()),
+        limit=5,
+    )
+    assert overlap[0].uri == "zotero://fixture/1"
+
+
+def test_fts_ignores_uri_and_source(corpus: Corpus) -> None:
+    corpus.upsert_record(
+        Record(
+            id="shop",
+            source="slack",
+            uri="slack://coastal",
+            title="Shopping",
+            text="Buy milk and eggs tomorrow.",
+        )
+    )
+    if not corpus.fts_ok:
+        pytest.skip("sqlite build has no fts5")
+    assert corpus.search_fts('"coastal" OR "slack"', limit=5) == []
+    found = corpus.search_fts('"milk"', limit=5)
+    assert found is not None and found[0][0] == "slack://coastal"
+
+
+def test_old_fts_schema_is_rebuilt(tmp_path: Path) -> None:
+    probe = sqlite3.connect(":memory:")
+    try:
+        probe.execute("CREATE VIRTUAL TABLE t USING fts5(x)")
+    except sqlite3.OperationalError:
+        probe.close()
+        pytest.skip("sqlite build has no fts5")
+    probe.close()
+    db = tmp_path / "evidence.db"
+    first = Corpus(db)
+    first.upsert_record(
+        Record(
+            id="shop",
+            source="slack",
+            uri="slack://coastal",
+            title="Shopping",
+            text="Buy milk and eggs tomorrow.",
+        )
+    )
+    first.close()
+    conn = sqlite3.connect(db)
+    conn.execute("DROP TABLE records_fts")
+    conn.execute(
+        """
+        CREATE VIRTUAL TABLE records_fts USING fts5(
+            uri, source, title, text, tokenize='unicode61'
+        )
+        """
+    )
+    conn.execute(
+        "INSERT INTO records_fts (uri, source, title, text) VALUES (?, ?, ?, ?)",
+        ("slack://coastal", "slack", "Shopping", "Buy milk and eggs tomorrow."),
+    )
+    conn.commit()
+    conn.close()
+    again = Corpus(db)
+    try:
+        assert again.search_fts('"coastal"', limit=5) == []
+        found = again.search_fts('"milk"', limit=5)
+        assert found is not None and found[0][0] == "slack://coastal"
+    finally:
+        again.close()
+
+
+def test_retrieve_caps_at_eight_hits() -> None:
+    records = [
+        Record(
+            id=str(i),
+            source="pubs",
+            uri=f"zotero://fixture/{i}",
+            title="Synthetic coastal paper",
+            text="Glen wrote a synthetic paper on coastal governance.",
+        )
+        for i in range(12)
+    ]
+    hits = retrieve(records, "coastal governance", limit=50)
+    assert len(hits) == 8
+
+
+def test_education_and_publication_drafts_skip_the_model(corpus: Corpus) -> None:
+    education = Record(
+        id="edu",
+        source="linkedin",
+        uri="linkedin://education/0",
+        title="MSc at Oceans",
+        text="MSc at Oceans. 2011–2013. Coastal governance.",
+        table="linkedin.education",
+    )
+    publication = Record(
+        id="pub",
+        source="linkedin",
+        uri="https://example.invalid/paper",
+        title="Coastal governance paper",
+        text="Coastal governance paper. Ocean Press. 2020.",
+        table="linkedin.publications",
+    )
+    corpus.upsert_record(education)
+    corpus.upsert_record(publication)
+    cards = extract_corpus(corpus, _Boom(), "fake", use_llm=True)
+    by_uri = {card.citations[0]: card for card in cards}
+    assert by_uri[education.uri].claim == "MSc at Oceans"
+    assert by_uri[publication.uri].claim == "Coastal governance paper"
+    assert all(card.status == STATUS_PENDING for card in cards)
+
+
+def test_draft_falls_back_to_a_body_line(corpus: Corpus) -> None:
+    record = Record(
+        id="pos",
+        source="linkedin",
+        uri="linkedin://positions/1",
+        title="Hidden heading",
+        text="Analyst at Oceans. Paris.",
+        table="linkedin.positions",
+    )
+    corpus.upsert_record(record)
+    cards = extract_corpus(corpus, _Boom(), "fake", use_llm=True)
+    assert cards[0].claim == "Analyst at Oceans. Paris."
+
+
+def test_auto_calls_once_when_no_sentence_carries_the_question() -> None:
+    record = Record(
+        id="split",
+        source="pubs",
+        uri="zotero://fixture/split",
+        title="Notes",
+        text=(
+            "Glen drafted the notes.\n"
+            "The workshop met in March.\n"
+            "A separate paper covered fish.\n"
+            "Editing happened the next week.\n"
+            "Methods sat in an appendix."
+        ),
+    )
+    question = "drafted workshop paper editing methods"
+    hits = retrieve([record], question)
+    assert len(hits) == 1
+    exact = respond(question, hits, _Boom(), "fake", mode="exact")
+    assert exact.refused
+    client = _Once()
+    result = respond(question, hits, client, "fake", mode="auto")
+    assert client.calls == 1
+    assert result.refused
+
+
+def test_run_allowlist_skips_unknown_adapters(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
+    monkeypatch.setenv("DOSSIER_LLM_PROVIDER", "off")
+    monkeypatch.setenv("DOSSIER_RUN_ADAPTERS", "not-an-adapter")
+    monkeypatch.setenv("DATA_DUMPS_WAREHOUSE", str(tmp_path / "missing.duckdb"))
+    corpus = Corpus(tmp_path / "evidence.db")
+    corpus.upsert_record(
+        Record(
+            id="pos",
+            source="linkedin",
+            uri="linkedin://positions/0",
+            title="Analyst at Oceans",
+            text="Analyst at Oceans. Paris.",
+            table="linkedin.positions",
+        )
+    )
+    corpus.close()
+    assert main(["run", "--mode", "exact"]) == 0
+    out = capsys.readouterr().out
+    assert "skip not-an-adapter: unknown adapter" in out
+    again = Corpus(tmp_path / "evidence.db")
+    try:
+        assert any(card.claim == "Analyst at Oceans" for card in again.cards("pending"))
+    finally:
+        again.close()

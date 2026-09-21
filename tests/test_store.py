@@ -56,3 +56,30 @@ def test_upsert_replaces_text_for_the_same_uri(corpus) -> None:
     recs = corpus.records()
     assert len(recs) == 1
     assert recs[0].text.startswith("second text")
+
+
+def test_upsert_rebuilds_passages(corpus) -> None:
+    corpus.upsert_record(
+        Record(
+            id="r1",
+            source="pubs",
+            uri="zotero://fixture/1",
+            title="One",
+            text="First block about ships.\n\nSecond block about coastal governance.",
+        )
+    )
+    first = corpus.passage_rows()
+    assert len(first) >= 2
+    corpus.upsert_record(
+        Record(
+            id="r1",
+            source="pubs",
+            uri="zotero://fixture/1",
+            title="One",
+            text="Only one coastal block now.",
+        )
+    )
+    again = corpus.passage_rows()
+    assert len(again) == 1
+    assert again[0][0] == "zotero://fixture/1"
+    assert "Only one coastal block" in again[0][1]
