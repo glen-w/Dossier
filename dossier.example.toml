@@ -1,0 +1,27 @@
+# Copy to $DOSSIER_DATA/dossier.toml to override defaults.
+# That path is gitignored. Environment variables win over this file.
+# Leave a key out to keep the built-in default.
+
+[llm]
+provider = "ollama" # ollama | litellm | off
+model = "qwen3.8:latest"
+base_url = "http://127.0.0.1:11434"
+allow_remote = false
+# api_base = "https://example.invalid/v1"
+
+[ask]
+mode = "auto" # exact | auto | rich
+limit = 5
+fts = true
+
+[extract]
+llm = true
+
+[run]
+adapters = [] # empty: every detected adapter
+pack = "career"
+
+# Retrieval expansions. When this key is absent, built-in lens words
+# (delivered, skills, contributions, publications, roles) expand on their own.
+# An empty list turns those extras off. A list replaces them.
+# lexicon = ["workshop", "brief"]

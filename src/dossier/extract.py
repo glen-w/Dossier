@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from dossier.cards import ClaimCard, ProposedClaim, adjudicate, card_id
+from dossier.drafts import draft_record
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
 from dossier.store import Corpus, Record
 
@@ -21,6 +22,13 @@ Text:
 {text}
 """
 
+SEEKER_PROMPT_TAIL = """
+This record was sought as professional work evidence, not a full inbox dump.
+Optional keys per claim: "lens" (delivered|skills|contributions), "kind",
+"skills" (list of strings), "org", "period". Prefer the Lens/Kind/Org/Year
+header when present. Still refuse anything the text will not carry.
+"""
+
 
 def lock_claims(
     record: Record,
@@ -29,17 +37,25 @@ def lock_claims(
 ) -> list[ClaimCard]:
     """Adjudicate proposals against the corpus. Uncited or unsupported → refused."""
     out: list[ClaimCard] = []
+    seen: set[tuple[str, tuple[str, ...]]] = set()
     for prop in proposals:
-        status, reason = adjudicate(prop.claim, prop.citations, evidence_by_uri)
+        cites = [u.strip() for u in prop.citations if u and str(u).strip()]
+        key = (_norm_claim(prop.claim), tuple(cites))
+        if prop.claim.strip() and key in seen:
+            continue
+        if prop.claim.strip():
+            seen.add(key)
+        status, reason = adjudicate(prop.claim, cites, evidence_by_uri)
         out.append(
             ClaimCard(
-                id=card_id(prop.claim, prop.citations),
+                id=card_id(prop.claim, cites),
                 claim=prop.claim.strip(),
-                citations=[u.strip() for u in prop.citations if u and str(u).strip()],
+                citations=cites,
                 source=record.source,
                 status=status,
                 reason=reason,
                 record_id=record.id,
+                extras=dict(prop.extras),
             )
         )
     return out
@@ -62,7 +78,8 @@ def proposals_from_json(data: dict[str, Any], default_uri: str) -> list[Proposed
         uris = [str(c).strip() or default_uri for c in cites]
         if not uris:
             uris = [default_uri]
-        out.append(ProposedClaim(claim=claim, citations=uris))
+        extras = _extras_from_item(item)
+        out.append(ProposedClaim(claim=claim, citations=uris, extras=extras))
     return out
 
 
@@ -72,6 +89,8 @@ def propose_with_llm(
     prompt = EXTRACT_PROMPT.format(
         uri=record.uri, title=record.title, text=record.text[:12_000]
     )
+    if record.source in {"slack", "mbox"}:
+        prompt = prompt + SEEKER_PROMPT_TAIL
     req = CompletionRequest(
         model=model,
         prompt=prompt,
@@ -107,13 +126,22 @@ def extract_corpus(
     model: str,
     source: str | None = None,
     limit: int | None = None,
+    *,
+    use_llm: bool = True,
 ) -> list[ClaimCard]:
     records = corpus.records(source)
     if limit is not None:
         records = records[:limit]
     out: list[ClaimCard] = []
     for rec in records:
-        out.extend(extract_record(rec, corpus, client, model))
+        if corpus.record_has_open_card(rec.id):
+            continue
+        drafted = draft_record(rec, corpus)
+        if drafted:
+            out.extend(drafted)
+            continue
+        if use_llm:
+            out.extend(extract_record(rec, corpus, client, model))
     return out
 
 
@@ -121,3 +149,23 @@ def dump_proposals(proposals: list[ProposedClaim]) -> str:
     return json.dumps(
         {"claims": [{"claim": p.claim, "citations": p.citations} for p in proposals]}
     )
+
+
+def _extras_from_item(item: dict[str, Any]) -> dict[str, str]:
+    extras: dict[str, str] = {}
+    for key in ("lens", "kind", "org", "period"):
+        value = item.get(key)
+        if value:
+            extras[key] = str(value).strip()
+    skills = item.get("skills")
+    if isinstance(skills, list):
+        joined = ", ".join(str(s).strip() for s in skills if s)
+        if joined:
+            extras["skills"] = joined
+    elif isinstance(skills, str) and skills.strip():
+        extras["skills"] = skills.strip()
+    return extras
+
+
+def _norm_claim(claim: str) -> str:
+    return " ".join(claim.lower().split())

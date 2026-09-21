@@ -18,6 +18,7 @@ DEFAULT_GROK_BLOBS = (
     / "sand-client-persistence"
 )
 DEFAULT_PUBS_URL = "http://127.0.0.1:8012"
+DEFAULT_MAIL_ROOT = Path.home() / "email"
 
 
 def data_dir() -> Path:
@@ -58,3 +59,9 @@ def grok_blobs_dir() -> Path:
 
 def pubs_url() -> str:
     return os.environ.get("DOSSIER_PUBS_URL", DEFAULT_PUBS_URL).rstrip("/")
+
+
+def mail_root() -> Path:
+    if raw := os.environ.get("DOSSIER_MAIL_ROOT"):
+        return Path(raw).expanduser()
+    return DEFAULT_MAIL_ROOT

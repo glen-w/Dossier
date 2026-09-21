@@ -1,0 +1,82 @@
+{
+  "people": [
+    {
+      "name": "Ada Overlap",
+      "company": "Coastal Lab",
+      "jobTitle": "Editor",
+      "keywords": "",
+      "bio": "",
+      "note": "",
+      "enrichmentStatus": "REVIEWED",
+      "coAuthorWithGlen": 0,
+      "lastContactAt": null,
+      "timelineCount": 0
+    },
+    {
+      "name": "Bev Keywords",
+      "company": "Other Org",
+      "jobTitle": "Researcher",
+      "keywords": "coastal governance methods marine policy fisheries",
+      "bio": "Works on marine policy.",
+      "note": "Spoke about coastal governance.",
+      "enrichmentStatus": "REVIEWED",
+      "coAuthorWithGlen": 2,
+      "lastContactAt": "2026-08-01T00:00:00Z",
+      "timelineCount": 3
+    },
+    {
+      "name": "Pat Skip",
+      "company": "Coastal Lab",
+      "jobTitle": "Director",
+      "keywords": "governance",
+      "note": "Known name.",
+      "enrichmentStatus": "REVIEWED"
+    },
+    {
+      "name": "Revie Stub",
+      "company": "Coastal Lab",
+      "jobTitle": "Fellow",
+      "keywords": "governance",
+      "note": "Unreviewed stub.",
+      "enrichmentStatus": "NEEDS_REVIEW"
+    },
+    {
+      "name": "Sam Scarce",
+      "company": "Coastal Lab",
+      "jobTitle": "Lead",
+      "keywords": "",
+      "note": "",
+      "enrichmentStatus": "REVIEWED"
+    },
+    {
+      "name": "Rue Ledout",
+      "company": "Coastal Lab",
+      "jobTitle": "Advisor",
+      "note": "Ruled out for this pack.",
+      "enrichmentStatus": "REVIEWED"
+    },
+    {
+      "name": "Stu Dent",
+      "company": "Coastal Lab",
+      "jobTitle": "Student",
+      "note": "Student unless asked.",
+      "enrichmentStatus": "REVIEWED"
+    },
+    {
+      "name": "Inbox Only",
+      "company": "",
+      "jobTitle": "",
+      "keywords": "",
+      "note": "",
+      "enrichmentStatus": "REVIEWED"
+    },
+    {
+      "name": "Quin Quarter",
+      "company": "Far Institute",
+      "jobTitle": "Accountant",
+      "keywords": "",
+      "note": "",
+      "enrichmentStatus": "REVIEWED"
+    }
+  ]
+}

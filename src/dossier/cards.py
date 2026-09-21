@@ -44,6 +44,16 @@ _STOP = frozenset(
         "most",
         "other",
         "into",
+        "what",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "there",
+        "here",
+        "like",
     }
 )
 
@@ -64,6 +74,7 @@ class ClaimCard:
 class ProposedClaim:
     claim: str
     citations: list[str]
+    extras: dict[str, str] = field(default_factory=dict)
 
 
 def card_id(claim: str, citations: list[str]) -> str:
@@ -71,19 +82,31 @@ def card_id(claim: str, citations: list[str]) -> str:
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
-def evidence_carries(claim: str, evidence: str) -> bool:
-    """True when evidence text can carry the claim without an LLM."""
-    blob = evidence.lower()
-    if not blob.strip():
-        return False
-    tokens = [
+def content_tokens(text: str) -> list[str]:
+    """Words long enough to match a record. Shared by the locker and ask."""
+    return [
         w
-        for w in re.findall(r"[a-z0-9]+", claim.lower())
+        for w in re.findall(r"[a-z0-9]+", text.lower())
         if len(w) >= 4 and w not in _STOP
     ]
+
+
+def content_token_set(text: str) -> set[str]:
+    return set(content_tokens(text))
+
+
+def evidence_carries(claim: str, evidence: str) -> bool:
+    """True when evidence text can carry the claim without an LLM.
+
+    Match whole words. A token inside a longer word does not count.
+    """
+    if not evidence.strip():
+        return False
+    tokens = content_tokens(claim)
     if not tokens:
         return True
-    hits = sum(1 for t in tokens if t in blob)
+    blob = content_token_set(evidence)
+    hits = sum(1 for token in tokens if token in blob)
     need = 1 if len(tokens) <= 3 else max(2, len(tokens) // 4)
     return hits >= need
 

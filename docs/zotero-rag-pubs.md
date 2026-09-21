@@ -1,15 +1,15 @@
-# zotero-rag pubs (proposal)
+# Publications index
 
-Read-only look at `~/Documents/papers/zotero.sqlite` on 21 Sep 2026 (immutable open; Zotero had the file locked).
+Own publications are retrieved from a separate [zotero-rag](https://github.com/anapaulagomes/zotero-rag) instance. Dossier does not embed a Zotero library, and it does not reuse an index built for some other collection.
 
-A collection is named **`my pubs`** (353 items). That matches the name already used for Glen’s own publications. This note proposes a third zotero-rag instance. It does not start one.
+Suggested layout, when you choose to run one:
 
-- Clone pattern: laptop compose beside hoops `:8009` and ocean `:8010`
-- Suggested port: `:8012`
-- `ZOTERO_COLLECTION=my pubs`
-- Own LanceDB directory
-- Ingest **off** until Glen confirms the collection and that 353 items is the right scope
+- Its own compose project and its own LanceDB directory
+- `ZOTERO_COLLECTION` set to the collection that is actually your publications
+- Loopback port `8012` (the `pubs` adapter’s default `DOSSIER_PUBS_URL`)
 
-Dossier’s `pubs` adapter retrieves from that index later (HTTP ping on `:8012`). Today it loads a JSON fixture or a stub retriever. Live `records()` is empty on purpose.
+Confirm the collection name in Zotero before any ingest. A large library and a publications folder are different scopes.
 
-Do not re-embed hoops or ocean into Dossier. Do not wire Homer/Kuma/Syncthing in this sitting.
+## What the adapter does now
+
+`PubsSource` can load a JSON fixture (`{"records": [{"uri", "title", "text"}]}`) for tests. `HttpPubsRetriever` may ping `DOSSIER_PUBS_URL`. Its `records()` method returns an empty list. Wiring real hits from that index is still to do, and this repo does not start the other service.

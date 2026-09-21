@@ -1,60 +1,89 @@
 # Dossier
 
-Local-first evidence locker and ask-the-corpus RAG for professional work. Private. Dumps, mail, and PDFs stay on your machine, outside this git tree.
+Dossier is a local-first locker for professional evidence. It turns records you already have into claim cards you could paste into a CV or letter. Each claim cites a record. If the record will not carry the sentence, the claim is refused. You approve a card before it is paste-ready.
 
-Untangle spec (Glen): `~/Documents/untangle/projects/dossier.md`. This README does not copy task lists from there.
+Exports, mail, and PDFs stay on your machine. They are not part of this git tree.
 
-## What it does
+Ask-the-corpus chat — “what did I actually do?” — is `dossier ask`. It answers from records already in the locker and prints the citation URIs. How far that goes is under [Status](docs/status.md).
 
-1. **Locker** — claim cards with citations. If the evidence will not carry a claim, the claim is refused. A human approves a card before it is pasted into a CV.
-2. **RAG** — ask what you actually did. Answers cite the same records. **Not built yet.**
+## How a card gets made
 
-v0 is the locker: five explicit adapters, extract, buffet, approve. Mail and Slack are parked.
+1. **Ingest** an adapter you actually have. Records land in a local SQLite file, `data/evidence.db`.
+2. **Extract** drafts a card when the record already carries the sentence, then asks a local model for the rest.
+3. Empty citations, missing records, or text that does not support the sentence are stored as **refused**.
+4. **Buffet** lists the cards. **Approve** is the human gate. Nothing is copied into a CV by the tool.
+5. **Ask** quotes a matching span when that span carries the question. Otherwise one local completion, still cited or refused.
+6. **Brief** and **run** answer a fixed question pack into `data/briefs/`. They do not approve cards.
 
-## Glen vs a thin install
+Adapters are an explicit list in `src/dossier/contributions.py`. There is no plugin directory and no entry-point scan. Turn on only the sources you have.
 
-| | Glen | Thin user |
-| --- | --- | --- |
-| LLM | Ollama on `127.0.0.1:11434` | Ollama, or an OpenAI-compatible API you opt into |
-| Mail | Thunderbird mbox under `~/email` (bodies). data_dumps Thunderbird tables are metadata only | One exported folder |
-| Dumps | Read `~/Documents/data_dumps_raw` warehouse. Do not re-implement those loaders | Skip, or one export zip |
-| Pubs | Zotero collection `my pubs` via a separate zotero-rag instance (see `docs/zotero-rag-pubs.md`). Do not re-embed other libraries | Optional JSON fixture |
-| People / referees | Later: read Twenty. Not in v0 | Skip, or a local CSV |
+## Install
 
-Cloud models are opt-in and must print an egress notice. Work mail and Slack do not leave the machine by default.
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
-## Adapters
+```text
+uv sync --extra dev
+uv run dossier --help
+```
 
-Explicit list in `src/dossier/contributions.py`. No plugin directory, no entry-point scan. Enable only the adapters you have.
-
-| Name | Glen path | Notes |
-| --- | --- | --- |
-| `pubs` | zotero-rag-pubs `:8012` | Retrieve only. Ingest off until the collection is confirmed. Tests use a stub. |
-| `chatgpt` | warehouse `chatgpt.messages` | Read DuckDB. No zip loader. |
-| `linkedin` | warehouse positions / education / skills / publications | Read DuckDB. |
-| `applications` | `~/Documents/job applications/` | Text files in. PDF bytes stay on disk. |
-| `transcripts` | Cursor `agent-transcripts/` and Grok Bot blobs | Local scan. Not committed. |
+The default model is Ollama at `http://127.0.0.1:11434`. Set `DOSSIER_LLM_PROVIDER=off` to skip model calls. `dossier ask --mode exact` still quotes from the corpus. An OpenAI-compatible API is opt-in (`DOSSIER_LLM_PROVIDER=litellm`, plus `dossier[llm]`). If a completion can leave the machine, the CLI prints an egress notice before it runs. Copy `dossier.example.toml` to `data/dossier.toml` to change defaults; environment variables win.
 
 ## CLI
 
-Corpus and cards live in `~/Documents/Dossier/data/evidence.db` (gitignored). Override with `DOSSIER_DATA`.
-
 ```text
-uv run dossier ingest --adapter chatgpt
-uv run dossier ingest --adapter applications "~/Documents/job applications"
+uv run dossier ingest --adapter applications ./path/to/applications
+uv run dossier ingest --adapter slack
+uv run dossier ingest --adapter mbox
+uv run dossier extract --source slack
 uv run dossier extract
 uv run dossier buffet --status pending
 uv run dossier approve <card-id>
+uv run dossier ask "what did I write about coastal governance?"
+uv run dossier ask --mode exact --source pubs "coastal governance"
+uv run dossier brief
+uv run dossier run
+uv run dossier referees --posting ./posting.txt --employer "Hiring Org"
 ```
 
-`extract` talks to Ollama unless `DOSSIER_LLM_PROVIDER=off`. LiteLLM / a non-loopback URL prints a yellow egress notice.
+`dossier referees` reads a JSON people file, or Twenty when both API variables below are set. It prints a shortlist and does not write the corpus or the CRM. Put skips in a local policy file (`--policy` or `DOSSIER_REFEREE_POLICY`), for example under `private/`, which is gitignored.
+
+`evidence.db` is created under `~/Documents/Dossier/data` unless you set `DOSSIER_DATA` to another directory. That file is gitignored.
+
+| Variable | Use |
+| --- | --- |
+| `DOSSIER_LLM_MODEL` | Ollama tag (default `qwen3.8:latest`) |
+| `DOSSIER_ASK_MODE` | `exact`, `auto` (default), or `rich` |
+| `DOSSIER_ASK_FTS` | Use SQLite full text (`true` by default) |
+| `DOSSIER_EXTRACT_LLM` | Ask the model after drafts (`true` by default) |
+| `DOSSIER_RUN_PACK` | Question pack for `brief` and `run` (default `career`) |
+| `DOSSIER_RUN_ADAPTERS` | Comma-separated adapter allowlist for `run` |
+| `DOSSIER_LLM_BASE_URL` | Ollama root |
+| `DOSSIER_LLM_ALLOW_REMOTE` | Allow a non-loopback Ollama URL |
+| `DOSSIER_LLM_API_BASE` | Base URL when provider is `litellm` |
+| `DATA_DUMPS_WAREHOUSE` | DuckDB file for ChatGPT, LinkedIn, Slack, and mail seekers |
+| `DOSSIER_MAIL_ROOT` | Thunderbird tree for mbox body fetch (default `~/email`) |
+| `DOSSIER_SLACK_USER_IDS` | Comma-separated Slack user ids to treat as you |
+| `DOSSIER_SEEKER_PER_STRATUM` | Max hits per lens/kind/year (default 20) |
+| `DOSSIER_SEEKER_OVERALL` | Max seeker records per ingest (default 400) |
+| `DOSSIER_APPLICATIONS` | Folder of prior application packs |
+| `DOSSIER_CURSOR_PROJECTS` | Cursor projects root (transcripts) |
+| `DOSSIER_GROK_BLOBS` | Optional extra transcript folder |
+| `DOSSIER_PUBS_URL` | Publications RAG base URL (default `http://127.0.0.1:8012`) |
+| `DOSSIER_TWENTY_API_URL` | Twenty API origin for `referees` (read-only GraphQL) |
+| `DOSSIER_TWENTY_API_KEY` | Bearer token for that read. Never commit it |
 
 ## Privacy
 
-Do not commit dumps, DuckDB, LanceDB, evidence databases, `.env`, mbox, or PDFs. See `.gitignore`.
+Do not commit dumps, DuckDB files, LanceDB, `evidence.db`, `.env`, mbox, or PDFs. See `.gitignore`.
 
-## Later
+Work stays on loopback unless you opt into a remote model. The egress notice is the warning, not a block.
 
-**Ask-the-corpus RAG** over the same records. **mbox** (not the 26G IDDRI box as a first folder). **Slack**. Employer-named folders (needs an allowlist). Git. TranscriptX exports. JD factory (RenderCV).
+## Docs
 
-**Referee suggest** is not v0. When it exists it will read a CRM (Glen: Twenty People / Company / Notes) and shortlist names from job text, closeness already recorded, and hiring-firm overlap. A human confirms before a name is written on an application. No last-contacted column. No email send. Spec: Untangle `projects/dossier.md` (Later — referee suggest).
+- [Status](docs/status.md) — what is implemented, stubbed, and unbuilt
+- [Architecture](docs/architecture.md) — pipeline and adapter protocol
+- [Seekers](docs/seekers.md) — mail and Slack: seek, quotas, targeted fetch
+- [Prior art](docs/prior-art.md) — what this borrows
+- [Publications index](docs/zotero-rag-pubs.md) — separate RAG instance for your own papers
+
+MIT. Copyright 2026 Glen.

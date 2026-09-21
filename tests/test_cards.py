@@ -21,6 +21,10 @@ def test_empty_citation_is_refused() -> None:
     assert "missing" in reason
 
 
+def test_substring_inside_another_word_does_not_count() -> None:
+    assert not evidence_carries("port policy", "This report covers opportunity.")
+
+
 def test_evidence_must_carry_the_claim() -> None:
     evidence = "shopping list: milk, eggs, butter"
     assert not evidence_carries("Led the Oceana BBNJ working group", evidence)
@@ -64,3 +68,23 @@ def test_lock_claims_writes_refused_and_pending() -> None:
     assert by_claim["Drafted a coastal governance briefing"] == STATUS_PENDING
     assert by_claim["Commanded a lunar base"] == STATUS_REFUSED
     assert by_claim["Did something"] == STATUS_REFUSED
+
+
+def test_lock_claims_drops_near_duplicate_wording() -> None:
+    record = Record(
+        id="r1",
+        source="slack",
+        uri="slack://C/1",
+        title="Synthetic",
+        text="Glen drafted a coastal governance briefing for Oceana.",
+    )
+    cards = lock_claims(
+        record,
+        [
+            ProposedClaim("Drafted a coastal governance briefing", [record.uri]),
+            ProposedClaim("  drafted a Coastal Governance briefing  ", [record.uri]),
+        ],
+        {record.uri: record.text},
+    )
+    assert len(cards) == 1
+    assert cards[0].status == STATUS_PENDING

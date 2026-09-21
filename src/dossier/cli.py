@@ -1,16 +1,21 @@
-"""dossier — ingest adapters, extract claim cards, human-approve a buffet."""
+"""dossier — ingest, extract claim cards, ask the corpus, approve a buffet."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
+from dossier.ask import ASK_MODES, respond
+from dossier.brief import ask_hits, run_pack, write_brief
 from dossier.cards import STATUS_APPROVED
 from dossier.config import Config
 from dossier.contributions import CONTRIBUTIONS, contribution
 from dossier.extract import extract_corpus
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
+from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
+from dossier.packs import load_pack
 from dossier.paths import (
     applications_dir,
     cursor_projects_root,
@@ -33,7 +38,8 @@ def main(argv: list[str] | None = None) -> int:
 
     p_ing = sub.add_parser("ingest", help="Load one adapter into the local corpus")
     p_ing.add_argument(
-        "--adapter", help="pubs, chatgpt, linkedin, applications, transcripts"
+        "--adapter",
+        help="pubs, chatgpt, linkedin, applications, transcripts, slack, mbox",
     )
     p_ing.add_argument("path", nargs="?", type=Path, help="Override the default path")
 
@@ -51,7 +57,47 @@ def main(argv: list[str] | None = None) -> int:
     p_ok = sub.add_parser("approve", help="Human gate: mark a pending card approved")
     p_ok.add_argument("card_id")
 
+    p_ask = sub.add_parser("ask", help="Answer from ingested records, with citations")
+    p_ask.add_argument("question")
+    p_ask.add_argument("--limit", type=int, default=None)
+    p_ask.add_argument("--source", help="Limit retrieval to one adapter name")
+    p_ask.add_argument("--lens", help="Limit retrieval to a seeker lens header")
+    p_ask.add_argument("--kind", help="Limit retrieval to a seeker kind header")
+    p_ask.add_argument("--mode", choices=ASK_MODES, default=None)
+    p_ask.add_argument(
+        "--follow",
+        action="store_true",
+        help="Include up to three earlier accepted answers as context",
+    )
+
+    p_brief = sub.add_parser("brief", help="Answer a question pack into data/briefs")
+    p_brief.add_argument("--pack", default=None, help="career, or a path to a JSON pack")
+    p_brief.add_argument("--mode", choices=ASK_MODES, default=None)
+
+    p_run = sub.add_parser(
+        "run",
+        help="Ingest detected adapters, draft claims, then write a brief",
+    )
+    p_run.add_argument("--pack", default=None, help="career, or a path to a JSON pack")
+    p_run.add_argument("--mode", choices=ASK_MODES, default=None)
+
+    p_ref = sub.add_parser("referees", help="Read-only referee shortlist")
+    posting = p_ref.add_mutually_exclusive_group(required=True)
+    posting.add_argument("--posting", type=Path, help="Posting text file")
+    posting.add_argument("--text", help="Posting text")
+    p_ref.add_argument("--employer", default="", help="Hiring organisation name")
+    p_ref.add_argument("--people", type=Path, help="JSON people file")
+    p_ref.add_argument("--policy", type=Path, help="JSON skip and alias file")
+    p_ref.add_argument(
+        "--students",
+        action="store_true",
+        help="Keep people listed as students in the policy file",
+    )
+
     args = parser.parse_args(argv)
+    _note_egress.done = False
+    if args.cmd == "referees":
+        return _referees(args)
     cfg = Config.from_env()
     db = evidence_db(Path(cfg.data_dir))
     corpus = Corpus(db)
@@ -64,6 +110,12 @@ def main(argv: list[str] | None = None) -> int:
             return _buffet(args, corpus)
         if args.cmd == "approve":
             return _approve(args, corpus)
+        if args.cmd == "ask":
+            return _ask(args, cfg, corpus)
+        if args.cmd == "brief":
+            return _brief(args, cfg, corpus)
+        if args.cmd == "run":
+            return _run(args, cfg, corpus)
     finally:
         corpus.close()
     return 2
@@ -113,24 +165,88 @@ def _ingest(args: argparse.Namespace, corpus: Corpus) -> int:
 
 
 def _extract(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
-    if llm_egress_is_remote(cfg):
-        print(f"{_YELLOW}{EGRESS_NOTICE}{_RESET}", file=sys.stderr)
-    client = get_client(cfg)
-    ok, msg = client.check_config(cfg.llm_model)
-    if not ok:
-        print(msg, file=sys.stderr)
-        return 2
+    return _extract_cards(cfg, corpus, source=args.source, limit=args.limit, strict_llm=True)
+
+
+def _note_egress(cfg: Config) -> None:
+    if getattr(_note_egress, "done", False) or not llm_egress_is_remote(cfg):
+        return
+    _note_egress.done = True  # type: ignore[attr-defined]
+    print(f"{_YELLOW}{EGRESS_NOTICE}{_RESET}", file=sys.stderr)
+
+
+class _LazyClient:
+    """Open the model on the first completion. Exact answers never get that far."""
+
+    provider = "lazy"
+
+    def __init__(self, cfg: Config) -> None:
+        self.cfg = cfg
+        self._inner: LLMClient | None = None
+
+    def check_config(self, model: str) -> tuple[bool, str]:
+        return True, "ok"
+
+    def complete(self, request):  # noqa: ANN001
+        return self._client().complete(request)
+
+    def complete_json(self, request):  # noqa: ANN001
+        return self._client().complete_json(request)
+
+    def _client(self) -> LLMClient:
+        if self._inner is None:
+            _note_egress(self.cfg)
+            inner = get_client(self.cfg)
+            ok, msg = inner.check_config(self.cfg.llm_model)
+            if not ok:
+                raise LLMClientError(msg)
+            self._inner = inner
+        return self._inner
+
+
+def _extract_cards(
+    cfg: Config,
+    corpus: Corpus,
+    *,
+    source: str | None,
+    limit: int | None,
+    strict_llm: bool,
+) -> int:
+    use_llm = cfg.extract_llm and cfg.llm_enabled
+    client: LLMClient = NullLLMClient()
+    if use_llm:
+        if llm_egress_is_remote(cfg):
+            _note_egress(cfg)
+        client = get_client(cfg)
+        ok, msg = client.check_config(cfg.llm_model)
+        if not ok:
+            drafted = extract_corpus(
+                corpus,
+                NullLLMClient(),
+                cfg.llm_model,
+                source=source,
+                limit=limit,
+                use_llm=False,
+            )
+            _print_extract(drafted)
+            print(msg, file=sys.stderr)
+            return 2 if strict_llm else 0
     cards = extract_corpus(
         corpus,
         client,
         cfg.llm_model,
-        source=args.source,
-        limit=args.limit,
+        source=source,
+        limit=limit,
+        use_llm=use_llm,
     )
-    pending = sum(1 for c in cards if c.status == "pending")
+    _print_extract(cards)
+    return 0
+
+
+def _print_extract(cards: list) -> None:
+    pending = sum(1 for card in cards if card.status == "pending")
     refused = len(cards) - pending
     print(f"cards: {len(cards)} pending={pending} refused={refused}")
-    return 0
 
 
 def _buffet(args: argparse.Namespace, corpus: Corpus) -> int:
@@ -142,9 +258,91 @@ def _buffet(args: argparse.Namespace, corpus: Corpus) -> int:
         print(f"{card.status:8} {card.id}  {card.claim}")
         if card.citations:
             print(f"         citations: {', '.join(card.citations)}")
+        if card.extras:
+            bits = ", ".join(f"{k}={v}" for k, v in card.extras.items() if v)
+            if bits:
+                print(f"         {bits}")
         if card.reason:
             print(f"         {card.reason}")
     return 0
+
+
+def _referees(args: argparse.Namespace) -> int:
+    from dossier.referees.rank import format_suggestion, rank
+
+    try:
+        posting = _posting_text(args)
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if not posting.strip():
+        print("posting is empty", file=sys.stderr)
+        return 2
+    try:
+        people = _people_source(args)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if people is None:
+        print("no people source", file=sys.stderr)
+        return 1
+    try:
+        policy = _policy_source(args)
+    except (OSError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    shortlist = rank(
+        posting,
+        people,
+        policy,
+        employer=args.employer,
+        include_students=args.students,
+    )
+    for index, suggestion in enumerate(shortlist, start=1):
+        print(format_suggestion(suggestion, index))
+    return 0
+
+
+def _posting_text(args: argparse.Namespace) -> str:
+    if args.text is not None:
+        return args.text
+    return args.posting.read_text(encoding="utf-8")
+
+
+def _people_source(args: argparse.Namespace):
+    path = args.people or _env_path("DOSSIER_PEOPLE")
+    if path is not None:
+        from dossier.referees.load import load_people
+
+        return load_people(path)
+    url = os.environ.get("DOSSIER_TWENTY_API_URL", "").strip()
+    key = os.environ.get("DOSSIER_TWENTY_API_KEY", "").strip()
+    if url or key:
+        if not (url and key):
+            raise RuntimeError(
+                "Twenty read needs both DOSSIER_TWENTY_API_URL and DOSSIER_TWENTY_API_KEY"
+            )
+        from dossier.referees.twenty import fetch_people
+
+        return fetch_people(url, key)
+    return None
+
+
+def _policy_source(args: argparse.Namespace):
+    from dossier.referees.load import load_policy
+    from dossier.referees.rank import Policy
+
+    path = args.policy or _env_path("DOSSIER_REFEREE_POLICY")
+    if path is None:
+        return Policy.empty()
+    return load_policy(path)
+
+
+def _env_path(name: str) -> Path | None:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return None
+    return Path(raw)
 
 
 def _approve(args: argparse.Namespace, corpus: Corpus) -> int:
@@ -160,8 +358,124 @@ def _approve(args: argparse.Namespace, corpus: Corpus) -> int:
     return 0
 
 
+def _ask(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
+    mode = args.mode or cfg.ask_mode
+    limit = cfg.ask_limit if args.limit is None else args.limit
+    hits = ask_hits(
+        corpus,
+        args.question,
+        cfg,
+        limit=limit,
+        source=args.source,
+        lens=args.lens,
+        kind=args.kind,
+    )
+    if not hits or mode == "exact":
+        client = NullLLMClient()
+    elif mode == "auto":
+        client = _LazyClient(cfg)
+    else:
+        client, code = _client_for_mode(cfg, mode)
+        if code is not None:
+            return code
+    prior = corpus.recent_accepted_texts(3) if args.follow else None
+    result = respond(args.question, hits, client, cfg.llm_model, mode=mode, prior=prior)
+    corpus.add_answer(
+        question=args.question,
+        mode=mode,
+        text=result.text,
+        citations=result.citations,
+        refused=result.refused,
+        reason=result.reason,
+    )
+    if result.refused:
+        print("refused")
+        if result.reason:
+            print(result.reason)
+        return 1
+    print(result.text)
+    print("citations: " + ", ".join(result.citations))
+    return 0
+
+
+def _brief(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
+    mode = args.mode or cfg.ask_mode
+    try:
+        questions = load_pack(args.pack or cfg.run_pack)
+    except (OSError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    client, code = _client_for_mode(cfg, mode)
+    if code is not None:
+        return code
+    items = run_pack(corpus, questions, cfg, client, mode=mode)
+    path = write_brief(items, Path(cfg.data_dir) / "briefs")
+    print(path)
+    return 0
+
+
+def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
+    targets, skipped = _detected_targets(cfg.run_adapters)
+    for line in skipped:
+        print(line)
+    if not targets and not corpus.records():
+        print("nothing to ingest (no default source detected)")
+    n_before = len(corpus.records())
+    for item, path in targets:
+        print(f"ingest {item.name} from {path}")
+        item.source.load(path, corpus)
+    n_after = len(corpus.records())
+    if targets:
+        print(f"records: {n_after} (+{n_after - n_before})")
+    _extract_cards(cfg, corpus, source=None, limit=None, strict_llm=False)
+    return _brief(args, cfg, corpus)
+
+
+def _client_for_mode(cfg: Config, mode: str) -> tuple[LLMClient, int | None]:
+    """A client, and an exit code when rich mode cannot reach a model."""
+    if mode == "exact" or not cfg.llm_enabled:
+        return NullLLMClient(), None
+    if llm_egress_is_remote(cfg):
+        _note_egress(cfg)
+    client = get_client(cfg)
+    ok, msg = client.check_config(cfg.llm_model)
+    if ok:
+        return client, None
+    if mode == "rich":
+        print(msg, file=sys.stderr)
+        return client, 2
+    print(msg, file=sys.stderr)
+    return NullLLMClient(), None
+
+
+def _detected_targets(
+    allowlist: tuple[str, ...],
+) -> tuple[list[tuple], list[str]]:
+    names = allowlist or tuple(item.name for item in CONTRIBUTIONS)
+    targets: list[tuple] = []
+    skipped: list[str] = []
+    for name in names:
+        item = contribution(name)
+        if item is None:
+            skipped.append(f"skip {name}: unknown adapter")
+            continue
+        paths: list[Path] = []
+        default = _default_path(name)
+        if default is not None and item.source.detect(default):
+            paths.append(default)
+        for extra in _extra_paths(name):
+            if item.source.detect(extra):
+                paths.append(extra)
+        if not paths:
+            skipped.append(f"skip {name}: not detected")
+            continue
+        for path in paths:
+            targets.append((item, path))
+    return targets, skipped
+
+
 def _default_path(name: str) -> Path | None:
-    if name in {"chatgpt", "linkedin"}:
+    if name in {"chatgpt", "linkedin", "slack", "mbox"}:
         return warehouse_db()
     if name == "applications":
         return applications_dir()

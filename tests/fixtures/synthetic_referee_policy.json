@@ -1,0 +1,10 @@
+{
+  "hard_skips": ["Pat Skip"],
+  "students": ["Stu Dent"],
+  "scarce": ["Sam Scarce"],
+  "ruled_out": ["Rue Ledout"],
+  "this_quarter": ["Quin Quarter", "Bev Keywords"],
+  "employer_aliases": {
+    "Coastal Lab": ["CL Coast"]
+  }
+}
