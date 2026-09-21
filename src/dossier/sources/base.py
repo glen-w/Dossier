@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from dossier.store import Corpus
 
 
 @runtime_checkable
@@ -16,7 +19,7 @@ class Source(Protocol):
         """Return True if this adapter owns the given file or directory."""
         ...
 
-    def load(self, path: Path) -> None:
+    def load(self, path: Path, corpus: Corpus) -> None:
         """Read into the local gitignored corpus. Do not commit the bytes."""
         ...
 

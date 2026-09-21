@@ -1,15 +1,22 @@
 [project]
 name = "dossier"
-version = "0.0.0"
+version = "0.1.0"
 description = "Local-first work-evidence locker and RAG"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Glen" }]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "httpx>=0.27",
+    "duckdb>=1.1",
+]
 
 [project.optional-dependencies]
+llm = ["litellm>=1.70,<2"]
 dev = ["pytest>=8"]
+
+[project.scripts]
+dossier = "dossier.cli:main"
 
 [build-system]
 requires = ["hatchling"]

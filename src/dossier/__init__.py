@@ -1,3 +1,5 @@
-"""Dossier — local work-evidence locker and RAG. Scaffold only."""
+"""Dossier — local work-evidence locker and RAG."""
 
-__version__ = "0.0.0"
+from __future__ import annotations
+
+__version__ = "0.1.0"
