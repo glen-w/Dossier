@@ -396,13 +396,28 @@ class Corpus:
             except sqlite3.OperationalError:
                 self.passages_fts_ok = False
         self._conn.commit()
-        n_rec = self._conn.execute("SELECT count(*) FROM records").fetchone()[0]
-        n_uri = self._conn.execute(
-            "SELECT count(DISTINCT record_uri) FROM passages"
-        ).fetchone()[0]
-        if n_rec != n_uri:
-            for record in self.records():
-                self._replace_passages(record)
+        missing = self._conn.execute(
+            """
+            SELECT id, source, uri, title, text, table_name
+            FROM records
+            WHERE length(trim(text)) > 0
+              AND NOT EXISTS (
+                SELECT 1 FROM passages WHERE passages.record_uri = records.uri
+              )
+            """
+        ).fetchall()
+        for row in missing:
+            self._replace_passages(
+                Record(
+                    id=row["id"],
+                    source=row["source"],
+                    uri=row["uri"],
+                    title=row["title"],
+                    text=row["text"],
+                    table=row["table_name"] or "",
+                )
+            )
+        if missing:
             self._conn.commit()
 
     def _replace_passages(self, record: Record) -> None:

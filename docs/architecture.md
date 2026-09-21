@@ -6,6 +6,8 @@ adapters you enable
         → deterministic drafts, then the model for what is left
             → human approve
                 → buffet of cards you can paste
+                    → defend stores the carrying sentence
+                        → data/packets when you write a packet
         → interview ask (approved claim, passages, one hop, then one completion)
             → cited answer, or a refusal
             → data/briefs when you run a question pack
@@ -28,6 +30,8 @@ One adapter per source. Register it by appending `CONTRIBUTIONS` in `src/dossier
 A proposed claim becomes `pending` only when every citation resolves to corpus text and that text can carry the sentence. Otherwise the card is stored as `refused`, with a reason. `dossier approve` accepts a pending card. Refused cards stay refused until a better record exists.
 
 Extraction writes a draft card when the sentence is already in a LinkedIn row or a seeker record, then asks the configured model for JSON claims on the rest. The model does not get to mark a card approved. `DOSSIER_LLM_PROVIDER=off` leaves only the drafts.
+
+`dossier defend` stores a carrying sentence on a pending or approved card (`extras.span` and `extras.span_uri`). That check is one sentence, stricter than the whole-record rule above. It does not change status. `dossier packet` writes markdown for the approved cards that have a span under `data/packets/`. `dossier gaps` counts Lens and Kind headers already on records. None of these calls a model.
 
 ## Wired adapters
 

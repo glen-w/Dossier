@@ -95,6 +95,57 @@ def content_token_set(text: str) -> set[str]:
     return set(content_tokens(text))
 
 
+_HEADER_LINE = re.compile(
+    r"^(Lens|Kind|Org|Year|Skills|Artifacts|People|Hunt):",
+    re.I,
+)
+
+
+def header_values(text: str, key: str) -> list[str]:
+    """Values on the first `Key:` line. Seeker headers are a closed set."""
+    prefix = key.lower() + ":"
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith(prefix):
+            raw = stripped.split(":", 1)[1]
+            return [part.strip().lower() for part in raw.split(",") if part.strip()]
+    return []
+
+
+def sentences(text: str) -> list[str]:
+    """Non-header sentences. A header line is not a span."""
+    body: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or _HEADER_LINE.match(stripped):
+            continue
+        body.append(stripped)
+    if not body:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+", " ".join(body))
+    return [part.strip() for part in parts if part.strip()]
+
+
+def carrying_span(claim: str, text: str) -> str:
+    """The sentence with the most shared content words, or empty.
+
+    Stricter than `evidence_carries` on the whole record: the words must
+    sit in one sentence. Ties keep the earlier sentence.
+    """
+    best = ""
+    best_score = -1
+    tokens = content_tokens(claim)
+    for sentence in sentences(text):
+        if not evidence_carries(claim, sentence):
+            continue
+        blob = content_token_set(sentence)
+        score = sum(1 for token in tokens if token in blob)
+        if score > best_score:
+            best = sentence
+            best_score = score
+    return best
+
+
 def evidence_carries(claim: str, evidence: str) -> bool:
     """True when evidence text can carry the claim without an LLM.
 

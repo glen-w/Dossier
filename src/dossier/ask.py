@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, replace
 
-from dossier.cards import STATUS_APPROVED, content_token_set, content_tokens, evidence_carries
+from dossier.cards import (
+    STATUS_APPROVED,
+    carrying_span,
+    content_token_set,
+    content_tokens,
+    evidence_carries,
+    header_values,
+)
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
 from dossier.store import Corpus, Record
 
@@ -24,10 +30,6 @@ Records:
 
 MAX_HITS = 8
 ASK_MODES = ("exact", "auto", "rich")
-_HEADER = re.compile(
-    r"^(Lens|Kind|Org|Year|Skills|Artifacts|People|Hunt):",
-    re.I,
-)
 _TRIGGERS: dict[str, tuple[str, ...]] = {
     "delivered": ("report", "paper", "chapter", "workshop"),
     "skills": ("teaching", "editing"),
@@ -350,21 +352,11 @@ def _filter_records(
         rows = [rec for rec in rows if rec.source == source]
     if lens:
         want = lens.strip().lower()
-        rows = [rec for rec in rows if want in _header_values(rec.text, "Lens")]
+        rows = [rec for rec in rows if want in header_values(rec.text, "Lens")]
     if kind:
         want = kind.strip().lower()
-        rows = [rec for rec in rows if _header_values(rec.text, "Kind") == [want]]
+        rows = [rec for rec in rows if header_values(rec.text, "Kind") == [want]]
     return rows
-
-
-def _header_values(text: str, key: str) -> list[str]:
-    prefix = key.lower() + ":"
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.lower().startswith(prefix):
-            raw = stripped.split(":", 1)[1]
-            return [part.strip().lower() for part in raw.split(",") if part.strip()]
-    return []
 
 
 def _score(records: list[Record], tokens: list[str]) -> list[Hit]:
@@ -383,31 +375,7 @@ def _needs_many(hits: list[Hit]) -> bool:
 
 def _exact(question: str, hits: list[Hit]) -> Answer:
     top = hits[0]
-    if not evidence_carries(question, f"{top.title}\n{top.text}"):
+    span = carrying_span(question, top.text)
+    if not span:
         return Answer(text="", citations=[], refused=True, reason="no direct span")
-    best = ""
-    best_score = -1
-    question_tokens = content_tokens(question)
-    for sentence in _sentences(top.text):
-        if not evidence_carries(question, sentence):
-            continue
-        blob = content_token_set(sentence)
-        score = sum(1 for token in question_tokens if token in blob)
-        if score > best_score:
-            best = sentence
-            best_score = score
-    if not best:
-        return Answer(text="", citations=[], refused=True, reason="no direct span")
-    return Answer(text=best[:240], citations=[top.uri], refused=False, reason="")
-
-
-def _sentences(text: str) -> list[str]:
-    body: list[str] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped or _HEADER.match(stripped):
-            continue
-        body.append(stripped)
-    blob = " ".join(body) if body else text.strip()
-    parts = re.split(r"(?<=[.!?])\s+", blob)
-    return [part.strip() for part in parts if part.strip()]
+    return Answer(text=span[:240], citations=[top.uri], refused=False, reason="")

@@ -1,7 +1,7 @@
 import pytest
 
 from dossier.cards import STATUS_PENDING, STATUS_REFUSED, ClaimCard
-from dossier.store import Record
+from dossier.store import Corpus, Record
 
 
 def test_refused_card_cannot_be_approved(corpus) -> None:
@@ -83,3 +83,37 @@ def test_upsert_rebuilds_passages(corpus) -> None:
     assert len(again) == 1
     assert again[0][0] == "zotero://fixture/1"
     assert "Only one coastal block" in again[0][1]
+
+
+def test_empty_text_does_not_rebuild_on_reopen(tmp_path, monkeypatch) -> None:
+    db = tmp_path / "evidence.db"
+    corpus = Corpus(db)
+    corpus.upsert_record(
+        Record(id="e", source="pubs", uri="u://empty", title="Empty", text="   ")
+    )
+    corpus.upsert_record(
+        Record(
+            id="t",
+            source="pubs",
+            uri="u://text",
+            title="Text",
+            text="Coastal governance paper.",
+        )
+    )
+    corpus.close()
+    calls: list[str] = []
+    original = Corpus._replace_passages
+
+    def spy(self, record):
+        calls.append(record.uri)
+        return original(self, record)
+
+    monkeypatch.setattr(Corpus, "_replace_passages", spy)
+    again = Corpus(db)
+    try:
+        uris = {uri for uri, _ in again.passage_rows()}
+        assert "u://empty" not in uris
+        assert "u://text" in uris
+        assert calls == []
+    finally:
+        again.close()

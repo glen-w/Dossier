@@ -4,7 +4,7 @@ Dossier is a local-first locker for professional evidence. It turns records you 
 
 Exports, mail, and PDFs stay on your machine. They are not part of this git tree.
 
-Ask-the-corpus — “what did I actually do?” — is `dossier ask`. It answers from records already in the locker and prints the citation URIs. Version **0.4** adds passages, approved-card answers, one seeker hop, compound split, and a model call budget. How far that goes is under [Status](docs/status.md). What comes next is under [Roadmap](docs/roadmap.md).
+Ask-the-corpus — “what did I actually do?” — is `dossier ask`. It answers from records already in the locker and prints the citation URIs. Version **0.5** shows the sentence that carries a claim: `span`, `defend`, `gaps`, and `packet`. How far that goes is under [Status](docs/status.md). What comes next is under [Roadmap](docs/roadmap.md).
 
 ## How a card gets made
 
@@ -13,7 +13,8 @@ Ask-the-corpus — “what did I actually do?” — is `dossier ask`. It answer
 3. Empty citations, missing records, or text that does not support the sentence are stored as **refused**.
 4. **Buffet** lists the cards. **Approve** is the human gate. Nothing is copied into a CV by the tool.
 5. **Ask** quotes a matching span when that span carries the question. An approved claim can answer first. Otherwise one local completion, still cited or refused.
-6. **Brief** and **run** answer a fixed question pack into `data/briefs/`. They do not approve cards. **Doctor** prints whether this interpreter has full text and which adapters detect.
+6. **Span** prints the one sentence that carries a claim. **Defend** stores that sentence on pending and approved cards and does not change their status. **Packet** writes those sentences to `data/packets/`. **Gaps** shows which lenses are empty.
+7. **Brief** and **run** answer a fixed question pack into `data/briefs/`. They do not approve cards. **Doctor** prints whether this interpreter has full text and which adapters detect.
 
 Adapters are an explicit list in `src/dossier/contributions.py`. There is no plugin directory and no entry-point scan. Turn on only the sources you have.
 
@@ -38,6 +39,10 @@ uv run dossier extract --source slack
 uv run dossier extract
 uv run dossier buffet --status pending
 uv run dossier approve <card-id>
+uv run dossier span "synthetic paper on coastal governance"
+uv run dossier defend
+uv run dossier gaps
+uv run dossier packet
 uv run dossier ask "what did I write about coastal governance?"
 uv run dossier ask --mode exact --source pubs "coastal governance"
 uv run dossier brief
@@ -89,6 +94,7 @@ Work stays on loopback unless you opt into a remote model. The egress notice is 
 
 ## Docs
 
+- [Changelog](CHANGELOG.md) — 0.4 and 0.5
 - [Status](docs/status.md) — what is implemented, stubbed, and unbuilt
 - [Roadmap](docs/roadmap.md) — now / next / later, and hard boundaries
 - [Architecture](docs/architecture.md) — pipeline and adapter protocol

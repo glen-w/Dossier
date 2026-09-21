@@ -2,7 +2,7 @@
 
 What ships now, what is next, and what stays later. Behaviour detail lives in [status](status.md). Pipeline shape lives in [architecture](architecture.md). Life facts and commitment stay in Untangle (`projects/dossier.md`).
 
-## Now — 0.4
+## Shipped — 0.4
 
 Local locker plus interview over the same SQLite records.
 
@@ -13,6 +13,16 @@ Local locker plus interview over the same SQLite records.
 - `doctor` for data dir, FTS5 availability, provider, budget, adapter detect
 
 Tested on synthetic fixtures. Not yet run as a full extract or ask over a real corpus in this repository’s history.
+
+## Now — 0.5
+
+Show the sentence that carries a claim.
+
+- `span` prints that sentence, with its URI and title, or refuses
+- `defend` stores it on pending and approved cards (`extras.span`, `extras.span_uri`) and does not change status
+- `gaps` counts Lens and Kind headers and lists approved cards that are the only spanned card for that pair
+- `packet` writes `data/packets/<stamp>.md` from approved cards that have a span
+- A sentence must carry the claim on its own. Words spread across two sentences can still pass the whole-record check and still fail `span`
 
 ## Next
 

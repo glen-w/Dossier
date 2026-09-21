@@ -11,15 +11,15 @@ from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx
 from dossier.store import Corpus, Record
 
 EXTRACT_PROMPT = """You extract professional claim sentences for a CV locker.
-Return JSON only: {{"claims": [{{"claim": "...", "citations": ["{uri}"]}}]}}
+Return JSON only: {"claims": [{"claim": "...", "citations": ["@@URI@@"]}]}
 Each claim MUST be supported by the record text. Use only this URI in citations.
-If nothing is a sellable professional claim, return {{"claims": []}}.
+If nothing is a sellable professional claim, return {"claims": []}.
 Do not invent employers, titles, or dates that are not in the text.
 
-URI: {uri}
-Title: {title}
+URI: @@URI@@
+Title: @@TITLE@@
 Text:
-{text}
+@@TEXT@@
 """
 
 SEEKER_PROMPT_TAIL = """
@@ -86,8 +86,10 @@ def proposals_from_json(data: dict[str, Any], default_uri: str) -> list[Proposed
 def propose_with_llm(
     record: Record, client: LLMClient, model: str
 ) -> list[ProposedClaim]:
-    prompt = EXTRACT_PROMPT.format(
-        uri=record.uri, title=record.title, text=record.text[:12_000]
+    prompt = (
+        EXTRACT_PROMPT.replace("@@URI@@", record.uri)
+        .replace("@@TITLE@@", record.title)
+        .replace("@@TEXT@@", record.text[:12_000])
     )
     if record.source in {"slack", "mbox"}:
         prompt = prompt + SEEKER_PROMPT_TAIL

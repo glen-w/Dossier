@@ -84,3 +84,35 @@ def test_seeker_claims_keep_lens_extras(corpus) -> None:
     stored = corpus.get_card(cards[0].id)
     assert stored is not None
     assert stored.extras["org"] == "REN21"
+
+
+def test_extract_prompt_keeps_braces(corpus) -> None:
+    record = Record(
+        id="r3",
+        source="slack",
+        uri="slack://brace",
+        title="Notes {draft}",
+        text="Drafted the {coastal} governance chapter for the report.",
+    )
+    corpus.upsert_record(record)
+    seen: dict[str, str] = {}
+
+    class _Capture(FakeLLM):
+        def complete_json(self, request) -> dict:
+            seen["prompt"] = request.prompt
+            return self.payload
+
+    client = _Capture(
+        {
+            "claims": [
+                {
+                    "claim": "Drafted the coastal governance chapter",
+                    "citations": [record.uri],
+                }
+            ]
+        }
+    )
+    cards = extract_record(record, corpus, client, "fake")
+    assert "{coastal}" in seen["prompt"]
+    assert "{draft}" in seen["prompt"]
+    assert cards[0].status == STATUS_PENDING

@@ -10,14 +10,13 @@ from dossier.ask import (
     Answer,
     Hit,
     _exact,
-    _header_values,
     _needs_many,
     answer_question,
     approved_answer,
     collect_hits,
     expand_tokens,
 )
-from dossier.cards import content_tokens
+from dossier.cards import content_tokens, header_values
 from dossier.config import Config
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
 from dossier.store import Corpus
@@ -170,7 +169,7 @@ def _without_model(
     if not exact.refused:
         return exact, hits
     if cfg.ask_hops >= 1 and hits:
-        extra = _header_values(hits[0].text, "Lens") + _header_values(hits[0].text, "Kind")
+        extra = header_values(hits[0].text, "Lens") + header_values(hits[0].text, "Kind")
         if extra:
             base = expand_tokens(question, cfg.lexicon)
             hopped = collect_hits(

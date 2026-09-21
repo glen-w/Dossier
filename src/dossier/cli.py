@@ -18,6 +18,7 @@ from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
 from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
 from dossier.packs import load_pack, posting_pack
+from dossier.show import defend_cards, find_span, gap_report, write_packet
 from dossier.paths import (
     applications_dir,
     cursor_projects_root,
@@ -85,6 +86,18 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--posting", type=Path, help="Local posting text for the posting pack")
     p_run.add_argument("--mode", choices=ASK_MODES, default=None)
 
+    p_span = sub.add_parser("span", help="Print the sentence that carries a claim")
+    p_span.add_argument("claim")
+    p_span.add_argument("--uri", help="Limit the search to one record URI")
+    p_span.add_argument("--source", help="Limit the search to one adapter name")
+
+    sub.add_parser(
+        "defend",
+        help="Store the carrying sentence on pending and approved cards",
+    )
+    sub.add_parser("gaps", help="Show lens coverage and single-sourced approved cards")
+    sub.add_parser("packet", help="Write a markdown packet of spanned approved cards")
+
     p_doc = sub.add_parser("doctor", help="Print local readiness without writing")
 
     p_ref = sub.add_parser("referees", help="Read-only referee shortlist")
@@ -124,6 +137,14 @@ def main(argv: list[str] | None = None) -> int:
             return _brief(args, cfg, corpus)
         if args.cmd == "run":
             return _run(args, cfg, corpus)
+        if args.cmd == "span":
+            return _span(args, corpus)
+        if args.cmd == "defend":
+            return _defend(corpus)
+        if args.cmd == "gaps":
+            return _gaps(corpus)
+        if args.cmd == "packet":
+            return _packet(cfg, corpus)
     finally:
         corpus.close()
     return 2
@@ -468,6 +489,56 @@ def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
         f"egress={'yes' if llm_egress_is_remote(cfg) else 'no'}"
     )
     return code
+
+
+def _span(args: argparse.Namespace, corpus: Corpus) -> int:
+    claim = args.claim.strip()
+    if not claim:
+        print("refused")
+        print("empty claim")
+        return 1
+    shown = find_span(corpus, claim, uri=args.uri, source=args.source)
+    if shown is None:
+        print("refused")
+        print("no sentence carries this claim")
+        return 1
+    print(shown.sentence)
+    print(f"title: {shown.title}")
+    print(f"uri: {shown.uri}")
+    return 0
+
+
+def _defend(corpus: Corpus) -> int:
+    spanned, unspanned = defend_cards(corpus)
+    if not spanned and not unspanned:
+        print("no cards")
+        return 0
+    for card in spanned:
+        print(f"spanned {card.id}  {card.claim}")
+    for card in unspanned:
+        print(f"unspanned {card.id}  {card.claim}")
+    return 0
+
+
+def _gaps(corpus: Corpus) -> int:
+    from dossier.lenses import LENSES
+
+    report = gap_report(corpus)
+    for lens in LENSES:
+        print(f"lens {lens}: {report.lens_counts[lens]}")
+    for kind in sorted(report.kind_counts):
+        print(f"kind {kind}: {report.kind_counts[kind]}")
+    if report.empty_lenses:
+        print("empty: " + ", ".join(report.empty_lenses))
+    for line in report.singles:
+        print(f"single {line.lens}/{line.kind} {line.card.id}  {line.card.claim}")
+    return 0
+
+
+def _packet(cfg: Config, corpus: Corpus) -> int:
+    path = write_packet(corpus, Path(cfg.data_dir) / "packets")
+    print(path)
+    return 0
 
 
 def _doctor(cfg: Config) -> int:
