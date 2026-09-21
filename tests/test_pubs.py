@@ -26,7 +26,7 @@ def test_pubs_fixture_load(tmp_path: Path, corpus: Corpus) -> None:
     assert "coastal governance" in recs[0].text
 
 
-def test_http_retriever_returns_no_records_until_ingest_confirmed(corpus: Corpus) -> None:
+def test_http_retriever_returns_empty_without_server(corpus: Corpus) -> None:
     src = PubsSource()
     src.load(Path("/nonexistent/zotero-rag-pubs"), corpus)
     assert corpus.records("pubs") == []

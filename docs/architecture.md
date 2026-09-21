@@ -35,7 +35,7 @@ Extraction writes a draft card when the sentence is already in a LinkedIn row or
 
 ## Wired adapters
 
-`pubs`, `chatgpt`, `linkedin`, `applications`, `transcripts`, `slack`, `mbox`. Behaviour and limits: [status](status.md).
+`pubs`, `chatgpt`, `linkedin`, `applications`, `transcripts`, `slack`, `mbox`, `meetings`. Behaviour and limits: [status](status.md).
 
 ## Referee shortlist
 
@@ -45,4 +45,4 @@ People come from a JSON file, or from a GraphQL read when `DOSSIER_TWENTY_API_UR
 
 ## Roadmap
 
-Next and later work, including own-pubs ingest, a real-corpus pass, employer-folder allowlist, hybrid search, and CV/letter tailoring: [roadmap](roadmap.md).
+Versioned waves; 0.6 ships prove + pubs HTTP + product/Sphinx site. Next: thin-user sources, hybrid search, JD factory, then 0.9→1.0 user testing: [roadmap](roadmap.md).

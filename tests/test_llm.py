@@ -1,9 +1,12 @@
+from unittest.mock import patch
+
+import httpx
+import pytest
+
 from dossier.config import Config
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
-from dossier.llm.client import NullLLMClient, OllamaClient
-from dossier.llm.validate import validate_ollama_url
-from dossier.llm.validate import LlmConfigError
-import pytest
+from dossier.llm.client import CompletionRequest, LLMClientError, NullLLMClient, OllamaClient
+from dossier.llm.validate import LlmConfigError, validate_ollama_url
 
 
 def test_ollama_loopback_is_not_egress() -> None:
@@ -28,3 +31,14 @@ def test_disabled_llm_is_null() -> None:
 def test_remote_ollama_rejected_without_flag() -> None:
     with pytest.raises(LlmConfigError):
         validate_ollama_url("http://example.invalid:11434", allow_remote=False)
+
+
+def test_ollama_timeout_is_llm_client_error() -> None:
+    client = OllamaClient(base_url="http://127.0.0.1:11434", allow_remote=False)
+    req = CompletionRequest(model="toy", prompt="hi", timeout_seconds=1.0)
+    with patch("dossier.llm.client.httpx.Client") as mock_cls:
+        mock_cls.return_value.__enter__.return_value.post.side_effect = httpx.ReadTimeout(
+            "timed out"
+        )
+        with pytest.raises(LLMClientError, match="timed out"):
+            client.complete(req)

@@ -1,6 +1,6 @@
 [project]
 name = "dossier"
-version = "0.5.0"
+version = "0.6.0"
 description = "Local-first work-evidence locker and RAG"
 readme = "README.md"
 license = { text = "MIT" }
@@ -14,6 +14,14 @@ dependencies = [
 [project.optional-dependencies]
 llm = ["litellm>=1.70,<2"]
 dev = ["pytest>=8"]
+docs = [
+    "sphinx>=7.0.0",
+    "myst-parser>=2.0.0",
+    "furo>=2023.9.10",
+    "sphinx-autobuild>=2021.3.14",
+    "sphinxcontrib-mermaid>=0.9.2",
+    "sphinx-autodoc-typehints>=1.24.0",
+]
 
 [project.scripts]
 dossier = "dossier.cli:main"

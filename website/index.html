@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dossier — cited claims from work you already keep</title>
+    <meta
+      name="description"
+      content="Dossier is a local-first locker for professional evidence. It turns records you already have into claim cards you could paste into a CV or letter — each claim cited, or refused."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="images/favicon.png" />
+    <link rel="stylesheet" href="chrome/site_chrome.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header do-site-chrome">
+      <div class="wrap header-inner">
+        <a class="brand" href="./">Dossier</a>
+        <button
+          class="nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="site-nav"
+          data-nav-toggle
+        >
+          Menu
+        </button>
+        <nav id="site-nav" class="site-nav" data-nav>
+          <a href="#product">See how it works</a>
+          <a href="./guide/">Docs</a>
+          <a href="#install">Install</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="hero-atmosphere" aria-hidden="true"></div>
+        <div class="wrap hero-copy">
+          <img
+            class="hero-logo"
+            src="images/dossier_logo.png"
+            alt=""
+            width="96"
+            height="96"
+          />
+          <p class="brand-mark">Dossier</p>
+          <h1>Cited claims from work you already keep.</h1>
+          <p class="lede">
+            A local locker for professional evidence. Records become claim cards
+            you could paste into a CV or letter. Each claim cites a record — or
+            it is refused. Ask what you actually did; the answer carries URIs.
+          </p>
+          <div class="cta-row">
+            <a class="btn primary" href="#product">See how it works</a>
+            <a class="btn ghost" href="./guide/">Read the docs</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="product">
+        <div class="wrap">
+          <h2>Locker, then interview</h2>
+          <p class="section-lead">
+            Ingest only the adapters you have. Extract drafts cards from the
+            words already in a record. You approve before anything is paste-ready.
+            Ask quotes a span when that span carries the question.
+          </p>
+          <ol class="steps">
+            <li>
+              <strong>Ingest</strong> — Slack, mail (capped), LinkedIn, ChatGPT,
+              applications, transcripts, meetings, own pubs when the index is ready.
+            </li>
+            <li>
+              <strong>Extract</strong> — deterministic drafts first; optional
+              local model for the rest. Uncited claims stay refused.
+            </li>
+            <li>
+              <strong>Approve</strong> — the human gate. Nothing is copied into a
+              CV by the tool.
+            </li>
+            <li>
+              <strong>Ask / packet</strong> — cited answers, or a refusal. Span
+              stores the carrying sentence.
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section alt" id="outcomes">
+        <div class="wrap">
+          <h2>What you get</h2>
+          <p class="section-lead">
+            A buffet of pending and approved cards, markdown briefs and packets,
+            and a read-only referee shortlist — still never auto-attached.
+          </p>
+          <ul class="outcomes">
+            <li>Claim cards with citation URIs in a local SQLite corpus</li>
+            <li><code>dossier ask</code> with exact / auto / rich modes</li>
+            <li><code>span</code>, <code>defend</code>, <code>gaps</code>, <code>packet</code></li>
+            <li><code>referees</code> from a JSON people file or Twenty read</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section" id="privacy">
+        <div class="wrap">
+          <h2>Stays on your machine</h2>
+          <p class="section-lead">
+            Ollama on loopback by default. Cloud completions are opt-in and print
+            an egress notice. Dumps, warehouse files, and <code>evidence.db</code>
+            stay out of git. No Twenty writes. No auto-attach of a referee name.
+          </p>
+        </div>
+      </section>
+
+      <section class="section alt" id="install">
+        <div class="wrap">
+          <h2>Install</h2>
+          <p class="section-lead">
+            Python 3.11+ and
+            <a href="https://docs.astral.sh/uv/">uv</a>. Prefer an interpreter
+            whose SQLite has FTS5 — <code>dossier doctor</code> reports it.
+          </p>
+          <pre class="code"><code>uv sync --extra dev
+uv run dossier doctor
+uv run dossier prove</code></pre>
+          <p>
+            Full guide:
+            <a href="./guide/install.html">install</a>,
+            <a href="./guide/cli.html">CLI</a>,
+            <a href="./guide/prove.html">prove</a>.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-inner">
+        <p>Dossier · MIT · local-first evidence locker</p>
+        <p><a href="./guide/">Documentation</a></p>
+      </div>
+    </footer>
+    <script src="chrome/site_nav.js" defer></script>
+  </body>
+</html>

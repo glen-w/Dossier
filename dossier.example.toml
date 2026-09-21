@@ -28,6 +28,11 @@ adapters = [] # empty: every detected adapter
 pack = "career"
 # posting = "/absolute/path/to/posting.txt"
 
+# Own-pubs HTTP retrieve (sibling zotero-rag-pubs). Live ingest stays gated.
+# pubs_url = "http://127.0.0.1:8012"
+# pubs_seed = "publications"
+# pubs_top_k = 50
+
 # Retrieval expansions. When this key is absent, built-in lens words
 # (delivered, skills, contributions, publications, roles) expand on their own.
 # An empty list turns those extras off. A list replaces them.

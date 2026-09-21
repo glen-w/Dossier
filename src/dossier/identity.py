@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 DEFAULT_SLACK_USER_IDS = ("U05E73N5733", "UUDS0NJ9W")
+DEFAULT_SPEAKER_NAMES = ("Glen Wright", "Glen")
 
 DEFAULT_MAIL_ACCOUNTS: dict[str, str] = {
     "glen.wright@sciencespo.fr": "iddri",
@@ -68,6 +69,17 @@ def slack_user_ids_from_env() -> tuple[str, ...]:
     if raw:
         return tuple(part.strip() for part in raw.split(",") if part.strip())
     return ()
+
+
+def speaker_names_from_env() -> tuple[str, ...]:
+    raw = os.environ.get("DOSSIER_SPEAKER_NAMES", "").strip()
+    if raw:
+        return tuple(part.strip() for part in raw.split(",") if part.strip())
+    return ()
+
+
+def resolve_speaker_names() -> tuple[str, ...]:
+    return speaker_names_from_env() or DEFAULT_SPEAKER_NAMES
 
 
 def mail_account_map() -> dict[str, str]:

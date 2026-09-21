@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -18,12 +19,14 @@ from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
 from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
 from dossier.packs import load_pack, posting_pack
+from dossier.prove import DEFAULT_ADAPTERS, run_prove
 from dossier.show import defend_cards, find_span, gap_report, write_packet
 from dossier.paths import (
     applications_dir,
     cursor_projects_root,
     evidence_db,
     grok_blobs_dir,
+    transcriptx_library,
     warehouse_db,
 )
 from dossier.store import Corpus
@@ -42,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     p_ing = sub.add_parser("ingest", help="Load one adapter into the local corpus")
     p_ing.add_argument(
         "--adapter",
-        help="pubs, chatgpt, linkedin, applications, transcripts, slack, mbox",
+        help="pubs, chatgpt, linkedin, applications, transcripts, slack, mbox, meetings",
     )
     p_ing.add_argument("path", nargs="?", type=Path, help="Override the default path")
 
@@ -100,6 +103,36 @@ def main(argv: list[str] | None = None) -> int:
 
     p_doc = sub.add_parser("doctor", help="Print local readiness without writing")
 
+    p_prove = sub.add_parser(
+        "prove",
+        help="Disposable real-corpus pass into a throwaway data dir (never approves)",
+    )
+    p_prove.add_argument(
+        "--data",
+        default=None,
+        help="Data directory (default: a new temp dir)",
+    )
+    p_prove.add_argument(
+        "--adapters",
+        default=",".join(DEFAULT_ADAPTERS),
+        help=f"Comma-separated allowlist (default: {','.join(DEFAULT_ADAPTERS)})",
+    )
+    p_prove.add_argument(
+        "--allow-overlap",
+        action="store_true",
+        help="Continue when this interpreter has no FTS5",
+    )
+    p_prove.add_argument(
+        "--with-llm",
+        action="store_true",
+        help="Allow model calls during extract (default: off)",
+    )
+    p_prove.add_argument(
+        "--pubs",
+        action="store_true",
+        help="Include pubs adapter (empty until /search returns rows)",
+    )
+
     p_ref = sub.add_parser("referees", help="Read-only referee shortlist")
     posting = p_ref.add_mutually_exclusive_group(required=True)
     posting.add_argument("--posting", type=Path, help="Posting text file")
@@ -117,6 +150,21 @@ def main(argv: list[str] | None = None) -> int:
     _note_egress.done = False
     if args.cmd == "referees":
         return _referees(args)
+    if args.cmd == "prove":
+        names = tuple(part.strip() for part in args.adapters.split(",") if part.strip())
+        raw = args.data
+        data: Path | None
+        if raw is None or not str(raw).strip():
+            data = None
+        else:
+            data = Path(str(raw)).expanduser().resolve()
+        return run_prove(
+            data=data,
+            adapters=names or None,
+            allow_overlap=args.allow_overlap,
+            with_llm=args.with_llm,
+            include_pubs=args.pubs,
+        )
     cfg = Config.from_env()
     if args.cmd == "doctor":
         return _doctor(cfg)
@@ -547,6 +595,8 @@ def _doctor(cfg: Config) -> int:
     try:
         print(f"data_dir: {cfg.data_dir}")
         print(f"evidence_db: {db}")
+        print(f"python: {sys.executable}")
+        print(f"sqlite: {sqlite3.sqlite_version}")
         print(f"fts5: {'yes' if corpus.fts_ok else 'no'}")
         print(f"provider: {cfg.llm_provider}")
         print(f"max_calls: {cfg.llm_max_calls}")
@@ -556,10 +606,15 @@ def _doctor(cfg: Config) -> int:
         print(f"ask.hops: {cfg.ask_hops}")
         print(f"ask.decompose: {cfg.ask_decompose}")
         print(f"ask.planner: {cfg.ask_planner}")
+        print(f"pubs_url: {cfg.pubs_url}")
         for item in CONTRIBUTIONS:
             default = _default_path(item.name)
             seen = default is not None and item.source.detect(default)
-            print(f"adapter {item.name}: {'detected' if seen else 'not detected'}")
+            if item.name == "pubs" and seen:
+                rows = len(item.source.retriever.records())  # type: ignore[attr-defined]
+                print(f"adapter pubs: detected rows={rows}")
+            else:
+                print(f"adapter {item.name}: {'detected' if seen else 'not detected'}")
     finally:
         corpus.close()
     return 0
@@ -615,6 +670,8 @@ def _default_path(name: str) -> Path | None:
         return applications_dir()
     if name == "transcripts":
         return cursor_projects_root()
+    if name == "meetings":
+        return transcriptx_library()
     if name == "pubs":
         # Sentinel; PubsSource.detect uses retriever.ping(), not this path.
         return Path("/nonexistent/zotero-rag-pubs")

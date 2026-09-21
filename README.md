@@ -1,10 +1,17 @@
-# Dossier
+<h1 align="center">
+  <img src="docs/logo.png" alt="Dossier" width="280">
+</h1>
 
-Dossier is a local-first locker for professional evidence. It turns records you already have into claim cards you could paste into a CV or letter. Each claim cites a record. If the record will not carry the sentence, the claim is refused. You approve a card before it is paste-ready.
+<p align="center">
+  <strong>Local-first locker for professional evidence.</strong><br>
+  Records become claim cards you could paste into a CV or letter.
+  Each claim cites a record. If the record will not carry the sentence,
+  the claim is refused. You approve a card before it is paste-ready.
+</p>
 
 Exports, mail, and PDFs stay on your machine. They are not part of this git tree.
 
-Ask-the-corpus — “what did I actually do?” — is `dossier ask`. It answers from records already in the locker and prints the citation URIs. Version **0.5** shows the sentence that carries a claim: `span`, `defend`, `gaps`, and `packet`. How far that goes is under [Status](docs/status.md). What comes next is under [Roadmap](docs/roadmap.md).
+Ask-the-corpus — “what did I actually do?” — is `dossier ask`. It answers from records already in the locker and prints the citation URIs. Version **0.6** adds `dossier prove` (disposable real-corpus pass), own-pubs HTTP retrieve that can return rows, and a product page plus Sphinx guide (`make pages-site`). How far that goes is under [Status](docs/status.md). What comes next is under [Roadmap](docs/roadmap.md).
 
 ## How a card gets made
 
@@ -35,6 +42,7 @@ The default model is Ollama at `http://127.0.0.1:11434`. Set `DOSSIER_LLM_PROVID
 uv run dossier ingest --adapter applications ./path/to/applications
 uv run dossier ingest --adapter slack
 uv run dossier ingest --adapter mbox
+uv run dossier ingest --adapter meetings
 uv run dossier extract --source slack
 uv run dossier extract
 uv run dossier buffet --status pending
@@ -48,11 +56,12 @@ uv run dossier ask --mode exact --source pubs "coastal governance"
 uv run dossier brief
 uv run dossier brief --posting ./posting.txt
 uv run dossier run
+uv run dossier prove
 uv run dossier doctor
 uv run dossier referees --posting ./posting.txt --employer "Hiring Org"
 ```
 
-`dossier referees` reads a JSON people file, or Twenty when both API variables below are set. It prints a shortlist and does not write the corpus or the CRM. Put skips in a local policy file (`--policy` or `DOSSIER_REFEREE_POLICY`), for example under `private/`, which is gitignored.
+`dossier prove` writes a throwaway locker (or `--data`), drafts cards without approving, and leaves `ledger.json` for spot-checks. Prefer an interpreter with FTS5 (`dossier doctor`).
 
 `evidence.db` is created under `~/Documents/Dossier/data` unless you set `DOSSIER_DATA` to another directory. That file is gitignored.
 
@@ -82,7 +91,11 @@ uv run dossier referees --posting ./posting.txt --employer "Hiring Org"
 | `DOSSIER_APPLICATIONS` | Folder of prior application packs |
 | `DOSSIER_CURSOR_PROJECTS` | Cursor projects root (transcripts) |
 | `DOSSIER_GROK_BLOBS` | Optional extra transcript folder |
+| `DOSSIER_TRANSCRIPTX` | TranscriptX library root (default `~/Documents/transcripts`, or `TRANSCRIPTX_TRANSCRIPTS_DIR`) |
+| `DOSSIER_SPEAKER_NAMES` | Comma-separated display names to treat as you in meetings |
 | `DOSSIER_PUBS_URL` | Publications RAG base URL (default `http://127.0.0.1:8012`) |
+| `DOSSIER_PUBS_SEED` | Query for pubs ingest `/search` (default `publications`) |
+| `DOSSIER_PUBS_TOP_K` | Max pubs hits to upsert (default `50`) |
 | `DOSSIER_TWENTY_API_URL` | Twenty API origin for `referees` (read-only GraphQL) |
 | `DOSSIER_TWENTY_API_KEY` | Bearer token for that read. Never commit it |
 
@@ -94,12 +107,13 @@ Work stays on loopback unless you opt into a remote model. The egress notice is 
 
 ## Docs
 
-- [Changelog](CHANGELOG.md) — 0.4 and 0.5
+- [Changelog](CHANGELOG.md) — 0.4 through 0.6
 - [Status](docs/status.md) — what is implemented, stubbed, and unbuilt
-- [Roadmap](docs/roadmap.md) — now / next / later, and hard boundaries
+- [Roadmap](docs/roadmap.md) — waves through 0.9, then 0.9→1.0 user testing
 - [Architecture](docs/architecture.md) — pipeline and adapter protocol
 - [Seekers](docs/seekers.md) — mail and Slack: seek, quotas, targeted fetch
 - [Prior art](docs/prior-art.md) — what this borrows
 - [Publications index](docs/zotero-rag-pubs.md) — separate RAG instance for your own papers
+- Product page + Sphinx guide: `uv sync --extra docs && make pages-site` → `_site/`
 
 MIT. Copyright 2026 Glen.

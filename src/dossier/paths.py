@@ -65,3 +65,11 @@ def mail_root() -> Path:
     if raw := os.environ.get("DOSSIER_MAIL_ROOT"):
         return Path(raw).expanduser()
     return DEFAULT_MAIL_ROOT
+
+
+def transcriptx_library() -> Path:
+    if raw := os.environ.get("DOSSIER_TRANSCRIPTX"):
+        return Path(raw).expanduser()
+    if raw := os.environ.get("TRANSCRIPTX_TRANSCRIPTS_DIR"):
+        return Path(raw).expanduser()
+    return Path.home() / "Documents" / "transcripts"

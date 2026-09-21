@@ -91,7 +91,7 @@ def propose_with_llm(
         .replace("@@TITLE@@", record.title)
         .replace("@@TEXT@@", record.text[:12_000])
     )
-    if record.source in {"slack", "mbox"}:
+    if record.source in {"slack", "mbox", "meetings"}:
         prompt = prompt + SEEKER_PROMPT_TAIL
     req = CompletionRequest(
         model=model,

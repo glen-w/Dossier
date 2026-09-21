@@ -1,0 +1,125 @@
+/* Shared top chrome for marketing landing + Sphinx /guide/ pages. */
+.do-site-chrome {
+  --do-ink: #101820;
+  --do-ink-soft: #3d4a55;
+  --do-paper: #eef2f5;
+  --do-sea: #0f6e7c;
+  --do-line: rgba(16, 24, 32, 0.12);
+  --do-font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --do-font-body: "Source Sans 3", "Segoe UI", sans-serif;
+  --do-header-height: 3.5rem;
+
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  backdrop-filter: blur(10px);
+  background: rgba(238, 242, 245, 0.92);
+  border-bottom: 1px solid var(--do-line);
+  font-family: var(--do-font-body);
+  color: var(--do-ink);
+}
+
+.do-site-chrome .wrap {
+  width: min(1080px, calc(100% - 2.5rem));
+  margin-inline: auto;
+}
+
+.do-site-chrome .header-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: var(--do-header-height);
+}
+
+.do-site-chrome .brand {
+  font-family: var(--do-font-display);
+  font-weight: 700;
+  font-size: 1.25rem;
+  text-decoration: none;
+  color: var(--do-ink);
+  letter-spacing: -0.02em;
+}
+
+.do-site-chrome .nav-toggle {
+  display: none;
+  border: 1px solid var(--do-line);
+  background: transparent;
+  color: var(--do-ink);
+  padding: 0.4rem 0.7rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.do-site-chrome .site-nav {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.do-site-chrome .site-nav a {
+  text-decoration: none;
+  color: var(--do-ink-soft);
+  font-weight: 600;
+}
+
+.do-site-chrome .site-nav a:hover,
+.do-site-chrome .site-nav a:focus-visible {
+  color: var(--do-sea);
+}
+
+.do-site-chrome + .page {
+  min-height: calc(100% - var(--do-header-height));
+}
+
+@media (max-width: 720px) {
+  .do-site-chrome .nav-toggle {
+    display: inline-flex;
+  }
+
+  .do-site-chrome .site-nav {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(var(--do-header-height) - 0.1rem);
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    background: var(--do-paper);
+    border: 1px solid var(--do-line);
+    border-radius: 0.4rem;
+  }
+
+  .do-site-chrome .site-nav.open {
+    display: flex;
+  }
+}
+
+body[data-theme="dark"] .do-site-chrome {
+  background: rgba(24, 28, 32, 0.92);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+  color: #e8eaed;
+}
+
+body[data-theme="dark"] .do-site-chrome .brand {
+  color: #e8eaed;
+}
+
+body[data-theme="dark"] .do-site-chrome .nav-toggle {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #e8eaed;
+}
+
+body[data-theme="dark"] .do-site-chrome .site-nav a {
+  color: #c4c9cf;
+}
+
+body[data-theme="dark"] .do-site-chrome .site-nav a:hover,
+body[data-theme="dark"] .do-site-chrome .site-nav a:focus-visible {
+  color: #7ec8d4;
+}
+
+body[data-theme="dark"] .do-site-chrome .site-nav {
+  background: #1c2126;
+  border-color: rgba(255, 255, 255, 0.12);
+}

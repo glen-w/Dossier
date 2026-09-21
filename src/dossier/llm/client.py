@@ -101,10 +101,17 @@ class OllamaClient:
             "stream": False,
             "options": options,
         }
-        with httpx.Client(timeout=request.timeout_seconds) as client:
-            resp = client.post(f"{self._api_root()}/api/generate", json=payload)
-            resp.raise_for_status()
-            data = resp.json()
+        try:
+            with httpx.Client(timeout=request.timeout_seconds) as client:
+                resp = client.post(f"{self._api_root()}/api/generate", json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.TimeoutException as exc:
+            raise LLMClientError(
+                f"Ollama timed out after {request.timeout_seconds:.0f}s: {exc}"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise LLMClientError(f"Ollama request failed: {exc}") from exc
         if data.get("error"):
             raise LLMClientError(str(data["error"]))
         return str(data.get("response") or "")

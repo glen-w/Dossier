@@ -13,6 +13,7 @@ from dossier.sources.base import Source
 from dossier.sources.chatgpt import ChatGPTSource
 from dossier.sources.linkedin import LinkedInSource
 from dossier.sources.mbox import MboxSource
+from dossier.sources.meetings import MeetingsSource
 from dossier.sources.pubs import PubsSource
 from dossier.sources.slack import SlackSource
 from dossier.sources.transcripts import TranscriptsSource
@@ -32,6 +33,7 @@ CONTRIBUTIONS: list[Contribution] = [
     Contribution("transcripts", TranscriptsSource()),
     Contribution("slack", SlackSource()),
     Contribution("mbox", MboxSource()),
+    Contribution("meetings", MeetingsSource()),
 ]
 
 

@@ -1,4 +1,4 @@
-# Seekers (mail and Slack)
+# Seekers (mail, Slack, and meetings)
 
 Seek, then fetch a diverse snippet buffet, then let Ollama word claims. Do not scan or embed a full history.
 
@@ -40,10 +40,18 @@ Seek `thunderbird.messages` (Gloda: subject, folder, attachments, direction). Bo
 
 Glen: `uv run dossier ingest --adapter mbox` reads the warehouse and fetches from `DOSSIER_MAIL_ROOT` (default `~/email`). Thin user: one exported folder, same heuristics, no Gloda.
 
+## Meetings
+
+Read a TranscriptX library (`DOSSIER_TRANSCRIPTX`, else `TRANSCRIPTX_TRANSCRIPTS_DIR`, else `~/Documents/transcripts`). Speaker names live in `metadata/speaker_maps/*.speaker_map.json`. A folder of JSON files with colocated `.speaker_map.json` sidecars works the same way. Dossier does not import the TranscriptX package.
+
+Identity: `DOSSIER_SPEAKER_NAMES` (comma-separated display names). When unset, `Glen Wright` and `Glen`. A `SPEAKER_00` → `SPEAKER_00` self-map is not a name. Ignored speakers are skipped. A segment may name the diarized id (`SPEAKER_00`, `0`) or the display name.
+
+A meeting is kept when you are a named speaker and someone else spoke, or you are the only speaker and the filename is an event (workshop, webinar, teaching, slides). Solo notes are skipped. Conflicted copies and `__inbox` duplicates of a file already in the library are skipped. The stored text is your turns, capped, plus the other named people. Their speech stays in the library.
+
 ## Quotas
 
 Default 20 hits per (source, lens, kind, year), 400 overall. Override `DOSSIER_SEEKER_PER_STRATUM` / `DOSSIER_SEEKER_OVERALL`. At least one hit per populated stratum when possible.
 
 ## Extract
 
-`dossier extract --source slack` (or `mbox`) sends only those snippets to Ollama. Cloud still prints an egress notice. Work mail and Slack do not leave the machine by default.
+`dossier extract --source slack` (or `mbox`, or `meetings`) sends only those snippets to Ollama. Cloud still prints an egress notice. Work mail, Slack, and meeting transcripts do not leave the machine by default.

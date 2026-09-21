@@ -11,6 +11,10 @@ evidence.db
 *.mbox
 *.pdf
 data_dumps_raw/
+ledger.json
+ledger.md
+briefs/
+packets/
 
 # Python
 .venv/
@@ -20,6 +24,10 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Docs / site
+docs/_build/
+_site/
 
 # Local Cursor state
 .cursor/
