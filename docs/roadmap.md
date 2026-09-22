@@ -23,10 +23,10 @@ Tested on synthetic fixtures.
 
 - `dossier prove` — disposable real-corpus pass, ledger, never approves
 - `doctor` prints python / sqlite / FTS5; install guide documents a known-good interpreter
-- Own-pubs HTTP `POST /search` maps hits into records; live compose/ingest stays gated on collection confirm
+- Own-pubs HTTP `POST /search` maps hits into records when no Zotero collection is configured
 - Product page + Sphinx guide (`make pages-site`)
 
-Still open for the full done-when: warehouse `make prove` spot-check by Glen, and pubs after collection name + ~353 confirmed.
+Still open for the full done-when: warehouse `make prove` spot-check by Glen. The named Zotero collection is ingested with the other adapters.
 
 ### 0.8 — Thin corpus and hybrid ask
 
@@ -57,5 +57,5 @@ These are not delayed features; they are refuse lines.
 - No cloud LLM default. Text leaves the machine only when the provider is `litellm` or `DOSSIER_LLM_ALLOW_REMOTE` is set. The CLI prints an egress notice first. `dossier doctor` reports `egress: no` or `egress: yes`
 - No 26G IDDRI mbox stream; no Sent Mail as a folder walker; no re-embed of hoops/ocean
 - No plugin directory or entry-point scan
-- No Docker image for the locker. It installs with `uv` on the host. A pubs compose project, if any, stays separate and gated
+- No Docker image for the locker. It installs with `uv` on the host. Publications are the named Zotero collection, read in-process. No compose server, and no re-embed of hoops or ocean
 - Dumps, warehouse, LanceDB, `evidence.db`, `.env`, mbox, and PDFs stay off git. Before every push, `python3 scripts/release/check_gitignore.py` must pass

@@ -51,7 +51,7 @@ def main() -> int:
     for name, count in rows:
         print(f"{str(name).ljust(width)}  {count}")
     print()
-    print("Confirm the own-pubs name and ~353-item scope before starting zotero-rag-pubs.")
+    print("Set [pubs] collection in data/dossier.toml to the name ingest should read.")
     return 0
 
 

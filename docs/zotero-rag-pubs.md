@@ -1,40 +1,32 @@
 # Publications index
 
 Type: GUIDE
-Authority: How the sibling pubs server is wired. Ingest stays off until the collection is confirmed. Ask behavior lives in [status](status.md).
+Authority: How own publications enter the corpus. Ask behavior lives in [status](status.md).
 
-Own publications are retrieved from a separate [zotero-rag](https://github.com/anapaulagomes/zotero-rag) instance. Dossier does not embed a Zotero library, and it does not reuse an index built for some other collection.
+`dossier ingest` and `dossier run` read one Zotero collection into `pubs` records. The career brief lists those records under “What did I publish?”. No separate server, and no PDF parsing.
 
-Suggested layout, when you choose to run one:
+Set the collection in gitignored `data/dossier.toml` (environment variables win):
 
-- Its own compose project and its own LanceDB directory
-- `ZOTERO_COLLECTION` set to the collection that is actually your publications
-- Loopback port `8012` (the `pubs` adapter’s default `DOSSIER_PUBS_URL`)
-- A thin `POST /search` endpoint that wraps LanceDB retrieval (upstream zotero-rag is Chainlit + CLI today)
+```toml
+[pubs]
+collection = "my pubs"
+zotero_db = "/absolute/path/to/zotero.sqlite"
+```
 
-That compose project is the pubs server only. The locker stays a host CLI. See [install](install.md).
+`collection` is the collection name or key, including child collections. Unset means this path does not run. A different collection, including a whole library, is not read. `zotero_db` defaults to `~/Zotero/zotero.sqlite`. `DOSSIER_PUBS_COLLECTION` and `ZOTERO_DB` override the file.
 
-Confirm the collection name in Zotero before any ingest. A large library and a publications folder are different scopes.
+Each item becomes one record: title, authors, year, journal, DOI, and abstract when Zotero has one. The URI is `zotero://` plus the item key. Attachments, notes, and deleted items are skipped.
+
+List collection names without ingesting:
 
 ```text
 uv run python scripts/list_zotero_collections.py
 ```
 
-## HTTP contract
+`doctor` prints the collection and, when the file has items, `adapter pubs: detected rows=N`.
 
-`POST {DOSSIER_PUBS_URL}/search` with JSON `{"query": str, "top_k": int}` returns
-`{"hits": [{"uri", "title", "text", ...}]}`.
+## Optional loopback search
 
-Optional env, or the same keys under `[pubs]` in gitignored `data/dossier.toml`
-(environment variables win):
+When `collection` is unset, the adapter can still `POST {DOSSIER_PUBS_URL}/search` with `{"query", "top_k"}` and map `{"hits": [{"uri","title","text"}]}`. The default URL is `http://127.0.0.1:8012`. A non-loopback host is not contacted. `DOSSIER_PUBS_SEED` and `DOSSIER_PUBS_TOP_K` apply only to that search. `ask.pubs` can call it for one answer and does not write the corpus.
 
-- `DOSSIER_PUBS_SEED` / `seed` — query used when ingesting (default `publications`)
-- `DOSSIER_PUBS_TOP_K` / `top_k` — hit cap (default `50`)
-- `collection` — Zotero collection name. `doctor` prints it when set. Dossier does not embed that library and does not start ingest
-- `zotero_db` — path to `zotero.sqlite` for `scripts/list_zotero_collections.py`
-
-Ping tries `GET /health` then `GET /`.
-
-## What the adapter does now
-
-`PubsSource` can load a JSON fixture (`{"records": [{"uri", "title", "text"}]}`) for tests. `HttpPubsRetriever` pings the URL and maps `/search` hits into corpus records. Until the sibling pubs server implements `/search` and ingest is confirmed, live `records()` stays empty. This repo does not start the other service. `ask.pubs` can call `/search` for one answer and does not write those hits into the corpus. See [roadmap](roadmap.md).
+[zotero-rag](https://github.com/anapaulagomes/zotero-rag) remains a separate project for embedded PDF chat. Dossier does not start it and does not reuse its index.

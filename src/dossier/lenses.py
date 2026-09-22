@@ -34,7 +34,7 @@ _KIND_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("review", re.compile(r"peer[- ]?review|\bto review\b|\breviewer")),
     ("brief", re.compile(r"\bbrief|\bfactsheet")),
     ("paper", re.compile(r"\bpaper\b|marine policy|publication|\bjournal\b|\bsubmission\b|\bhandbook\b")),
-    ("book", re.compile(r"\bbook\b")),
+    ("book", re.compile(r"\bedited book\b|\bbook chapter\b|\bbook proposal\b|\bhandbook\b|(?<![a-z])books?(?![a-z])(?!\s+your)(?!\.com)")),
     ("chapter", re.compile(r"chapter|\bsection_|\bgsr_section")),
     ("editing", re.compile(r"\bedit|\bdesign_")),
     ("outreach", re.compile(r"outreach|\bcomms|\bcomm_|\bblog\b|\bspeech\b")),
@@ -73,9 +73,9 @@ _DOC_EXT = re.compile(r"\.(pdf|docx?|pptx?|xlsx?|csv)$", re.I)
 _NOISE = re.compile(
     r"(?:^|[^a-z])(?:"
     r"form|consent|registration|invoice|receipt|passport|duplicat|bulletin|"
-    r"judging|appointment|engagement|timesheet|time[- ]?sheet|"
-    r"attendee report|logistics(?: note)?|ordonnance|"
-    r"chatgpt|gemini testing|"
+    r"judging|appointment|engagement|timesheets?|time[- ]?sheets?|"
+    r"attendee report|logistics(?: note)?|ordonnance|holiday dates?|"
+    r"chatgpt|gemini testing|booking\.com|"
     r"\*\s*done\s*\*|image\.png|image\.jpe?g"
     r")(?:[^a-z]|$)|"
     r"(?:^|/)agenda\.docx?$|"

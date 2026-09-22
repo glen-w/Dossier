@@ -49,13 +49,14 @@ _STEM_DROP = frozenset(
     }
 )
 _BAD_TITLE = re.compile(
-    r"^(?:fwd:|re:|fw:|thank you|done|\*done\*|image)\b",
+    r"^(?:fwd:|re:|fw:|thank you|done|\*done\*|image|hey team|good afternoon|fyi,|@)\b|"
+    r"<!subteam|^tr:|^aw:",
     re.I,
 )
 _EMPLOYER_ROOTS = frozenset({"publications", "events", "projects", "slides"})
-_PER_KIND = 16
-_EXTRA_PER_YEAR = 2
-_MAX_LINES = 80
+_PER_KIND = 12
+_EXTRA_PER_YEAR = 1
+_MAX_LINES = 100
 _SOURCE_WEIGHT = {
     "mbox": 3,
     "employer": 3,
@@ -186,6 +187,27 @@ def _publications(corpus: Corpus) -> Answer:
     lines.extend(more_lines[:room])
     citations.extend(more_cites[:room])
     return _listed(lines, citations)
+
+
+def _zotero_publications(corpus: Corpus) -> tuple[list[str], list[str]] | None:
+    rows: list[tuple[int, str, str, str]] = []
+    for rec in corpus.records("pubs"):
+        if rec.table != "pubs.records":
+            continue
+        title = rec.title.strip()
+        if not title:
+            continue
+        year = ""
+        years = header_values(rec.text, "Year")
+        if years and years[0].isdigit():
+            year = years[0]
+        rows.append((int(year) if year else 0, title, rec.uri, year))
+    if not rows:
+        return None
+    rows.sort(key=lambda row: (-row[0], row[1].casefold(), row[2]))
+    lines = [f"- {year} · {title}" if year else f"- {title}" for _num, title, _uri, year in rows]
+    citations = [uri for _num, _title, uri, _year in rows]
+    return lines, citations
 
 
 def _files(
@@ -470,14 +492,23 @@ def _format(cand: _Cand) -> str:
 def _label(title: str, art: str) -> str:
     title = (title or "").strip()
     art = (art or "").strip()
-    if title and not _BAD_TITLE.search(title) and not is_noise_name(title):
-        # Prefer a subject that names the work over a cryptic filename.
-        if art and _DOC.search(art):
-            if len(title) >= 12 and art.casefold() not in title.casefold():
-                return title
-            return art
-        return title
-    return art or title
+    if _slack_prose(title) or _BAD_TITLE.search(title) or is_noise_name(title):
+        return art or title
+    if title and art and _DOC.search(art):
+        if len(title) >= 12 and art.casefold() not in title.casefold():
+            return title
+        return art
+    return title or art
+
+
+def _slack_prose(title: str) -> bool:
+    if not title:
+        return False
+    if "\n" in title or "<!" in title:
+        return True
+    if title.startswith("@") or title.startswith("*"):
+        return True
+    return len(title) > 120
 
 
 def _messy(name: str) -> bool:

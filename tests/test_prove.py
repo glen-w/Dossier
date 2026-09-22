@@ -102,6 +102,7 @@ def test_pubs_load_from_http_search(tmp_path: Path, corpus: Corpus, monkeypatch)
             super().__init__(*args, **kwargs)
 
     monkeypatch.setattr("dossier.sources.pubs.httpx.Client", Client)
+    monkeypatch.setattr("dossier.sources.pubs.collection_records", lambda: None)
     src = PubsSource(retriever=HttpPubsRetriever("http://127.0.0.1:8012"))
     src.load(Path("/nonexistent/zotero-rag-pubs"), corpus)
     assert len(corpus.records("pubs")) == 1

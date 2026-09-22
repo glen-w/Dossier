@@ -96,7 +96,7 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DOSSIER_ASK_PLANNER` | `off` (default) or `rich` to spend one call on sub-questions |
 | `DOSSIER_EMBED_MODEL` | Ollama embed tag for `dossier index` (default `nomic-embed-text`) |
 | `DOSSIER_ASK_EMBED` | Use stored passage vectors when full text is empty or thin (`true` by default) |
-| `DOSSIER_ASK_PUBS` | One pubs `/search` for that answer (`false` by default). Does not write the corpus |
+| `DOSSIER_ASK_PUBS` | One optional pubs `/search` for that answer (`false` by default). Does not write the corpus. Ingested Zotero rows are already in the brief |
 | `DOSSIER_CV_NAME` | Name printed on a tailored CV or letter. Empty omits it |
 | `DOSSIER_REFEREE_PUBS` | Treat a name on an ingested pubs record as a coauthor (`true` by default) |
 | `DOSSIER_EMPLOYER_PATHS` | Comma-separated employer folders. `~/Documents` itself is ignored |
@@ -129,8 +129,10 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DOSSIER_GROK_BLOBS` | Optional extra transcript folder |
 | `DOSSIER_TRANSCRIPTX` | TranscriptX library root (default `~/Documents/transcripts`, or `TRANSCRIPTX_TRANSCRIPTS_DIR`) |
 | `DOSSIER_SPEAKER_NAMES` | Comma-separated display names to treat as you in meetings |
-| `DOSSIER_PUBS_URL` | Publications RAG base URL (default `http://127.0.0.1:8012`) |
-| `DOSSIER_PUBS_SEED` | Query for pubs ingest `/search` (default `publications`) |
-| `DOSSIER_PUBS_TOP_K` | Max pubs hits to upsert (default `50`) |
+| `DOSSIER_PUBS_COLLECTION` | Zotero collection name to ingest. Overrides `[pubs] collection` |
+| `ZOTERO_DB` | Path to `zotero.sqlite`. Overrides `[pubs] zotero_db` |
+| `DOSSIER_PUBS_URL` | Optional `/search` base URL when no collection is set (default `http://127.0.0.1:8012`) |
+| `DOSSIER_PUBS_SEED` | Query for that `/search` (default `publications`) |
+| `DOSSIER_PUBS_TOP_K` | Max hits from that `/search` (default `50`) |
 | `DOSSIER_TWENTY_API_URL` | Twenty API origin for `referees` (read-only GraphQL) |
 | `DOSSIER_TWENTY_API_KEY` | Bearer token for that read. Never commit it |

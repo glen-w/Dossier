@@ -19,6 +19,6 @@ Take the rule that fits. Leave the product that does not.
 
 **rollup** (house). `parse.py` walks a whole mbox for newsletter digests. Dossier wraps `parse_message` for **one** allowlisted message after a Gloda seek. It does not call `parse_mbox_folder` on Sent Mail or IDDRI.
 
-**zotero-rag** ([anapaulagomes/zotero-rag](https://github.com/anapaulagomes/zotero-rag)). RAG over one Zotero collection. Own publications should be a separate instance of that project, not a new embedder inside Dossier. See [publications index](zotero-rag-pubs.md).
+**zotero-rag** ([anapaulagomes/zotero-rag](https://github.com/anapaulagomes/zotero-rag)). RAG over one Zotero collection, with its own embeddings. Dossier reads bibliography fields from the named collection and does not embed that library. See [publications index](zotero-rag-pubs.md).
 
 The LLM client in this repo defaults to Ollama on loopback. A remote completion prints an egress notice first.

@@ -3,7 +3,7 @@
 Type: PRODUCT
 Authority: What this version does. Refuse lines live in [roadmap](roadmap.md). Pipeline shape lives in [architecture](architecture.md).
 
-Dossier 0.9 writes a posting-shaped CV or letter from spanned approved cards (`dossier tailor`). 0.8 added thin-user sources and hybrid ask over passage vectors in `evidence.db`. Retrieval still prefers a quote. When full text is empty or thin, a high-cosine neighbor can supply the sentence. When one span is not enough, it can stitch compound questions, hop on seeker headers (`ask.hops`, default 1), and call a local model (completion budget unlimited by default; set `DOSSIER_LLM_MAX_CALLS` to cap). `dossier index` embeds passages with Ollama. `ask.pubs` is off unless you turn it on. Fixture tests are green. A full warehouse prove and live pubs ingest (after collection confirm) are still human steps.
+Dossier 0.9 writes a posting-shaped CV or letter from spanned approved cards (`dossier tailor`). 0.8 added thin-user sources and hybrid ask over passage vectors in `evidence.db`. Retrieval still prefers a quote. When full text is empty or thin, a high-cosine neighbor can supply the sentence. When one span is not enough, it can stitch compound questions, hop on seeker headers (`ask.hops`, default 1), and call a local model (completion budget unlimited by default; set `DOSSIER_LLM_MAX_CALLS` to cap). `dossier index` embeds passages with Ollama. `ask.pubs` is off unless you turn it on. The pubs adapter reads the Zotero collection named in config. Fixture tests are green. A full warehouse prove is still a human step.
 
 ## Works
 
@@ -22,7 +22,7 @@ Dossier 0.9 writes a posting-shaped CV or letter from spanned approved cards (`d
 - `gaps` counts seeker `Lens` and `Kind` headers on records, lists lenses with zero records, and lists approved cards that are the only spanned card for their lens and kind. It also names an ingest hint for an empty lens, approved cards with no span, and records with no open card. It does not run those commands and it does not approve. No model.
 - `packet` writes `data/packets/<stamp>.md` from approved cards that already have a span: the claim, lens and kind when present, the sentence as a quote, and the URI. Approved cards without a span are listed under “Not included” and are not quoted. No model.
 - `index` embeds passages into `evidence.db` with Ollama `POST /api/embed`. Provider `off`, a missing model, or a remote URL without `DOSSIER_LLM_ALLOW_REMOTE` leaves the table empty. One query embedding per ask does not spend `DOSSIER_LLM_MAX_CALLS`.
-- `doctor` prints the data directory, python executable, SQLite version, whether FTS5 is available, the provider, whether egress is on (`no` until a remote LLM is opted in), the call budget (`0` means unlimited), embed model, vector count, whether ask-pubs is on, pubs URL, the pubs collection when set, how many employer folders and git repos are listed, the git author when set, how many spanned approved cards tailor can quote, and which adapters detect (pubs includes a row count from `/search` when the server answers). It does not write. Zero spanned cards tell you to approve and defend first.
+- `doctor` prints the data directory, python executable, SQLite version, whether FTS5 is available, the provider, whether egress is on (`no` until a remote LLM is opted in), the call budget (`0` means unlimited), embed model, vector count, whether ask-pubs is on, pubs URL, the pubs collection when set, how many employer folders and git repos are listed, the git author when set, how many spanned approved cards tailor can quote, and which adapters detect (pubs includes a row count from the named Zotero collection, or from `/search` when no collection is set and the server answers). It does not write. Zero spanned cards tell you to approve and defend first.
 - `referees` prints at most seven people for a posting. Rank is local (hiring-firm overlap, shared words, note, timeline, existing last-contact time, a coauthor flag, and a name already on an ingested pubs record unless `DOSSIER_REFEREE_PUBS=false`). It does not call a model. Under a name it may print up to two claims they could speak to. People come from `--people` / `DOSSIER_PEOPLE`, or from Twenty when both API env vars are set. That Twenty read sends a fixed people query, not the corpus. No people source exits without ranking. A policy file can skip names, warn on scarce names, and alias employers. Every line says to confirm before listing. The command does not write the corpus or Twenty, and it does not send mail.
 - Ollama on loopback by default. Text leaves the machine only for a remote LLM: provider `litellm`, or `DOSSIER_LLM_ALLOW_REMOTE` for a non-loopback Ollama. Both are off by default. The CLI prints an egress notice before the prompt is sent. A non-loopback pubs URL is not contacted.
 - Ten adapters, registered by hand in `src/dossier/contributions.py`.
@@ -32,7 +32,7 @@ Dossier 0.9 writes a posting-shaped CV or letter from spanned approved cards (`d
 
 | Adapter | What `ingest` does now |
 | --- | --- |
-| `pubs` | Loads a JSON fixture in tests. Against a live URL it pings `/health` or `/`, then `POST /search` maps hits into records. Empty until the pubs server returns hits. It does not embed a Zotero library and it does not download PDFs. |
+| `pubs` | Reads the Zotero collection named in config (`collection`, `zotero_db`) into bibliography records: title, authors, year, journal, DOI, abstract. A JSON fixture still loads in tests. It does not parse PDFs and it does not embed a library. With no collection set, a loopback `POST /search` can still supply rows. |
 | `chatgpt` | Reads a ChatGPT export zip or folder (`conversations.json`), or `chatgpt.messages` from a DuckDB file you already have. Short replies are skipped. It does not unpack the zip into the repo. |
 | `linkedin` | Reads `positions`, `education`, `skills`, and `publications` from that same warehouse. It skips the rest of a LinkedIn archive. |
 | `applications` | Walks one folder whose name contains “job application” (or is `applications`). Text files are stored. Other files are inventory lines only; PDF bytes are not read. |
@@ -49,7 +49,7 @@ LinkedIn expects the warehouse schema produced elsewhere (see [prior art](prior-
 
 See [roadmap](roadmap.md) for 0.9→1.0 user testing. Still out of 0.9:
 
-- Live pubs ingest (compose up) until the collection name and ~353 scope are confirmed. `ask.pubs` does not start that server and does not embed hoops or ocean.
+- A separate pubs server. `ask.pubs` can still call loopback `/search` for one answer and does not write those hits. Ingest does not embed hoops or ocean.
 - LanceDB, sqlite-vec, or a second search product. Vectors are float blobs in `evidence.db`.
 - A PDF or JSON Resume renderer. `tailor` writes markdown under `data/drafts/`. France Travail and portal CVs stay outside this repo.
 - A plugin loader.

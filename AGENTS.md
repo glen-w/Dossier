@@ -9,5 +9,5 @@ Instructions for agents in this repo. Life facts stay in Untangle, not here.
 - Before every push, run `python3 scripts/release/check_gitignore.py`. Do not push if it fails. Personal corpus, exports, and `dossier.toml` stay gitignored.
 - No Twenty writes. Referee shortlist is read-only; do not attach a name to an application.
 - Tests use synthetic fixtures only.
-- Do not `docker compose up` zotero-rag-pubs or start a pubs ingest until Glen confirms `my pubs` and the 353-item scope.
+- Pubs ingest reads only the Zotero collection named in `data/dossier.toml`. Do not re-read hoops or ocean, and do not `docker compose up` zotero-rag.
 - Product now/next/later: [docs/roadmap.md](docs/roadmap.md). Untangle commitment and life context: `~/Documents/untangle/projects/dossier.md`.

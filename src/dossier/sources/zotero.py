@@ -175,7 +175,8 @@ def _authors(conn: sqlite3.Connection, item_ids: list[int]) -> dict[int, str]:
             chunk,
         ).fetchall()
         for item_id, last, first in rows:
-            name = ", ".join(part.strip() for part in (str(last or ""), str(first or "")) if part and str(part).strip())
+            parts = [str(last or "").strip(), str(first or "").strip()]
+            name = ", ".join(part for part in parts if part)
             if name:
                 grouped.setdefault(int(item_id), []).append(name)
     return {item_id: "; ".join(names) for item_id, names in grouped.items()}

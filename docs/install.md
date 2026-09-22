@@ -42,7 +42,7 @@ FTS5 is missing unless you pass `--allow-overlap`.
 
 A container would need a bind mount for each of those paths and a second route to loopback Ollama. The 1.0 install is this page. FTS5 is the interpreter note above (`UV_PYTHON`), not an image pin. The refuse line is in [roadmap](roadmap.md).
 
-The pubs search server, when you run one, is its own compose project. This repo does not start it. See [Publications index](zotero-rag-pubs.md).
+Publications come from the Zotero collection named under `[pubs]` in `data/dossier.toml`. This repo does not start another service. See [Publications index](zotero-rag-pubs.md).
 
 ## Model
 

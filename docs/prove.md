@@ -34,8 +34,8 @@ DOSSIER_DATA=<path> uv run dossier approve --all --except chatgpt,git
 DOSSIER_DATA=<path> uv run dossier ask "…"
 ```
 
-Spot-check refusals and spanned packets. Own-pubs live rows require the
-collection confirm gate — see [publications index](zotero-rag-pubs.md).
+Spot-check refusals and spanned packets. A normal `dossier run` ingests the
+Zotero collection named in config — see [publications index](zotero-rag-pubs.md).
 
 ## Collection listing (read-only)
 

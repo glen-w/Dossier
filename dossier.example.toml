@@ -62,9 +62,11 @@ pack = "career"
 # lexicon = ["workshop", "brief"]
 
 [pubs]
-# Own-pubs HTTP retrieve (sibling zotero-rag-pubs). Live ingest stays gated.
+# Bibliography for briefs. Ingest reads this collection from zotero.sqlite.
+# Other collections are left alone. PDFs are not parsed.
 # collection = "your-zotero-collection"
+# zotero_db = "/absolute/path/to/zotero.sqlite"
+# Optional loopback /search when collection is unset. A remote host is not contacted.
 # seed = "publications"
 # top_k = 50
-# url = "http://127.0.0.1:8012" # loopback only; a remote host is not contacted
-# zotero_db = "/absolute/path/to/zotero.sqlite"
+# url = "http://127.0.0.1:8012"
