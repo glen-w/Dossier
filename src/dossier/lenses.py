@@ -51,6 +51,8 @@ _SKILL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("ocean-governance", re.compile(r"ocean|bbnj|seabed|maritime")),
 )
 
+SKILL_NAMES: tuple[str, ...] = tuple(name for name, _pattern in _SKILL_PATTERNS)
+
 _EVENT_KINDS = frozenset(
     {
         "workshop",

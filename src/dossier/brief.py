@@ -9,6 +9,7 @@ from pathlib import Path
 from dossier.ask import Answer, collect_hits
 from dossier.config import Config
 from dossier.interview import conduct
+from dossier.inventory import try_inventory
 from dossier.llm.client import LLMClient
 from dossier.packs import PackQuestion, follow_up
 from dossier.sources.pubs import optional_pubs_hits
@@ -52,23 +53,27 @@ def run_pack(
     blobs = [f"{rec.title}\n{rec.text}" for rec in corpus.records()]
     while index < len(queue):
         item = queue[index]
-        extra = optional_pubs_hits(
-            item.question,
-            enabled=cfg.ask_pubs,
-            limit=cfg.ask_limit,
-        )
-        result = conduct(
-            corpus,
-            item.question,
-            cfg,
-            client,
-            mode=mode,
-            limit=cfg.ask_limit,
-            source=item.source,
-            lens=item.lens,
-            embedder=embedder,
-            extra_hits=extra or None,
-        )
+        listed = try_inventory(corpus, item)
+        if listed is not None:
+            result = listed
+        else:
+            extra = optional_pubs_hits(
+                item.question,
+                enabled=cfg.ask_pubs,
+                limit=cfg.ask_limit,
+            )
+            result = conduct(
+                corpus,
+                item.question,
+                cfg,
+                client,
+                mode=mode,
+                limit=cfg.ask_limit,
+                source=item.source,
+                lens=item.lens,
+                embedder=embedder,
+                extra_hits=extra or None,
+            )
         corpus.add_answer(
             question=item.question,
             mode=mode,
@@ -80,7 +85,7 @@ def run_pack(
         out.append((item, result))
         if on_progress is not None:
             on_progress(index + 1, len(queue), item, result)
-        if result.refused:
+        if result.refused and listed is None:
             nxt = follow_up(
                 item.id,
                 item.question,

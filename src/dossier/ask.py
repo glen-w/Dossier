@@ -34,6 +34,28 @@ COSINE_NEIGHBOR = 0.34
 COSINE_QUOTE = 0.82
 _RRF_K = 60
 ASK_MODES = ("exact", "auto", "rich")
+# Words that show up in almost any export. Sharing one of them is not an answer.
+_GENERIC = frozenset(
+    {
+        "held",
+        "work",
+        "deliver",
+        "delivered",
+        "record",
+        "records",
+        "show",
+        "shown",
+        "recorded",
+        "publish",
+        "published",
+        "role",
+        "roles",
+        "skill",
+        "skills",
+        "contribution",
+        "contributions",
+    }
+)
 _TRIGGERS: dict[str, tuple[str, ...]] = {
     "delivered": ("report", "paper", "chapter", "workshop"),
     "skills": ("teaching", "editing"),
@@ -238,16 +260,23 @@ def _source_fallback(
 
 
 def approved_answer(corpus: Corpus, question: str) -> Answer | None:
-    """An approved claim that carries the question. Pending cards stay out."""
+    """An approved claim that carries the question. Pending cards stay out.
+
+    Every content word of the question has to be in the claim, and one of
+    those words has to be specific. "Held" or "publish" alone is not enough.
+    """
     best = None
     best_score = 0
     qtokens = content_tokens(question)
+    if not qtokens or not any(token not in _GENERIC for token in qtokens):
+        return None
     for card in corpus.cards(STATUS_APPROVED):
         if not card.claim.strip() or not card.citations:
             continue
-        if not evidence_carries(question, card.claim):
+        blob = content_token_set(card.claim)
+        if any(token not in blob for token in qtokens):
             continue
-        score = sum(1 for token in qtokens if token in content_token_set(card.claim))
+        score = len(qtokens)
         if score > best_score:
             best = card
             best_score = score
