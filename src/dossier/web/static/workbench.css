@@ -43,16 +43,19 @@ nav.side {
   padding: 18px 14px 28px;
 }
 
-nav.side .brand {
-  font-family: var(--do-display);
-  font-size: 1.35rem;
-  margin: 0 0 4px;
+nav.side .mark {
+  display: block;
+  background: var(--do-paper);
+  border-radius: 10px;
+  padding: 6px 8px 2px;
+  margin: 0 0 16px;
 }
 
-nav.side .sub {
-  color: #c9d4cc;
-  font-size: 0.85rem;
-  margin: 0 0 18px;
+nav.side .mark img {
+  display: block;
+  width: min(168px, 100%);
+  height: auto;
+  margin: 0 auto;
 }
 
 nav.side a {

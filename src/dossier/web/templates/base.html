@@ -11,8 +11,7 @@
 <body data-job-id="{{ job_id or (job.id if job else '') }}">
   <div class="shell">
     <nav class="side" aria-label="Workbench">
-      <p class="brand">Dossier</p>
-      <p class="sub">Local locker workbench</p>
+      <a class="mark" href="/locker"><img src="/static/logo.png" alt="Dossier"></a>
       {% for key, title in nav %}
       <a href="/{{ key }}" class="{{ 'on' if active == key else '' }}">{{ title }}</a>
       {% endfor %}
