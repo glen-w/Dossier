@@ -38,10 +38,15 @@ SKIP_BODY_FOLDERS = frozenset(
     }
 )
 
-NOISE_FOLDER_RE = re.compile(
-    r"newsletter|receipt|news etc|la vie de l.?iddri|bounced|out of office",
-    re.I,
+# Broadcast filing. Admin, budget, and finance stay out of this list on purpose:
+# a reimbursement or a budget note in those folders is evidence.
+# Matched on the lowercased folder name in SQL, and case-insensitively here.
+NOISE_FOLDER_PATTERN = (
+    r"newsletter|receipt|news etc|la vie de l.?iddri|out of office|"
+    r"google alerts?|amazon affiliate|"
+    r"(?:^|[^a-z])bounce[ds]?(?:[^a-z]|$)"
 )
+NOISE_FOLDER_RE = re.compile(NOISE_FOLDER_PATTERN, re.I)
 
 ACTIVITY_FOLDER_RE = re.compile(
     r"teach|webinar|workshop|event|publicat|paper|book|policy|bbnj|iki|"
@@ -122,6 +127,7 @@ def skip_folder(name: str) -> bool:
 
 
 def noise_folder(name: str) -> bool:
+    """True for newsletter-style folders. Admin, budget, and finance are kept."""
     return bool(NOISE_FOLDER_RE.search(name or ""))
 
 

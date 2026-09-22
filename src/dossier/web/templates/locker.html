@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('locker') }}</h1>
+<p class="lede">{{ blurbs.locker }}</p>
+
+<div class="grid">
+  <div class="stat"><div class="n">{{ snap.records }}</div><div class="k">records</div></div>
+  <div class="stat"><div class="n">{{ snap.pending }}</div><div class="k">pending cards</div></div>
+  <div class="stat"><div class="n">{{ snap.approved }}</div><div class="k">approved</div></div>
+  <div class="stat"><div class="n">{{ snap.refused }}</div><div class="k">refused</div></div>
+  <div class="stat"><div class="n">{{ snap.spanned }}</div><div class="k">spanned</div></div>
+  <div class="stat"><div class="n">{{ snap.vectors }}</div><div class="k">vectors</div></div>
+</div>
+
+<div class="card">
+  <h3>Readiness</h3>
+  <p class="meta">data_dir: {{ snap.data_dir }}</p>
+  <p class="meta">evidence_db: {{ snap.evidence_db }}</p>
+  <p class="meta">fts5: {{ 'yes' if snap.fts5 else 'no' }} · sqlite {{ snap.sqlite }}</p>
+  <p class="meta">provider: {{ snap.provider }} · {{ snap.egress }}</p>
+  <p class="meta">effort: {{ snap.effort }} · model: {{ snap.model }} · ask: {{ snap.ask_mode }}</p>
+  <p class="meta">extract LLM: {{ 'on' if snap.extract_llm else 'off' }} · max_calls: {{ 'unlimited' if snap.max_calls == 0 else snap.max_calls }}</p>
+</div>
+
+<div class="card">
+  <h3>Sources</h3>
+  <table>
+    <thead><tr><th>Adapter</th><th>Detected</th><th>Path</th></tr></thead>
+    <tbody>
+    {% for row in snap.adapters %}
+      <tr>
+        <td>{{ row.name }}</td>
+        <td>{{ 'yes' if row.detected else 'no' }}</td>
+        <td class="meta">{{ row.path }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

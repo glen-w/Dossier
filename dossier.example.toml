@@ -2,6 +2,9 @@
 # That path is gitignored. Environment variables win over this file.
 # Leave a key out to keep the built-in default.
 
+# Global LLM investment: light | balanced | high (balanced = today's defaults)
+# effort = "balanced"
+
 [llm]
 provider = "ollama" # ollama | litellm | off
 model = "qwen3.8:latest"

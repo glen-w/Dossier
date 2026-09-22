@@ -23,19 +23,11 @@ from dossier.packs import load_pack, posting_pack
 from dossier.prove import DEFAULT_ADAPTERS, run_prove
 from dossier.show import defend_cards, find_span, gap_report, write_packet
 from dossier.paths import (
-    applications_dir,
-    chatgpt_export,
-    cursor_projects_root,
-    employer_paths,
     evidence_db,
+    employer_paths,
     git_paths,
     git_user,
-    grok_blobs_dir,
     pubs_collection,
-    slack_export,
-    zotero_db,
-    transcriptx_library,
-    warehouse_db,
 )
 from dossier.sources.pubs import optional_pubs_hits
 from dossier.store import Corpus
@@ -84,6 +76,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p_review = sub.add_parser("review", help="Loopback page to sift claim cards")
     p_review.add_argument("--port", type=int, default=8765)
+
+    p_gui = sub.add_parser(
+        "gui",
+        help="Loopback workbench (needs the [web] extra)",
+    )
+    p_gui.add_argument("--port", type=int, default=8766)
+    p_gui.add_argument("--host", default="127.0.0.1")
 
     p_ask = sub.add_parser("ask", help="Answer from ingested records, with citations")
     p_ask.add_argument("question")
@@ -205,6 +204,8 @@ def main(argv: list[str] | None = None) -> int:
     cfg = Config.from_env()
     if args.cmd == "doctor":
         return _doctor(cfg)
+    if args.cmd == "gui":
+        return _gui(args)
     db = evidence_db(Path(cfg.data_dir))
     corpus = Corpus(db)
     try:
@@ -667,6 +668,12 @@ def _reopen(args: argparse.Namespace, corpus: Corpus) -> int:
     return _gate(args, corpus, action="reopen")
 
 
+def _gui(args: argparse.Namespace) -> int:
+    from dossier.web.__main__ import main as web_main
+
+    return web_main(["--host", args.host, "--port", str(args.port)])
+
+
 def _review(args: argparse.Namespace, corpus: Corpus) -> int:
     from dossier.review import serve
 
@@ -1074,38 +1081,15 @@ def _query_embedder(cfg: Config, corpus: Corpus):
 
 
 def _default_path(name: str) -> Path | None:
-    if name == "chatgpt":
-        return chatgpt_export() or warehouse_db()
-    if name == "slack":
-        return slack_export() or warehouse_db()
-    if name == "employer":
-        paths = employer_paths()
-        return paths[0] if paths else None
-    if name == "git":
-        paths = git_paths()
-        return paths[0] if paths else None
-    if name in {"linkedin", "mbox"}:
-        return warehouse_db()
-    if name == "applications":
-        return applications_dir()
-    if name == "transcripts":
-        return cursor_projects_root()
-    if name == "meetings":
-        return transcriptx_library()
-    if name == "pubs":
-        # Detection uses the named collection inside this file, not the path.
-        return zotero_db()
-    return None
+    from dossier.ops import default_path
+
+    return default_path(name)
 
 
 def _extra_paths(name: str) -> list[Path]:
-    if name == "transcripts":
-        return [grok_blobs_dir()]
-    if name == "employer":
-        return list(employer_paths()[1:])
-    if name == "git":
-        return list(git_paths()[1:])
-    return []
+    from dossier.ops import extra_paths
+
+    return extra_paths(name)
 
 
 if __name__ == "__main__":

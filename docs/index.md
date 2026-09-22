@@ -31,6 +31,7 @@ adapters
 :caption: How it works
 
 architecture
+vocab
 seekers
 zotero-rag-pubs
 privacy

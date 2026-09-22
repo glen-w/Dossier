@@ -37,7 +37,8 @@ Identity: `DOSSIER_SLACK_USER_IDS` (ids or a display name), or `[identity] slack
 
 Seek `thunderbird.messages` (Gloda: subject, folder, attachments, direction). Bodies are not in the warehouse.
 
-- Exclude newsletters, receipts, `la vie de l'iddri`, bounced, out of office, and Gloda `signals` of those kinds
+- Exclude newsletters, receipts, google alerts, affiliate mail, bounce folders, `la vie de l'iddri`, and out of office, plus Gloda `signals` of newsletter, receipt, subscription, and signup
+- Keep admin, budget, and finance folders. A reimbursement or a budget note there is evidence. One message tagged as a receipt still drops
 - Prefer activity folders (Teaching, webinars, workshops, BBNJ, IKI, PROG, Review, …)
 - Rank sent+document in those folders; delivery-ish subjects; starred/replied
 - Sent+document outside activity folders is metadata only

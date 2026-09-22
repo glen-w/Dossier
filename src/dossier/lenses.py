@@ -96,10 +96,29 @@ def kinds_mentioned(text: str) -> tuple[str, ...]:
     return tuple(found)
 
 
+# A form that records a budget, expense, or reimbursement is evidence.
+_BUDGET_EVIDENCE = re.compile(
+    r"frais|budgets?|expenses?|reimburs|rembours|ordre de mission|mission order",
+    re.I,
+)
+# Still noise when the name is a timesheet or a leave form, even if a project is named.
+_LIFE_ADMIN = re.compile(
+    r"timesheets?|time[- ]?sheets?|payslips?|bulletins? de paie|cong[eé]s?",
+    re.I,
+)
+
+
 def is_noise_name(*parts: str) -> bool:
-    """True for logistics, life-admin, or status pings that are not career evidence."""
+    """True for logistics, life-admin, or status pings that are not career evidence.
+
+    Expense and budget forms are kept. A timesheet or a leave form is not.
+    """
     blob = " ".join(p for p in parts if p).strip()
     if not blob:
+        return False
+    if _LIFE_ADMIN.search(blob):
+        return True
+    if _BUDGET_EVIDENCE.search(blob):
         return False
     return bool(_NOISE.search(blob))
 

@@ -1,0 +1,20 @@
+<div id="job-strip"
+     class="job-strip {{ 'idle' if not busy else '' }}"
+     hx-get="/partials/job-strip"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML">
+  {% if job %}
+  <strong>{{ job.kind }}</strong>
+  <span class="meta">· {{ job.status }} · id {{ job.id }}</span>
+  <div data-job-line>
+    {% if job.latest and job.latest.line %}{{ job.latest.line }}
+    {% elif job.latest and job.latest.title %}{{ job.latest.title }}{% if job.latest.detail %} · {{ job.latest.detail }}{% endif %}
+    {% elif job.error %}{{ job.error }}
+    {% else %}Running…{% endif %}
+  </div>
+  <div class="meta" data-job-meta></div>
+  {% else %}
+  <span data-job-line>No job running.</span>
+  <span class="meta" data-job-meta>One job at a time — the locker has a single writer.</span>
+  {% endif %}
+</div>

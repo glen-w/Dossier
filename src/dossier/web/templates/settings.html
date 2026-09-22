@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('settings') }}</h1>
+<p class="lede">{{ blurbs.settings }} Environment variables still win at load time.</p>
+
+{% if saved %}
+<div class="ok">Saved to {{ toml_path }}.</div>
+{% endif %}
+
+<form method="post" action="/settings/save">
+  <div class="card">
+    <h3>{{ label('effort') }}</h3>
+    <p class="meta">{{ blurbs.effort }}</p>
+    <label class="field">Preset
+      <select name="effort">
+        {% for name in efforts %}
+        <option value="{{ name }}" {% if cfg.effort == name %}selected{% endif %}>{{ name }} — {{ effort_blurbs[name] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <div class="card">
+    <h3>Common knobs</h3>
+    <div class="row">
+      <label class="field">Model
+        <input name="model" value="{{ cfg.llm_model }}">
+      </label>
+      <label class="field">Max calls (0 = unlimited)
+        <input name="max_calls" type="number" min="0" value="{{ cfg.llm_max_calls }}">
+      </label>
+      <label class="field">Ask mode
+        <select name="ask_mode">
+          {% for m in modes %}
+          <option value="{{ m }}" {% if cfg.ask_mode == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field">Ask planner
+        <select name="ask_planner">
+          <option value="off" {% if cfg.ask_planner == 'off' %}selected{% endif %}>off</option>
+          <option value="rich" {% if cfg.ask_planner == 'rich' %}selected{% endif %}>rich</option>
+        </select>
+      </label>
+      <label class="field">Extract LLM
+        <select name="extract_llm">
+          <option value="on" {% if cfg.extract_llm %}selected{% endif %}>on</option>
+          <option value="off" {% if not cfg.extract_llm %}selected{% endif %}>off</option>
+        </select>
+      </label>
+    </div>
+    <p class="meta">Toml path: {{ toml_path }}. Identity, warehouse, and source paths stay in the file.</p>
+    <button class="primary" type="submit">Save</button>
+  </div>
+</form>
+
+<div class="card">
+  <h3>{{ label('profile') }}s</h3>
+  <p class="meta">{{ blurbs.profile }} Virtual <code>default</code> resets effort to balanced.</p>
+  <table>
+    <thead><tr><th>Name</th><th>Description</th><th></th></tr></thead>
+    <tbody>
+    {% for p in profiles %}
+      <tr>
+        <td>{{ p.name }}{% if p.is_virtual %} <span class="meta">(virtual)</span>{% endif %}</td>
+        <td class="meta">{{ p.description }}</td>
+        <td>
+          <form method="post" action="/settings/profile/activate" style="display:inline">
+            <input type="hidden" name="name" value="{{ p.name }}">
+            <button type="submit">Activate</button>
+          </form>
+          {% if not p.is_virtual %}
+          <form method="post" action="/settings/profile/delete" style="display:inline" onsubmit="return confirm('Delete profile {{ p.name }}?');">
+            <input type="hidden" name="name" value="{{ p.name }}">
+            <button class="warn" type="submit">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <form class="row" method="post" action="/settings/profile/save" style="margin-top:12px">
+    <label class="field">Save current as
+      <input name="name" required pattern="[a-z0-9][a-z0-9_-]*" placeholder="quick">
+    </label>
+    <label class="field">Description
+      <input name="description" placeholder="optional">
+    </label>
+    <button type="submit">Save profile</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dossier · {{ label(active) }}</title>
+  <link rel="stylesheet" href="/static/workbench.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/workbench.js" defer></script>
+</head>
+<body data-job-id="{{ job_id or (job.id if job else '') }}">
+  <div class="shell">
+    <nav class="side" aria-label="Workbench">
+      <p class="brand">Dossier</p>
+      <p class="sub">Local locker workbench</p>
+      {% for key, title in nav %}
+      <a href="/{{ key }}" class="{{ 'on' if active == key else '' }}">{{ title }}</a>
+      {% endfor %}
+    </nav>
+    <main>
+      {% include "partials/job_strip.html" %}
+      {% if notice %}
+      <div class="notice" role="status">{{ notice }}</div>
+      {% endif %}
+      {% if err == 'busy' %}
+      <div class="err">{{ blurbs.locker_busy }}</div>
+      {% elif err %}
+      <div class="err">{{ err }}</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

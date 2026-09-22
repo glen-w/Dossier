@@ -13,7 +13,14 @@ dependencies = [
 
 [project.optional-dependencies]
 llm = ["litellm>=1.70,<2"]
-dev = ["pytest>=8"]
+web = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=2.0",
+]
+dev = ["pytest>=8", "httpx>=0.27"]
 docs = [
     "sphinx>=7.0.0",
     "myst-parser>=2.0.0",
@@ -32,6 +39,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dossier"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/dossier/web/templates" = "dossier/web/templates"
+"src/dossier/web/static" = "dossier/web/static"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

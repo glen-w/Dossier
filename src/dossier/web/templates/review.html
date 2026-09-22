@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('review') }}</h1>
+<p class="lede">{{ blurbs.review }} Disabled while a job holds the locker.</p>
+
+<form class="row" method="get" action="/review">
+  <label class="field">Status
+    <select name="status">
+      <option value="pending" {% if status == 'pending' %}selected{% endif %}>pending</option>
+      <option value="approved" {% if status == 'approved' %}selected{% endif %}>approved</option>
+      <option value="refused" {% if status == 'refused' %}selected{% endif %}>refused</option>
+      <option value="" {% if status == '' %}selected{% endif %}>all</option>
+    </select>
+  </label>
+  <label class="field">Source
+    <input name="source" value="{{ source }}" placeholder="adapter name">
+  </label>
+  <label class="field">Lens
+    <input name="lens" value="{{ lens }}">
+  </label>
+  <label class="field">Kind
+    <input name="kind" value="{{ kind }}">
+  </label>
+  <label class="field">Search
+    <input name="q" value="{{ q }}" placeholder="claim text">
+  </label>
+  <button type="submit">Filter</button>
+</form>
+
+{% if source and not busy %}
+<form class="row" method="post" action="/review/act" onsubmit="return confirm('Apply to matching pending cards?');">
+  <input type="hidden" name="action" value="approve">
+  <input type="hidden" name="source" value="{{ source }}">
+  <input type="hidden" name="lens" value="{{ lens }}">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="status" value="{{ status }}">
+  <input type="hidden" name="q" value="{{ q }}">
+  <button class="primary" type="submit">Approve matching</button>
+</form>
+<form class="row" method="post" action="/review/act" onsubmit="return confirm('Refuse matching pending cards?');">
+  <input type="hidden" name="action" value="refuse">
+  <input type="hidden" name="source" value="{{ source }}">
+  <input type="hidden" name="lens" value="{{ lens }}">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="status" value="{{ status }}">
+  <input type="hidden" name="q" value="{{ q }}">
+  <button class="warn" type="submit">Refuse matching</button>
+</form>
+{% endif %}
+
+<p class="meta">{{ cards.total }} cards · showing {{ cards.cards | length }} from offset {{ cards.offset }}</p>
+
+{% for card in cards.cards %}
+<div class="card">
+  <h3>{{ card.claim }}</h3>
+  <p class="meta">{{ card.status }} · {{ card.source }}{% if card.lens and card.lens != '(none)' %} · {{ card.lens }}/{{ card.kind }}{% endif %}</p>
+  {% if card.snippet %}<p class="snippet">{{ card.snippet }}</p>{% endif %}
+  <ul class="cite">
+    {% for uri in card.citations %}<li class="meta">{{ uri }}</li>{% endfor %}
+  </ul>
+  {% if not busy %}
+  <div class="actions">
+    {% if card.status == 'pending' %}
+    <form method="post" action="/review/act">
+      <input type="hidden" name="action" value="approve">
+      <input type="hidden" name="ids" value="{{ card.id }}">
+      <input type="hidden" name="status" value="{{ status }}">
+      <input type="hidden" name="source" value="{{ source }}">
+      <input type="hidden" name="lens" value="{{ lens }}">
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <button class="primary" type="submit">Approve</button>
+    </form>
+    <form method="post" action="/review/act">
+      <input type="hidden" name="action" value="refuse">
+      <input type="hidden" name="ids" value="{{ card.id }}">
+      <input type="hidden" name="status" value="{{ status }}">
+      <input type="hidden" name="source" value="{{ source }}">
+      <input type="hidden" name="lens" value="{{ lens }}">
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <button class="warn" type="submit">Refuse</button>
+    </form>
+    {% else %}
+    <form method="post" action="/review/act">
+      <input type="hidden" name="action" value="reopen">
+      <input type="hidden" name="ids" value="{{ card.id }}">
+      <input type="hidden" name="status" value="{{ status }}">
+      <input type="hidden" name="source" value="{{ source }}">
+      <input type="hidden" name="lens" value="{{ lens }}">
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <button type="submit">Reopen</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<p class="meta">No cards match.</p>
+{% endfor %}
+
+{% if cards.has_more %}
+<p><a class="btn" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&offset={{ cards.offset + cards.cards|length }}">Next page</a></p>
+{% endif %}
+{% endblock %}

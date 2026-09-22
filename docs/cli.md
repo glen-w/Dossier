@@ -19,6 +19,7 @@ uv run dossier approve --all --except chatgpt,git
 uv run dossier refuse --all --source chatgpt
 uv run dossier reopen <card-id>
 uv run dossier review
+uv run dossier gui
 uv run dossier span "synthetic paper on coastal governance"
 uv run dossier defend
 uv run dossier gaps
@@ -63,6 +64,12 @@ Sources open into lens and kind groups. Approve or refuse applies to pending
 cards in that group, that source, or one card. Reopen walks a card back to
 pending. Source and group actions ask before they run. A claim search and the
 first cited record's opening text sit on each card.
+
+`dossier gui` serves the optional workbench on `127.0.0.1:8766` (override with
+`--port`). It needs the `[web]` extra (`uv sync --extra web`). Pages cover
+locker status, ingest, extract, review, ask, effort, and saved profiles. Live
+job progress uses Server-Sent Events. The CLI stays the scriptable surface;
+`dossier review` stays available without the extra. See [vocab](vocab.md).
 
 `dossier tailor` writes CV or letter markdown under `data/drafts/` from
 approved cards that already have a span. `--arrange` is letter-only.
@@ -109,6 +116,7 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DOSSIER_GIT_USER` | Author name or email fragment. Empty keeps every author |
 | `DOSSIER_MBOX_MAX_FILES` | Max mbox files opened in one exported folder (default 40) |
 | `DOSSIER_LLM_MAX_CALLS` | Cap completions per process (`0` = unlimited, the default) |
+| `DOSSIER_EFFORT` | Global LLM investment: `light`, `balanced` (default), or `high` |
 | `DOSSIER_EXTRACT_LLM` | Ask the model after drafts (`true` by default) |
 | `DOSSIER_RUN_PACK` | Question pack for `brief` and `run` (default `career`) |
 | `DOSSIER_RUN_POSTING` | Local posting path for the posting pack |

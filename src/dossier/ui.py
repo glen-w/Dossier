@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TextIO
+from typing import Any, TextIO
 
 
 _RESET = "\033[0m"
+_ProgressSink = Callable[[dict[str, Any]], None]
+_progress_sink: _ProgressSink | None = None
 _BOLD = "\033[1m"
 _DIM = "\033[2m"
 _CYAN = "\033[36m"
@@ -26,6 +29,27 @@ _BLUE = "\033[34m"
 
 _ACTIVE: "BottomBar | None" = None
 _ACTIVE_STACK: list[BottomBar] = []
+
+
+def set_progress_sink(sink: _ProgressSink | None) -> _ProgressSink | None:
+    """Install a structured progress sink (used by the workbench job runner).
+
+    Returns the previous sink so callers can restore it.
+    """
+    global _progress_sink
+    previous = _progress_sink
+    _progress_sink = sink
+    return previous
+
+
+def _emit(kind: str, **payload: Any) -> None:
+    if _progress_sink is None:
+        return
+    event = {"kind": kind, **payload}
+    try:
+        _progress_sink(event)
+    except Exception:  # noqa: BLE001 — never break CLI on a bad sink
+        pass
 
 
 def colour_enabled(stream: TextIO | None = None) -> bool:
@@ -61,11 +85,13 @@ def stage(title: str, detail: str = "", *, stream: TextIO | None = None) -> None
     if detail:
         line = f"{line}  {paint(detail, _DIM, stream=out)}"
     _log_line(line, stream=out)
+    _emit("stage", title=title, detail=detail, line=_plain(line) if detail else title)
 
 
 def note(text: str, *, stream: TextIO | None = None) -> None:
     out = stream if stream is not None else sys.stderr
     _log_line(paint(text, _DIM, stream=out), stream=out)
+    _emit("note", text=text, line=text)
 
 
 def ok(text: str, *, stream: TextIO | None = None) -> None:
@@ -74,6 +100,7 @@ def ok(text: str, *, stream: TextIO | None = None) -> None:
         f"{paint('✓', _GREEN, _BOLD, stream=out)} {text}",
         stream=out,
     )
+    _emit("ok", text=text, line=text)
 
 
 def warn(text: str, *, stream: TextIO | None = None) -> None:
@@ -82,6 +109,7 @@ def warn(text: str, *, stream: TextIO | None = None) -> None:
         f"{paint('!', _YELLOW, _BOLD, stream=out)} {text}",
         stream=out,
     )
+    _emit("warn", text=text, line=text)
 
 
 def trunc(text: str, width: int = 36) -> str:
@@ -213,17 +241,28 @@ class Progress:
 
     def _render(self, *, final: bool = False) -> None:
         line = self._format_line()
+        plain = _plain(line)
+        _emit(
+            "progress",
+            label=self.label,
+            done=self.done,
+            total=self.total,
+            status=self._status,
+            stats=dict(self._stats),
+            line=plain,
+            final=final,
+        )
         if self._bar is not None:
             self._bar.set_line(line, final=final)
-            self._last_plain = _plain(line)
+            self._last_plain = plain
             return
         if self._tty:
-            pad = max(0, len(self._last_plain) - len(_plain(line)))
+            pad = max(0, len(self._last_plain) - len(plain))
             self._out.write("\r" + line + (" " * pad))
             if final:
                 self._out.write("\n")
             self._out.flush()
-            self._last_plain = _plain(line) if not final else ""
+            self._last_plain = plain if not final else ""
             return
         step = max(1, self.total // 10) if self.total else 50
         if final or self.done == 1 or self.done % step == 0:

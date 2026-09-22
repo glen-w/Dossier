@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('ask') }}</h1>
+<p class="lede">{{ blurbs.ask }} One exchange for now; room for a transcript later.</p>
+
+<form method="post" action="/ask/run">
+  <label class="field">Question
+    <textarea name="question" required placeholder="What did I deliver on coastal governance?"></textarea>
+  </label>
+  <div class="row" style="margin-top:10px">
+    <label class="field">Mode
+      <select name="mode">
+        <option value="">use settings ({{ cfg.ask_mode }})</option>
+        {% for m in modes %}
+        <option value="{{ m }}">{{ m }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Ask</button>
+  </div>
+</form>
+
+{% if result %}
+<div class="card">
+  <h3>{{ result.question }}</h3>
+  <p class="meta">mode {{ result.mode }}</p>
+  {% if result.refused %}
+  <p class="err">Refused{% if result.reason %}: {{ result.reason }}{% endif %}</p>
+  {% else %}
+  <p>{{ result.text }}</p>
+  <ul class="cite">
+    {% for uri in result.citations %}<li class="meta">{{ uri }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% elif job and job.status == 'running' %}
+<p class="meta">Waiting for the ask job…</p>
+{% endif %}
+{% endblock %}

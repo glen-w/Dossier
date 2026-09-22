@@ -234,6 +234,96 @@ def test_year_spread_keeps_early_and_late_reports(corpus: Corpus) -> None:
     assert "*Done*" not in text
 
 
+def test_slack_prose_and_admin_names_stay_off_the_list(corpus: Corpus) -> None:
+    corpus.upsert_record(
+        Record(
+            id="prose",
+            source="slack",
+            uri="slack://prose",
+            title="Hey team the draft is ready",
+            text=(
+                "Lens: delivered\nKind: report\nYear: 2019\n"
+                "Artifacts: ocean mcs report.docx"
+            ),
+        )
+    )
+    corpus.upsert_record(
+        Record(
+            id="booking",
+            source="mbox",
+            uri="mbox://booking",
+            title="booking.com confirmation.pdf",
+            text=(
+                "Lens: delivered\nKind: report\nYear: 2022\n"
+                "Artifacts: booking.com confirmation.pdf"
+            ),
+        )
+    )
+    corpus.upsert_record(
+        Record(
+            id="holiday",
+            source="mbox",
+            uri="mbox://holiday",
+            title="Holiday dates 2024.xlsx",
+            text=(
+                "Lens: delivered\nKind: tables\nYear: 2024\n"
+                "Artifacts: Holiday dates 2024.xlsx"
+            ),
+        )
+    )
+    items = run_pack(
+        corpus,
+        [PackQuestion("delivered", "What work did I deliver?", lens="delivered")],
+        _cfg(),
+        _Boom(),
+        mode="exact",
+    )
+    text = items[0][1].text
+    folded = text.casefold()
+    assert "ocean mcs report.docx" in folded
+    assert "hey team" not in folded
+    assert "booking.com" not in folded
+    assert "holiday dates" not in folded
+
+
+def test_budget_form_stays_and_newsletter_folder_does_not(corpus: Corpus) -> None:
+    corpus.upsert_record(
+        Record(
+            id="frais",
+            source="mbox",
+            uri="mbox://glen@example.test/IKI/frais-1",
+            title="Form frais for IKI/SHS",
+            text=(
+                "Lens: delivered\nKind: report\nYear: 2019\nOrg: IDDRI\n"
+                "Artifacts: form frais fiji.xlsx"
+            ),
+        )
+    )
+    corpus.upsert_record(
+        Record(
+            id="news",
+            source="mbox",
+            uri="mbox://glen@example.test/Newsletters/news-1",
+            title="IDDRI newsletter",
+            text=(
+                "Lens: delivered\nKind: report\nYear: 2019\nOrg: IDDRI\n"
+                "Artifacts: digest.pdf"
+            ),
+        )
+    )
+    items = run_pack(
+        corpus,
+        [PackQuestion("delivered", "What work did I deliver?", lens="delivered")],
+        _cfg(),
+        _Boom(),
+        mode="exact",
+    )
+    text = items[0][1].text
+    assert "Form frais" in text
+    assert "newsletter" not in text.casefold()
+    assert "digest.pdf" not in text
+
+
 def test_employer_publication_joins_publications_without_dup_stem(corpus: Corpus) -> None:
     corpus.upsert_record(
         Record(

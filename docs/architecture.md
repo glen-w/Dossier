@@ -20,7 +20,7 @@ adapters you enable
 
 Ask reads records already in the corpus, then the passage vectors in that same file when full text is thin. The order — approved card, quote, hops, one completion — and when a neighbor is quoted live in [status](status.md).
 
-The locker is a host process: `uv run dossier` on the machine that holds the folders, the SQLite file, and Ollama on loopback. There is no image. See [install](install.md).
+The locker is a host process: `uv run dossier` on the machine that holds the folders, the SQLite file, and Ollama on loopback. There is no image. See [install](install.md). Shared product words (locker, source, extract, card, ask, effort, profile) live in [vocab](vocab.md).
 
 ## Source protocol
 

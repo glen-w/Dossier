@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('extract') }}</h1>
+<p class="lede">{{ blurbs.extract }} Effort and Settings control whether the model runs after drafts.</p>
+
+<form class="row" method="post" action="/extract/run">
+  <label class="field">Source
+    <select name="source">
+      <option value="">all</option>
+      {% for row in rows %}
+      <option value="{{ row.name }}">{{ row.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="field">Limit
+    <input name="limit" type="number" min="1" placeholder="optional">
+  </label>
+  <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Extract</button>
+</form>
+
+<p class="meta">Current: extract LLM {{ 'on' if cfg.extract_llm else 'off' }} · effort {{ cfg.effort }} · model {{ cfg.llm_model }}</p>
+{% endblock %}

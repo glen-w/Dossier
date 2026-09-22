@@ -1,4 +1,4 @@
-from dossier.lenses import infer_kind, infer_lenses, infer_skills
+from dossier.lenses import infer_kind, infer_lenses, infer_skills, is_noise_name
 from dossier.seekers.hits import Hit, merge_hits
 from dossier.seekers.quota import apply_quotas
 
@@ -31,6 +31,15 @@ def test_infer_kind_from_folder_and_files() -> None:
     assert infer_kind(folder="MCS workshop 1", artifacts=("deck.pptx",)) == "workshop"
     assert infer_kind(subject="factsheet demand buildings", artifacts=("f.pdf",)) == "brief"
     assert infer_kind(subject="please find attached", artifacts=("deck.pptx",)) == "slides"
+    assert infer_kind(subject="edited book on ocean rights") == "book"
+    assert infer_kind(subject="booking.com receipt") != "book"
+    assert is_noise_name("Holiday dates 2024.xlsx")
+    assert is_noise_name("booking.com confirmation.pdf")
+    assert is_noise_name("registration form.pdf")
+    assert is_noise_name("TimesheetTemplate_2020.xls")
+    assert is_noise_name("IKI budget timesheet.xlsx")
+    assert not is_noise_name("Form frais for IKI/SHS.xlsx")
+    assert not is_noise_name("IKI rethink budget")
 
 
 def test_skills_and_lenses() -> None:

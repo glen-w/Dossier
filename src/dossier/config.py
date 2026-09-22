@@ -11,6 +11,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from dossier.effort import DEFAULT_EFFORT, apply_effort, normalize_effort
 from dossier.paths import data_dir, pubs_url, warehouse_db
 
 ASK_MODES = ("exact", "auto", "rich")
@@ -54,6 +55,7 @@ class Config:
     employer_filter: bool = True
     employer_filter_llm: bool = True
     employer_filter_llm_calls: int = 4
+    effort: str = DEFAULT_EFFORT
 
     @classmethod
     def from_env(cls) -> Config:
@@ -88,7 +90,13 @@ class Config:
         lexicon = _lexicon(file_cfg)
         if "DOSSIER_LEXICON" in os.environ:
             lexicon = tuple(_name_list(os.environ.get("DOSSIER_LEXICON", "")))
-        return cls(
+        effort = normalize_effort(
+            _env_str(
+                "DOSSIER_EFFORT",
+                str(file_cfg.get("effort") or DEFAULT_EFFORT),
+            )
+        )
+        cfg = cls(
             llm_enabled=enabled,
             llm_provider="ollama" if not enabled else provider,
             llm_base_url=_env_str(
@@ -184,7 +192,9 @@ class Config:
                     _as_int(employer.get("filter_llm_calls"), 4),
                 ),
             ),
+            effort=effort,
         )
+        return apply_effort(cfg)
 
 
 def _choice(value: str, allowed: tuple[str, ...], default: str) -> str:

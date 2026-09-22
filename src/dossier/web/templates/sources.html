@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('sources') }}</h1>
+<p class="lede">{{ blurbs.sources }} Ingest copies detected adapters into the locker.</p>
+
+<form class="row" method="post" action="/sources/ingest">
+  <label class="field">Adapter
+    <select name="adapter">
+      <option value="">all detected</option>
+      {% for row in rows %}
+      <option value="{{ row.name }}">{{ row.name }}{% if row.detected %} · detected{% endif %}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Ingest</button>
+</form>
+
+<table>
+  <thead><tr><th>Adapter</th><th>Detected</th><th>Path</th><th>Extras</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td>{{ row.name }}</td>
+      <td>{{ 'yes' if row.detected else 'no' }}</td>
+      <td class="meta">{{ row.path }}</td>
+      <td class="meta">{{ row.extras | join(', ') }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

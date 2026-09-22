@@ -10,7 +10,7 @@ from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
-from dossier.identity import account_dir, is_blocked_mail_root, skip_folder
+from dossier.identity import account_dir, is_blocked_mail_root, noise_folder, skip_folder
 
 DEFAULT_MAX_BYTES = 200 * 1024 * 1024
 TEXT_CAP = 8000
@@ -57,9 +57,14 @@ def mbox_max_bytes() -> int:
     return DEFAULT_MAX_BYTES
 
 
+def _closed_folder(name: str) -> bool:
+    """Sent, inbox, and newsletter-style folders are not opened."""
+    return skip_folder(name) or noise_folder(name)
+
+
 def mbox_openable(path: Path, folder_name: str, max_bytes: int | None = None) -> bool:
     cap = mbox_max_bytes() if max_bytes is None else max_bytes
-    if skip_folder(folder_name) or skip_folder(path.name):
+    if _closed_folder(folder_name) or _closed_folder(path.name):
         return False
     try:
         return path.is_file() and path.stat().st_size <= cap
@@ -108,7 +113,7 @@ def iter_mbox_files(root: Path) -> Iterator[tuple[Path, str]]:
 
 
 def find_mbox(mail_root: Path, account_key: str, folder_name: str) -> Path | None:
-    if skip_folder(folder_name):
+    if _closed_folder(folder_name):
         return None
     index = build_mbox_index(mail_root)
     return lookup_mbox(index, mail_root, account_key, folder_name)
@@ -122,7 +127,7 @@ def build_mbox_index(mail_root: Path) -> dict[tuple[str, str], Path]:
     if not start.exists():
         return index
     for path, name in iter_mbox_files(start):
-        if skip_folder(name) or skip_folder(path.name):
+        if _closed_folder(name) or _closed_folder(path.name):
             continue
         try:
             rel = path.relative_to(root if root.is_dir() else start)
@@ -142,7 +147,7 @@ def lookup_mbox(
     account_key: str,
     folder_name: str,
 ) -> Path | None:
-    if skip_folder(folder_name):
+    if _closed_folder(folder_name):
         return None
     mapped = account_dir(mail_root, account_key)
     for key in ((mapped.name, folder_name), (mail_root.name, folder_name)):
@@ -166,7 +171,7 @@ def fetch_mbox_body(
     max_chars: int = TEXT_CAP,
     index: dict[tuple[str, str], Path] | None = None,
 ) -> str:
-    if skip_folder(folder_name):
+    if _closed_folder(folder_name):
         return ""
     catalog = index if index is not None else build_mbox_index(mail_root)
     path = lookup_mbox(catalog, mail_root, account_key, folder_name)

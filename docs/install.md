@@ -7,6 +7,7 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/) on the machine that h
 
 ```text
 uv sync --extra dev
+uv sync --extra web   # optional workbench (dossier gui)
 uv run dossier --help
 uv run dossier doctor
 ```

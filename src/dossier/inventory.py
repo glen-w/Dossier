@@ -8,6 +8,7 @@ from urllib.parse import unquote
 
 from dossier.ask import Answer
 from dossier.cards import header_values
+from dossier.identity import noise_folder
 from dossier.lenses import SKILL_NAMES, infer_kind, is_noise_name
 from dossier.packs import PackQuestion
 from dossier.store import Corpus, Record
@@ -286,6 +287,8 @@ def _from_seeker(rec: Record, kinds: set[str]) -> list[_Cand]:
     org = _one(rec, "Org")
     arts = [a.strip() for a in header_values(rec.text, "Artifacts") if a.strip()]
     folder = _mbox_folder(rec.uri) if rec.source == "mbox" else ""
+    if folder and noise_folder(folder):
+        return []
     cands: list[_Cand] = []
     for art in arts or [""]:
         if art and (not _DOC.search(art) or is_noise_name(art, rec.title)):

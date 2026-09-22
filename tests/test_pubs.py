@@ -104,6 +104,41 @@ def test_named_collection_loads_without_a_server(
     assert answer.citations == ["zotero://CHILDKEY1", "zotero://ABCD1234"]
 
 
+def test_collection_key_skips_notes_and_other_libraries(
+    tmp_path: Path, corpus: Corpus, monkeypatch
+) -> None:
+    db = _zotero_fixture(tmp_path)
+    monkeypatch.setenv("ZOTERO_DB", str(db))
+    monkeypatch.setenv("DOSSIER_PUBS_COLLECTION", "COLLPUBS")
+
+    def boom(*_args, **_kwargs):
+        raise AssertionError("pubs must not open an HTTP client")
+
+    monkeypatch.setattr("dossier.sources.pubs.httpx.Client", boom)
+    src = PubsSource()
+    src.load(db, corpus)
+    uris = {rec.uri for rec in corpus.records("pubs")}
+    assert uris == {"zotero://CHILDKEY1", "zotero://ABCD1234"}
+    assert all("Meeting note" not in rec.title for rec in corpus.records("pubs"))
+
+
+def test_unknown_collection_name_does_not_ingest(
+    tmp_path: Path, corpus: Corpus, monkeypatch
+) -> None:
+    db = _zotero_fixture(tmp_path)
+    monkeypatch.setenv("ZOTERO_DB", str(db))
+    monkeypatch.setenv("DOSSIER_PUBS_COLLECTION", "hoops")
+
+    def _refuse(self) -> bool:
+        raise AssertionError("ping")
+
+    monkeypatch.setattr(HttpPubsRetriever, "ping", _refuse)
+    src = PubsSource()
+    assert src.detect(db) is False
+    src.load(db, corpus)
+    assert corpus.records("pubs") == []
+
+
 def test_missing_collection_does_not_call_the_server(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("ZOTERO_DB", str(tmp_path / "missing.sqlite"))
     monkeypatch.setenv("DOSSIER_PUBS_COLLECTION", "my pubs")
@@ -159,9 +194,13 @@ def _zotero_fixture(tmp_path: Path) -> Path:
             (11, 'CHILDKEY1', 1),
             (12, 'OCEANKEY1', 1),
             (13, 'ATTACHKEY', 2),
-            (14, 'DELETED01', 1);
+            (14, 'DELETED01', 1),
+            (15, 'NOTEKEY01', 3);
         INSERT INTO deletedItems VALUES (14);
-        INSERT INTO collectionItems VALUES (1, 10), (2, 11), (3, 12), (1, 13), (1, 14);
+        INSERT INTO collectionItems VALUES
+            (1, 10), (2, 11), (3, 12), (1, 13), (1, 14), (1, 15);
+        INSERT INTO itemDataValues VALUES (101, 'Meeting note');
+        INSERT INTO itemData VALUES (15, 1, 101);
         INSERT INTO itemDataValues VALUES (100, 'Attachment pdf');
         INSERT INTO itemData VALUES (13, 1, 100);
         INSERT INTO creators VALUES (1, 'Glen', 'Wright');

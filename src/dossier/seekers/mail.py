@@ -10,6 +10,7 @@ from dossier.identity import (
     ACTIVITY_FOLDER_RE,
     DELIVERY_SUBJECT_RE,
     DOC_ATTACH_RE,
+    NOISE_FOLDER_PATTERN,
     NOISE_SIGNALS,
     activity_folder,
     noise_folder,
@@ -35,10 +36,7 @@ def hunt_mail(conn: duckdb.DuckDBPyConnection) -> list[Hit]:
 
 
 def _noise_sql(has_signals: bool) -> str:
-    folder = (
-        "NOT regexp_matches(lower(coalesce(f.name, '')), "
-        "'newsletter|receipt|news etc|la vie de l.?iddri|bounced|out of office')"
-    )
+    folder = "NOT regexp_matches(lower(coalesce(f.name, '')), ?)"
     if not has_signals:
         return folder
     kinds = ", ".join("?" for _ in NOISE_SIGNALS)
@@ -50,7 +48,10 @@ def _noise_sql(has_signals: bool) -> str:
 
 
 def _noise_params(has_signals: bool) -> list[str]:
-    return list(NOISE_SIGNALS) if has_signals else []
+    params = [NOISE_FOLDER_PATTERN]
+    if has_signals:
+        params.extend(NOISE_SIGNALS)
+    return params
 
 
 def _year(value: object) -> int:
