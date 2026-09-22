@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dossier.lists import application_dirs, application_files, excluded
 from dossier.store import Corpus, Record
 from dossier.util import record_id
 
 TEXT_SUFFIXES = {".txt", ".md", ".html", ".htm", ".json", ".tex", ".csv"}
-SKIP_NAMES = {".ds_store", "thumbs.db"}
 TEXT_CAP = 20_000
 
 
@@ -25,12 +25,21 @@ class ApplicationsSource:
         root = path.resolve()
         if not root.is_dir():
             return
+        skipped = application_dirs()
         for child in sorted(root.rglob("*")):
             if not child.is_file():
                 continue
-            if child.name.lower() in SKIP_NAMES:
+            rel_path = child.relative_to(root)
+            if any(
+                part.casefold() in skipped or part.startswith(".")
+                for part in rel_path.parts[:-1]
+            ):
                 continue
-            rel = child.relative_to(root).as_posix()
+            if child.name.casefold() in application_files():
+                continue
+            rel = rel_path.as_posix()
+            if excluded("applications", child.name, rel):
+                continue
             uri = f"file://applications/{rel}"
             parent = child.parent.name
             suffix = child.suffix.lower()

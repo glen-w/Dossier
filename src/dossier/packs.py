@@ -8,6 +8,7 @@ from pathlib import Path
 
 from dossier.cards import content_token_set, content_tokens
 from dossier.lenses import infer_skills, kinds_mentioned
+from dossier.paths import data_dir
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,65 @@ def follow_up(
         source,
         lens,
     )
+
+
+def resolve_pack(spec: str, root: Path | None = None) -> list[PackQuestion]:
+    """``career``, a saved name under ``$DOSSIER_DATA/packs``, or a JSON path."""
+    if spec == "career":
+        return list(CAREER)
+    named = packs_dir(root) / f"{spec}.json"
+    if named.is_file():
+        return load_pack(str(named))
+    return load_pack(spec)
+
+
+def packs_dir(root: Path | None = None) -> Path:
+    return (root or data_dir()) / "packs"
+
+
+def list_saved_packs(root: Path | None = None) -> list[str]:
+    folder = packs_dir(root)
+    if not folder.is_dir():
+        return []
+    return sorted(path.stem for path in folder.glob("*.json"))
+
+
+def questions_payload(questions: list[PackQuestion]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for item in questions:
+        row = {"id": item.id, "question": item.question}
+        if item.source:
+            row["source"] = item.source
+        if item.lens:
+            row["lens"] = item.lens
+        rows.append(row)
+    return rows
+
+
+def save_named_pack(name: str, raw: str, root: Path | None = None) -> list[PackQuestion]:
+    cleaned = name.strip().lower()
+    if cleaned in {"career", "posting", "default"}:
+        raise ValueError(f"cannot overwrite {cleaned}")
+    if not cleaned or not cleaned.replace("-", "").replace("_", "").isalnum():
+        raise ValueError(f"invalid pack name {name!r}")
+    folder = packs_dir(root)
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{cleaned}.json"
+    path.write_text(raw.strip() + "\n", encoding="utf-8")
+    try:
+        return load_pack(str(path))
+    except ValueError:
+        path.unlink(missing_ok=True)
+        raise
+
+
+def delete_named_pack(name: str, root: Path | None = None) -> None:
+    cleaned = name.strip().lower()
+    if cleaned in {"career", "posting"}:
+        raise ValueError(f"cannot delete {cleaned}")
+    path = packs_dir(root) / f"{cleaned}.json"
+    if path.is_file():
+        path.unlink()
 
 
 def _df(token: str, blobs: list[str]) -> int:

@@ -99,14 +99,22 @@ def run_pack(
     return out
 
 
-def write_brief(items: list[tuple[PackQuestion, Answer]], directory: Path) -> Path:
+def write_brief(
+    items: list[tuple[PackQuestion, Answer]],
+    directory: Path,
+    *,
+    prompt_stamp: str | None = None,
+) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%y%m%d-%H%M%S")
     path = directory / f"{stamp}.md"
     if path.exists():
         stamp = datetime.now(UTC).strftime("%y%m%d-%H%M%S-%f")
         path = directory / f"{stamp}.md"
-    path.write_text(_render(items), encoding="utf-8")
+    body = _render(items)
+    if prompt_stamp:
+        body = prompt_stamp.rstrip() + "\n" + body
+    path.write_text(body, encoding="utf-8")
     return path
 
 

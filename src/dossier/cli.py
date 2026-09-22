@@ -19,7 +19,8 @@ from dossier.interview import conduct
 from dossier.llm import EGRESS_NOTICE, egress_status, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
 from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
-from dossier.packs import load_pack, posting_pack
+from dossier.match import match_posting, write_match
+from dossier.packs import posting_pack, resolve_pack
 from dossier.prove import DEFAULT_ADAPTERS, run_prove
 from dossier.show import defend_cards, find_span, gap_report, write_packet
 from dossier.paths import (
@@ -135,6 +136,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Letter only: one completion that may only reuse the selected spans",
     )
+    p_match = sub.add_parser(
+        "match",
+        help="List evidence for each requirement in a job spec",
+    )
+    p_match.add_argument("--posting", type=Path, required=True)
     sub.add_parser("index", help="Embed passages into evidence.db with the local model")
 
     p_doc = sub.add_parser("doctor", help="Print local readiness without writing")
@@ -239,6 +245,8 @@ def main(argv: list[str] | None = None) -> int:
             return _packet(cfg, corpus)
         if args.cmd == "tailor":
             return _tailor(args, cfg, corpus)
+        if args.cmd == "match":
+            return _match(args, cfg, corpus)
         if args.cmd == "index":
             return _index(cfg, corpus)
     finally:
@@ -360,6 +368,7 @@ def _extract_cards(
                 timeout_seconds=min(cfg.llm_timeout_seconds, 60.0),
                 chunk_chars=cfg.extract_chunk_chars,
                 max_chunks=cfg.extract_max_chunks,
+                max_num_ctx=cfg.llm_max_num_ctx,
                 on_progress=_extract_progress(use_llm=False, model=cfg.llm_model),
             )
             _print_extract(drafted)
@@ -378,6 +387,7 @@ def _extract_cards(
         timeout_seconds=min(cfg.llm_timeout_seconds, 60.0),
         chunk_chars=cfg.extract_chunk_chars,
         max_chunks=cfg.extract_max_chunks,
+        max_num_ctx=cfg.llm_max_num_ctx,
         on_progress=_extract_progress(use_llm=use_llm, model=cfg.llm_model),
     )
     _print_extract(cards)
@@ -760,33 +770,40 @@ def _brief(
     stage("brief", f"{len(questions)} questions · mode={mode}")
     cited = 0
     refused = 0
+    from dossier.prompts import start_prompt_log, stop_prompt_log
 
-    with Progress(len(questions), label="brief") as bar:
+    token = start_prompt_log()
+    try:
+        with Progress(len(questions), label="brief") as bar:
 
-        def on_progress(done: int, total: int, item, result) -> None:  # noqa: ANN001
-            nonlocal cited, refused
-            bar.set_total(total)
-            if result.refused:
-                refused += 1
-            else:
-                cited += 1
-            bar.tick(
-                cited=cited,
-                refused=refused,
+            def on_progress(done: int, total: int, item, result) -> None:  # noqa: ANN001
+                nonlocal cited, refused
+                bar.set_total(total)
+                if result.refused:
+                    refused += 1
+                else:
+                    cited += 1
+                bar.tick(
+                    cited=cited,
+                    refused=refused,
+                )
+                bar.status(trunc(item.question, 40))
+
+            items = run_pack(
+                corpus,
+                questions,
+                cfg,
+                spent.wrap(client),
+                mode=mode,
+                on_progress=on_progress,
+                embedder=_query_embedder(cfg, corpus),
             )
-            bar.status(trunc(item.question, 40))
-
-        items = run_pack(
-            corpus,
-            questions,
-            cfg,
-            spent.wrap(client),
-            mode=mode,
-            on_progress=on_progress,
-            embedder=_query_embedder(cfg, corpus),
-        )
-        bar.finish(cited=cited, refused=refused)
-    path = write_brief(items, Path(cfg.data_dir) / "briefs")
+            bar.finish(cited=cited, refused=refused)
+        prompt_stamp = stop_prompt_log(token, empty="ask=none")
+    except Exception:
+        stop_prompt_log(token, empty="ask=none")
+        raise
+    path = write_brief(items, Path(cfg.data_dir) / "briefs", prompt_stamp=prompt_stamp)
     print(path)
     ok(f"brief · {cited} cited · {refused} refused")
     return 0
@@ -801,7 +818,7 @@ def _pack_questions(args: argparse.Namespace, cfg: Config) -> list:
         if posting is None:
             raise ValueError("posting pack needs --posting or DOSSIER_RUN_POSTING")
         return posting_pack(posting.read_text(encoding="utf-8"))
-    return load_pack(pack)
+    return resolve_pack(pack)
 
 
 def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
@@ -878,6 +895,32 @@ def _gaps(corpus: Corpus) -> int:
     return 0
 
 
+def _match(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
+    try:
+        posting = args.posting.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if not posting.strip():
+        print("posting is empty", file=sys.stderr)
+        return 2
+    report = match_posting(
+        corpus,
+        posting,
+        cfg,
+        embedder=_query_embedder(cfg, corpus),
+    )
+    path = write_match(report, Path(cfg.data_dir) / "matches")
+    evidenced = sum(1 for item in report.requirements if item.evidence)
+    gaps = len(report.requirements) - evidenced
+    print(path)
+    print(
+        f"requirements: {len(report.requirements)} · "
+        f"with evidence: {evidenced} · gaps: {gaps}"
+    )
+    return 0
+
+
 def _tailor(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
     from dossier.tailor import (
         CV_CAP,
@@ -905,9 +948,25 @@ def _tailor(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
             _note_egress(cfg)
         client = CallBudget(cfg.llm_max_calls).wrap(get_client(cfg))
         spans = [item.card.extras["span"] for item in picked]
-        paragraphs = arrange_letter(spans, client, cfg.llm_model)
+        from dossier.prompts import start_prompt_log, stop_prompt_log
+
+        token = start_prompt_log()
+        try:
+            paragraphs = arrange_letter(
+                spans,
+                client,
+                cfg.llm_model,
+                max_num_ctx=cfg.llm_max_num_ctx,
+                timeout_seconds=cfg.llm_timeout_seconds,
+            )
+            prompt_stamp = stop_prompt_log(token, empty="none")
+        except Exception:
+            stop_prompt_log(token, empty="none")
+            raise
         if paragraphs is None:
             print("arrange refused; kept the selected spans", file=sys.stderr)
+    else:
+        prompt_stamp = "prompts: none"
     text = render_draft(
         kind=args.kind,
         posting=posting,
@@ -917,7 +976,7 @@ def _tailor(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
         subtitle=linkedin_subtitle(corpus),
         paragraphs=paragraphs,
     )
-    path = write_draft(text, Path(cfg.data_dir) / "drafts")
+    path = write_draft(text, Path(cfg.data_dir) / "drafts", prompt_stamp=prompt_stamp)
     print(path)
     if not picked:
         print("nothing to quote; approve and defend first", file=sys.stderr)
@@ -940,8 +999,11 @@ def _doctor(cfg: Config) -> int:
         print(f"python: {sys.executable}")
         print(f"sqlite: {sqlite3.sqlite_version}")
         print(f"fts5: {'yes' if corpus.fts_ok else 'no'}")
-        print(f"provider: {cfg.llm_provider}")
+        print(f"provider: {cfg.llm_provider if cfg.llm_enabled else 'off'}")
         print(egress_status(cfg))
+        print(f"effort: {cfg.effort}")
+        print(f"llm.timeout: {cfg.llm_timeout_seconds}")
+        print(f"llm.max_ctx: {cfg.llm_max_num_ctx}")
         print(
             "max_calls: "
             + ("unlimited" if cfg.llm_max_calls == 0 else str(cfg.llm_max_calls))

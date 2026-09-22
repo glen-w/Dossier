@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('index') }}</h1>
+<p class="lede">Embed passages into the locker with the local model. Skips when the provider is off.</p>
+<form method="post" action="/index/run">
+  <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Index</button>
+</form>
+<p class="meta">embed model {{ cfg.embed_model }} · effort {{ cfg.effort }}</p>
+{% if result %}
+<div class="card">
+  {% if result.skipped %}<p>Skipped: {{ result.skipped }}</p>{% endif %}
+  <p class="meta">vectors: {{ result.vectors }}</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -10,6 +10,7 @@ from dossier.ask import Answer
 from dossier.cards import header_values
 from dossier.identity import noise_folder
 from dossier.lenses import SKILL_NAMES, infer_kind, is_noise_name
+from dossier.lists import employer_roots, employer_slugs
 from dossier.packs import PackQuestion
 from dossier.store import Corpus, Record
 
@@ -54,7 +55,6 @@ _BAD_TITLE = re.compile(
     r"<!subteam|^tr:|^aw:",
     re.I,
 )
-_EMPLOYER_ROOTS = frozenset({"publications", "events", "projects", "slides"})
 _PER_KIND = 12
 _EXTRA_PER_YEAR = 1
 _MAX_LINES = 100
@@ -368,11 +368,11 @@ def _employer_rel(uri: str) -> tuple[str, str] | None:
         return None
     # file://employer/<slug>/<rel...>
     slug = parts[0].casefold()
-    if slug in {"*unsorted", "unsorted", "admin"}:
+    if slug in employer_slugs():
         return None
     for i, part in enumerate(parts):
         key = part.casefold()
-        if key in _EMPLOYER_ROOTS:
+        if key in employer_roots():
             rel = "/".join(parts[i + 1 :])
             if not rel:
                 return None

@@ -39,6 +39,7 @@ ledger.md
 briefs/
 packets/
 drafts/
+matches/
 
 # Mail, chat, and document exports
 *.mbox

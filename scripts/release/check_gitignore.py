@@ -35,6 +35,7 @@ REQUIRED_LINES = (
     "briefs/",
     "packets/",
     "drafts/",
+    "matches/",
     "*.mbox",
     "*.eml",
     "conversations.json",
@@ -84,6 +85,7 @@ _DENY_PREFIXES = (
     "briefs/",
     "packets/",
     "drafts/",
+    "matches/",
     "lancedb/",
 )
 

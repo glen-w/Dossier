@@ -2,8 +2,19 @@
 # That path is gitignored. Environment variables win over this file.
 # Leave a key out to keep the built-in default.
 
-# Global LLM investment: light | balanced | high (balanced = today's defaults)
+# Global LLM investment: light | balanced | high
+# balanced keeps today's model, timeout, and context cap.
+# light: extract drafts only, ask exact, context 8192, timeout 120s.
+# high: ask rich, planner rich, timeout 600s.
 # effort = "balanced"
+
+# Model-only override for one effort. Leave unset to keep [llm] model.
+# [efforts.high]
+# model = "qwen3.8:latest"
+
+# Active prompt ids. Missing keys use the built-in of the same name.
+# [prompts]
+# ask = "ask"
 
 [llm]
 provider = "ollama" # ollama | litellm | off
@@ -39,15 +50,67 @@ pubs = false # one /search per ask; hits are not written into the corpus
 # [identity.mail_accounts]
 # "you@example.com" = "mail-folder"
 
+[mail]
+# Folder phrases. Leave these out and the built-in lists apply.
+# A list adds phrases. The matching `_off` list turns built-in phrases off.
+# Words and phrases, not regular expressions. Keep wins over exclude.
+# exclude = ["promo"]
+# exclude_off = ["amazon affiliate"]
+# keep = ["little blue letter"]
+# keep_off = ["finance"]
+# activity = ["coaching"]
+# activity_off = ["mcs"]
+# signals = ["promotion"]
+# signals_off = ["signup"]
+# closed_off = ["trash"]
+
+[names]
+# File and subject words, shared by mail, Slack, and employer lists.
+# drop wins over keep. keep wins over exclude.
+# drop = ["ticket restaurant"]
+# drop_off = ["timesheet"]
+# keep = ["per diem"]
+# keep_off = ["frais"]
+# exclude = ["newsletter"]
+# exclude_off = ["form"]
+
+[slack]
+# Channel phrases. Activity is the built-in sample list (gsr_, research_, …).
+# exclude drops a channel from every Slack hunt. Same add / _off rules as mail.
+# activity = ["coaching_"]
+# activity_off = ["policy"]
+# exclude = ["random"]
+
+[meetings]
+# exclude skips a directory name. solo is the kinds kept when you are the only speaker.
+# exclude = ["holding"]
+# exclude_off = ["metadata"]
+# solo = ["briefing"]
+# solo_off = ["slides"]
+
 [employer]
 # paths = ["/absolute/path/to/one/employer/folder"]
 filter = true # skip caches, junk types, and older copies of the same file
+# dir_exclude = ["scratch"]
+# dir_exclude_off = ["cache"]
+# suffix_exclude_off = [".png"]
+# file_exclude = ["notes.lock"]
+# roots = ["briefs"]          # career-list folders, added to publications/events/projects/slides
+# roots_off = ["slides"]
+# slug_exclude_off = ["admin"] # an employer folder named admin can be listed
+# exclude = ["scratch-notes"]  # path phrase dropped at ingest
 filter_llm = true # when the provider is on, one pass over folder names
 filter_llm_calls = 4 # own cap; does not spend DOSSIER_LLM_MAX_CALLS
 
 [git]
 # user = "your-git-author"
 # paths = ["/absolute/path/to/one/repo"]
+# exclude = ["wip"]
+
+# The same exclude / exclude_off pair exists for chatgpt, linkedin, transcripts,
+# pubs, and applications. applications also has file_exclude for junk names.
+# [chatgpt]
+# exclude = ["scratch"]
 
 [extract]
 llm = true

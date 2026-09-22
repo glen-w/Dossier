@@ -8,16 +8,13 @@ from pathlib import Path
 
 from dossier.identity import resolve_speaker_names
 from dossier.lenses import infer_kind, infer_lenses, infer_skills, primary_lens
+from dossier.lists import meetings_dirs, meetings_solo
 from dossier.seekers.hits import Hit
 
 TEXT_CAP = 8000
 PREVIEW_CAP = 240
 MAX_BYTES = 8_000_000
 PAIR_CAP = 2000
-SKIP_DIRS = frozenset(
-    {"metadata", "imports", "originals", "readable", ".stfolder", ".whispermlx-missing"}
-)
-_SOLO_KINDS = frozenset({"workshop", "webinar", "teaching", "side_event", "slides"})
 _CONTRIB_RE = re.compile(
     r"\b(draft\w*|edit\w*|coordinat\w*|review\w*|taught|teach\w*|conven\w*|"
     r"facilitat\w*|wrote|written|led|lead\w*|chair\w*|present\w*)\b",
@@ -47,8 +44,13 @@ def iter_meeting_pairs(root: Path) -> list[tuple[Path, Path]]:
     if not root.exists():
         return []
     base = root if root.is_dir() else root.parent
+    skipped = meetings_dirs()
     if root.is_file() and root.suffix.lower() == ".json":
         if root.name.endswith(".speaker_map.json"):
+            return []
+        if base.name.casefold() in skipped or base.name.startswith("."):
+            return []
+        if _dir_skipped(root, base, skipped):
             return []
         sidecar = root.with_name(f"{root.stem}.speaker_map.json")
         if sidecar.is_file() and _inside(base, root) and not _rejected(root):
@@ -62,6 +64,8 @@ def iter_meeting_pairs(root: Path) -> list[tuple[Path, Path]]:
             transcript = base / rel.parent / f"{sidecar.name[: -len('.speaker_map.json')]}.json"
             if not transcript.is_file() or _rejected(transcript):
                 continue
+            if _dir_skipped(transcript, base, skipped):
+                continue
             if not _inside(base, transcript) or not _inside(base, sidecar):
                 continue
             pairs.append((transcript, sidecar))
@@ -69,7 +73,7 @@ def iter_meeting_pairs(root: Path) -> list[tuple[Path, Path]]:
     pairs = []
     for sidecar in sorted(base.rglob("*.speaker_map.json")):
         rel_parent = sidecar.relative_to(base).parts[:-1]
-        if any(part in SKIP_DIRS or part.startswith(".") for part in rel_parent):
+        if any(part.casefold() in skipped or part.startswith(".") for part in rel_parent):
             continue
         transcript = sidecar.with_name(f"{sidecar.name[: -len('.speaker_map.json')]}.json")
         if not transcript.is_file() or _rejected(transcript):
@@ -78,6 +82,14 @@ def iter_meeting_pairs(root: Path) -> list[tuple[Path, Path]]:
             continue
         pairs.append((transcript, sidecar))
     return pairs
+
+
+def _dir_skipped(path: Path, base: Path, skipped: frozenset[str]) -> bool:
+    try:
+        parts = path.resolve().relative_to(base.resolve()).parts[:-1]
+    except (OSError, ValueError):
+        return False
+    return any(part.casefold() in skipped or part.startswith(".") for part in parts)
 
 
 def user_speech(doc: dict, sidecar: dict, names: tuple[str, ...]) -> str:
@@ -119,7 +131,8 @@ def _hit_for(root: Path, transcript: Path, sidecar_path: Path, names: tuple[str,
     stem = transcript.stem
     title = _title(stem)
     kind = infer_kind(folder=stem, subject=title)
-    if not others and kind not in _SOLO_KINDS:
+    solo = meetings_solo()
+    if not others and kind not in solo:
         return None
     skills = infer_skills(stem, title, speech[:PREVIEW_CAP])
     contrib = bool(_CONTRIB_RE.search(speech))
@@ -137,7 +150,7 @@ def _hit_for(root: Path, transcript: Path, sidecar_path: Path, names: tuple[str,
         score += 20
     if contrib:
         score += 25
-    if kind in _SOLO_KINDS:
+    if kind in solo:
         score += 15
     if len(speech) >= 400:
         score += 10

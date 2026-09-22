@@ -6,6 +6,7 @@ import json
 import zipfile
 from pathlib import Path
 
+from dossier.lists import excluded
 from dossier.store import Corpus, Record
 from dossier.util import record_id
 
@@ -44,12 +45,15 @@ def load_chatgpt_export(path: Path, corpus: Corpus) -> None:
             if len(body) <= MIN_CHARS:
                 continue
             uri = f"chatgpt://{cid}/{mid}"
+            heading = title or f"ChatGPT {role}"
+            if excluded("chatgpt", heading):
+                continue
             corpus.upsert_record(
                 Record(
                     id=record_id(uri),
                     source="chatgpt",
                     uri=uri,
-                    title=title or f"ChatGPT {role}",
+                    title=heading,
                     text=body[:TEXT_CAP],
                     table="chatgpt.messages",
                 )

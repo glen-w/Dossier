@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dossier.lists import excluded
 from dossier.sources.chatgpt_export import is_chatgpt_export, load_chatgpt_export
 from dossier.sources.warehouse import connect_readonly, has_table, resolve_warehouse
 from dossier.store import Corpus, Record
@@ -68,6 +69,8 @@ class ChatGPTSource:
             mid = str(message_id or record_id(body))
             uri = f"chatgpt://{cid}/{mid}"
             heading = str(title or "").strip() or f"ChatGPT {role or 'message'}"
+            if excluded("chatgpt", heading):
+                continue
             corpus.upsert_record(
                 Record(
                     id=record_id(uri),

@@ -122,7 +122,7 @@ def locker_snapshot(cfg: Config, corpus: Corpus) -> dict[str, Any]:
         "fts5": corpus.fts_ok,
         "python": sys.executable,
         "sqlite": sqlite3.sqlite_version,
-        "provider": cfg.llm_provider,
+        "provider": cfg.llm_provider if cfg.llm_enabled else "off",
         "egress": egress_status(cfg),
         "egress_remote": llm_egress_is_remote(cfg),
         "effort": cfg.effort,

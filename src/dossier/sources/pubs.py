@@ -12,6 +12,7 @@ from typing import Protocol
 
 import httpx
 
+from dossier.lists import excluded
 from dossier.llm.validate import host_is_local
 from dossier.paths import pubs_seed, pubs_top_k, pubs_url
 from dossier.sources.zotero import collection_records
@@ -148,6 +149,8 @@ class PubsSource:
 
     def load(self, path: Path, corpus: Corpus) -> None:
         for rec in self.records_for(path):
+            if excluded("pubs", rec.title):
+                continue
             corpus.upsert_record(rec)
 
     def tables(self) -> list[str]:

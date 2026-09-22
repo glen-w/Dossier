@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from dossier.lists import excluded
 from dossier.paths import git_user
 from dossier.store import Corpus, Record
 from dossier.util import record_id
@@ -29,6 +30,8 @@ class GitSource:
         name = path.resolve().name or "repo"
         for sha, day, subject, files in _commits(raw):
             if not sha or not subject:
+                continue
+            if excluded("git", subject, " ".join(files)):
                 continue
             lines = [subject]
             if day:

@@ -14,19 +14,13 @@ from dossier.cards import (
 )
 from dossier.lenses import infer_skills, kinds_mentioned
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
+from dossier.prompts import ARRANGE_BODY, active_prompt, render
 from dossier.store import Corpus
 
 CV_CAP = 8
 LETTER_CAP = 4
 GLUE = "I am applying for the role in the posting."
-_ARRANGE = """Arrange a short letter using only the sentences below.
-You may include this sentence once: "I am applying for the role in the posting."
-Return JSON only: {"sentences": ["...", ...]}
-Do not invent employers, dates, or titles.
-
-Sentences:
-@@SPANS@@
-"""
+_ARRANGE = ARRANGE_BODY
 
 
 @dataclass(frozen=True)
@@ -101,30 +95,42 @@ def render_draft(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def write_draft(text: str, directory: Path) -> Path:
+def write_draft(text: str, directory: Path, *, prompt_stamp: str = "prompts: none") -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%y%m%d-%H%M%S")
     path = directory / f"{stamp}.md"
     if path.exists():
         stamp = datetime.now(UTC).strftime("%y%m%d-%H%M%S-%f")
         path = directory / f"{stamp}.md"
-    path.write_text(text, encoding="utf-8")
+    body = text if text.startswith("prompts:") else f"{prompt_stamp.rstrip()}\n{text}"
+    path.write_text(body, encoding="utf-8")
     return path
 
 
-def arrange_letter(spans: list[str], client: LLMClient, model: str) -> list[str] | None:
+def arrange_letter(
+    spans: list[str],
+    client: LLMClient,
+    model: str,
+    *,
+    max_num_ctx: int = 32_768,
+    timeout_seconds: float = 300.0,
+) -> list[str] | None:
     """One completion. Anything outside the spans and the glue line is a miss."""
     clean = [span.strip() for span in spans if span.strip()]
     if not clean:
         return None
-    prompt = _ARRANGE.replace("@@SPANS@@", "\n".join(f"- {span}" for span in clean))
+    prompt = render(
+        active_prompt("tailor_arrange"),
+        {"SPANS": "\n".join(f"- {span}" for span in clean)},
+    )
     try:
         data = client.complete_json(
             CompletionRequest(
                 model=model,
                 prompt=prompt,
                 json_mode=True,
-                num_ctx=ctx_tokens_for(prompt),
+                num_ctx=ctx_tokens_for(prompt, max_num_ctx=max_num_ctx),
+                timeout_seconds=timeout_seconds,
             )
         )
     except LLMClientError:

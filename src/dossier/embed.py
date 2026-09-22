@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 import struct
 
+from collections.abc import Callable
+
 import httpx
 
 from dossier.llm.validate import LlmConfigError, validate_ollama_url
@@ -70,16 +72,28 @@ class OllamaEmbedder:
         return out
 
 
-def index_passages(corpus: Corpus, embedder: OllamaEmbedder) -> int:
+def index_passages(
+    corpus: Corpus,
+    embedder: OllamaEmbedder,
+    *,
+    on_batch: Callable[[int, int], None] | None = None,
+) -> int:
     """Store vectors for passages missing this model. Returns how many exist."""
     model = embedder.model
     corpus.drop_other_vectors(model)
     missing = corpus.passages_missing_vector(model)
-    for start in range(0, len(missing), BATCH):
+    total = len(missing)
+    done = 0
+    if on_batch is not None:
+        on_batch(done, total)
+    for start in range(0, total, BATCH):
         chunk = missing[start : start + BATCH]
         vectors = embedder.embed([text for _uri, _ordinal, text in chunk])
         for (uri, ordinal, _text), vector in zip(chunk, vectors, strict=True):
             corpus.upsert_vector(uri, ordinal, model, vector)
+        done += len(chunk)
+        if on_batch is not None:
+            on_batch(done, total)
     return corpus.vector_count(model)
 
 

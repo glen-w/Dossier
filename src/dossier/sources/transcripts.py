@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from dossier.lists import excluded
 from dossier.store import Corpus, Record
 from dossier.util import record_id
 
@@ -69,6 +70,8 @@ def _load_jsonl(path: Path, corpus: Corpus) -> None:
     stem = path.stem
     project = path.parent.parent.name if path.parent.name == "agent-transcripts" else "cursor"
     uri = f"cursor://{project}/{stem}"
+    if excluded("transcripts", project, stem):
+        return
     corpus.upsert_record(
         Record(
             id=record_id(uri),
@@ -131,6 +134,8 @@ def _load_blob(path: Path, corpus: Corpus) -> None:
     if not text:
         return
     uri = f"grok://{path.name}"
+    if excluded("transcripts", path.name):
+        return
     corpus.upsert_record(
         Record(
             id=record_id(uri),

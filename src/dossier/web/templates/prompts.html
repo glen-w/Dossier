@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('prompt') }}s</h1>
+<p class="lede">{{ blurbs.prompt }}</p>
+{% if saved %}<div class="ok">Saved.</div>{% endif %}
+<p class="meta"><a href="/settings">Settings</a> · <a href="/settings/packs">Packs</a></p>
+
+<form class="row" method="get" action="/settings/prompts">
+  <label class="field">Catalogue
+    <select name="id" onchange="this.form.submit()">
+      {% for item in catalogue %}
+      <option value="{{ item.prompt_id }}" {% if item.prompt_id == selected.prompt_id %}selected{% endif %}>
+        {{ item.title }} · {{ item.prompt_id }} v{{ item.version }} [{{ item.source }}]
+      </option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<div class="card">
+  <h3>{{ selected.title }}</h3>
+  <p class="meta">{{ selected.family }} · {{ selected.prompt_id }}@{{ selected.version }} · {{ selected.source }}</p>
+  <form method="post" action="/settings/prompts/override">
+    <input type="hidden" name="prompt_id" value="{{ selected.prompt_id }}">
+    <label class="field">System
+      <textarea name="system_prompt">{{ selected.system_prompt }}</textarea>
+    </label>
+    <label class="field">User template
+      <textarea name="user_template">{{ selected.user_template }}</textarea>
+    </label>
+    <div class="row" style="margin-top:10px">
+      {% if selected.prompt_id in roles %}
+      <button class="primary" type="submit">Save override</button>
+      {% endif %}
+    </div>
+  </form>
+  <div class="row">
+    {% if selected.source == 'override' %}
+    <form method="post" action="/settings/prompts/restore">
+      <input type="hidden" name="prompt_id" value="{{ selected.prompt_id }}">
+      <button type="submit">Restore built-in</button>
+    </form>
+    {% endif %}
+    <form method="get" action="/settings/prompts">
+      <input type="hidden" name="id" value="{{ selected.prompt_id }}">
+      <input type="hidden" name="dry" value="1">
+      <button type="submit">Dry run</button>
+    </form>
+  </div>
+  {% if rendered %}
+  <pre class="snippet">{{ rendered }}</pre>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>Use for a role</h3>
+  <form class="row" method="post" action="/settings/prompts/activate">
+    <label class="field">Role
+      <select name="role">
+        {% for role in roles %}
+        <option value="{{ role }}">{{ role }} (now {{ prompt_roles[role] }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">Prompt
+      <select name="prompt_id">
+        {% for item in catalogue %}
+        <option value="{{ item.prompt_id }}" {% if item.prompt_id == selected.prompt_id %}selected{% endif %}>{{ item.prompt_id }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Activate</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>New prompt</h3>
+  <form method="post" action="/settings/prompts/custom">
+    <div class="row">
+      <label class="field">Id
+        <input name="prompt_id" required pattern="[a-z][a-z0-9_]*" placeholder="ask_short">
+      </label>
+      <label class="field">Title
+        <input name="title">
+      </label>
+      <label class="field">Family
+        <select name="family">
+          {% for family in families %}
+          <option value="{{ family }}">{{ family }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <label class="field">User template
+      <textarea name="user_template" required></textarea>
+    </label>
+    <button type="submit">Save custom</button>
+  </form>
+</div>
+{% endblock %}

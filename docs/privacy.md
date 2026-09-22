@@ -21,7 +21,7 @@ Loopback calls that are not that exception:
 
 Before every push, run `python3 scripts/release/check_gitignore.py`. It fails if `.gitignore` drops a personal-data pattern or if a corpus, export, or secret is already tracked. Do not push when it fails.
 
-Also off git: dumps, DuckDB, LanceDB, `.env`, mbox, PDFs, and office exports. Slack ids, speaker names, and the mail-folder map live only in gitignored `$DOSSIER_DATA/dossier.toml` under `[identity]`.
+Also off git: dumps, DuckDB, LanceDB, `.env`, mbox, PDFs, and office exports. Slack ids, speaker names, the mail-folder map, and include/exclude phrase edits live only in gitignored `$DOSSIER_DATA/dossier.toml`.
 
 - No Twenty writes (Tasks, Opportunities, Notes, last-contacted).
 - No auto-attach of a referee name to an application.

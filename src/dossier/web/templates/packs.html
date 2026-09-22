@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('pack') }}s</h1>
+<p class="lede">{{ blurbs.pack }} Career stays in code. Saved packs live under data/packs.</p>
+{% if saved %}<div class="ok">Saved.</div>{% endif %}
+<p class="meta"><a href="/settings">Settings</a> · <a href="/settings/prompts">Prompts</a></p>
+
+<form class="row" method="get" action="/settings/packs">
+  <label class="field">Open
+    <select name="pack" onchange="this.form.submit()">
+      <option value="career" {% if pack_name == 'career' %}selected{% endif %}>career</option>
+      {% for name in saved_packs %}
+      <option value="{{ name }}" {% if pack_name == name %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+<form method="post" action="/settings/packs/save">
+  <div class="row">
+    <label class="field">Name
+      <input name="name" value="{{ '' if pack_name == 'career' else pack_name }}" required placeholder="short">
+    </label>
+    <button class="primary" type="submit">Save pack</button>
+  </div>
+  <label class="field">Questions JSON
+    <textarea name="body">{{ pack_body }}</textarea>
+  </label>
+</form>
+
+{% if pack_name != 'career' %}
+<form method="post" action="/settings/packs/delete" onsubmit="return confirm('Delete pack {{ pack_name }}?');">
+  <input type="hidden" name="name" value="{{ pack_name }}">
+  <button class="warn" type="submit">Delete</button>
+</form>
+{% endif %}
+{% endblock %}

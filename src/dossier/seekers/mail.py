@@ -7,14 +7,19 @@ from pathlib import Path
 import duckdb
 
 from dossier.identity import (
-    ACTIVITY_FOLDER_RE,
     DELIVERY_SUBJECT_RE,
     DOC_ATTACH_RE,
-    NOISE_FOLDER_PATTERN,
-    NOISE_SIGNALS,
     activity_folder,
     noise_folder,
     skip_folder,
+)
+from dossier.lists import (
+    mail_activity,
+    mail_exclude,
+    mail_keep,
+    mail_signals,
+    phrase_pattern,
+    seek_closed,
 )
 from dossier.lenses import infer_kind, infer_lenses, infer_org, infer_skills, primary_lens
 from dossier.seekers.hits import Hit
@@ -35,11 +40,26 @@ def hunt_mail(conn: duckdb.DuckDBPyConnection) -> list[Hit]:
     return hits
 
 
+# Lowercased folder name, with a curly apostrophe folded so the phrase list matches.
+_FOLDER = (
+    "replace(replace(lower(coalesce(f.name, '')), chr(8217), ''''), '`', '''')"
+)
+
+
 def _noise_sql(has_signals: bool) -> str:
-    folder = "NOT regexp_matches(lower(coalesce(f.name, '')), ?)"
-    if not has_signals:
+    closed = tuple(seek_closed())
+    closed_sql = ""
+    if closed:
+        marks = ", ".join("?" for _ in closed)
+        closed_sql = f" OR {_FOLDER} IN ({marks})"
+    folder = f"""NOT (
+        (regexp_matches({_FOLDER}, ?) AND NOT regexp_matches({_FOLDER}, ?))
+        {closed_sql}
+    )"""
+    signals = mail_signals() if has_signals else ()
+    if not signals:
         return folder
-    kinds = ", ".join("?" for _ in NOISE_SIGNALS)
+    kinds = ", ".join("?" for _ in signals)
     return f"""{folder}
         AND NOT EXISTS (
             SELECT 1 FROM thunderbird.signals s
@@ -48,9 +68,10 @@ def _noise_sql(has_signals: bool) -> str:
 
 
 def _noise_params(has_signals: bool) -> list[str]:
-    params = [NOISE_FOLDER_PATTERN]
+    params: list[str] = [phrase_pattern(mail_exclude()), phrase_pattern(mail_keep())]
+    params.extend(sorted(seek_closed()))
     if has_signals:
-        params.extend(NOISE_SIGNALS)
+        params.extend(mail_signals())
     return params
 
 
@@ -153,7 +174,7 @@ def _sent_docs_activity(conn: duckdb.DuckDBPyConnection, has_signals: bool) -> l
           AND regexp_matches(lower(coalesce(f.name, '')), ?)
           AND {_noise_sql(has_signals)}
         """
-    params: list[object] = [DOC_ATTACH_RE.pattern, ACTIVITY_FOLDER_RE.pattern]
+    params: list[object] = [DOC_ATTACH_RE.pattern, phrase_pattern(mail_activity())]
     params.extend(_noise_params(has_signals))
     rows = conn.execute(sql, params).fetchall()
     return [
@@ -174,7 +195,7 @@ def _sent_delivery_activity(
           AND regexp_matches(lower(coalesce(f.name, '')), ?)
           AND {_noise_sql(has_signals)}
         """
-    params: list[object] = [DELIVERY_SUBJECT_RE.pattern, ACTIVITY_FOLDER_RE.pattern]
+    params: list[object] = [DELIVERY_SUBJECT_RE.pattern, phrase_pattern(mail_activity())]
     params.extend(_noise_params(has_signals))
     rows = conn.execute(sql, params).fetchall()
     return [
@@ -199,7 +220,7 @@ def _starred_activity(conn: duckdb.DuckDBPyConnection, has_signals: bool) -> lis
           AND regexp_matches(lower(coalesce(f.name, '')), ?)
           AND {_noise_sql(has_signals)}
         """
-    params: list[object] = [ACTIVITY_FOLDER_RE.pattern]
+    params: list[object] = [phrase_pattern(mail_activity())]
     params.extend(_noise_params(has_signals))
     rows = conn.execute(sql, params).fetchall()
     return [
@@ -228,7 +249,7 @@ def _sent_docs_elsewhere(conn: duckdb.DuckDBPyConnection, has_signals: bool) -> 
         """
     params: list[object] = [
         DOC_ATTACH_RE.pattern,
-        ACTIVITY_FOLDER_RE.pattern,
+        phrase_pattern(mail_activity()),
     ]
     params.extend(_noise_params(has_signals))
     rows = conn.execute(sql, params).fetchall()

@@ -8,12 +8,10 @@ import duckdb
 
 from dossier.identity import configured_slack_user_ids, resolve_speaker_names
 from dossier.lenses import infer_kind, infer_lenses, infer_org, infer_skills, primary_lens
+from dossier.lists import phrase_blocked, phrase_pattern, slack_activity, slack_exclude
 from dossier.seekers.hits import Hit
 from dossier.sources.warehouse import has_table
 
-CHANNEL_SAMPLE_RE = (
-    r"gsr_|gfr_|research_|events_|comm_|comms_|academy_|policy"
-)
 LONG_TEXT = 400
 HOT_REPLY = 3
 HOT_REACT = 3
@@ -66,6 +64,10 @@ def hunt_slack(conn: duckdb.DuckDBPyConnection) -> list[Hit]:
     hits.extend(_hunt_thread_files(conn, ids))
     hits.extend(_hunt_channel_samples(conn, ids))
     return hits
+
+
+def _channel_blocked(name: str) -> bool:
+    return phrase_blocked(slack_exclude(), name)
 
 
 def _in_clause(ids: Sequence[str]) -> tuple[str, list[str]]:
@@ -163,6 +165,8 @@ def _hunt_glen_files(conn: duckdb.DuckDBPyConnection, ids: Sequence[str]) -> lis
     rows = conn.execute(sql, params).fetchall()
     out: list[Hit] = []
     for row in rows:
+        if _channel_blocked(str(row[2] or "")):
+            continue
         artifacts = _split_agg(row[9])
         score = 50 + int(row[6] or 0) + int(row[7] or 0)
         title = artifacts[0] if artifacts else (row[4] or row[2] or "file")
@@ -202,6 +206,8 @@ def _hunt_hot_threads(conn: duckdb.DuckDBPyConnection, ids: Sequence[str]) -> li
     ).fetchall()
     out: list[Hit] = []
     for row in rows:
+        if _channel_blocked(str(row[2] or "")):
+            continue
         score = 40 + int(row[6] or 0) + int(row[7] or 0)
         out.append(
             _hit(
@@ -239,6 +245,8 @@ def _hunt_long_messages(conn: duckdb.DuckDBPyConnection, ids: Sequence[str]) -> 
     ).fetchall()
     out: list[Hit] = []
     for row in rows:
+        if _channel_blocked(str(row[2] or "")):
+            continue
         out.append(
             _hit(
                 channel_id=str(row[0]),
@@ -275,6 +283,8 @@ def _hunt_file_conversations(
     ).fetchall()
     out: list[Hit] = []
     for row in rows:
+        if _channel_blocked(str(row[2] or "")):
+            continue
         channel = str(row[2] or "")
         out.append(
             _hit(
@@ -320,6 +330,8 @@ def _hunt_mentioned_files(
     ).fetchall()
     out: list[Hit] = []
     for row in rows:
+        if _channel_blocked(str(row[2] or "")):
+            continue
         artifacts = _split_agg(row[6])
         out.append(
             _hit(
@@ -366,6 +378,8 @@ def _hunt_thread_files(conn: duckdb.DuckDBPyConnection, ids: Sequence[str]) -> l
     ).fetchall()
     out: list[Hit] = []
     for row in rows:
+        if _channel_blocked(str(row[2] or "")):
+            continue
         artifacts = _split_agg(row[6])
         out.append(
             _hit(
@@ -401,10 +415,12 @@ def _hunt_channel_samples(
           AND coalesce(m.text_len, 0) >= ?
           AND regexp_matches(lower(coalesce(c.name, '')), ?)
         """,
-        params + [SAMPLE_MIN_LEN, CHANNEL_SAMPLE_RE],
+        params + [SAMPLE_MIN_LEN, phrase_pattern(slack_activity())],
     ).fetchall()
     out: list[Hit] = []
     for row in rows:
+        if _channel_blocked(str(row[2] or "")):
+            continue
         out.append(
             _hit(
                 channel_id=str(row[0]),

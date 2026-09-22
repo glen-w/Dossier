@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('brief') }}</h1>
+<p class="lede">Answer a question pack into data/briefs. A pack is questions, not a prompt.</p>
+<form method="post" action="/brief/run">
+  <div class="row">
+    <label class="field">Pack
+      <select name="pack">
+        {% for name in packs %}
+        <option value="{{ name }}">{{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">Posting path
+      <input name="posting" placeholder="required for posting">
+    </label>
+    <label class="field">Mode
+      <select name="mode">
+        <option value="">use settings ({{ cfg.ask_mode }})</option>
+        {% for m in modes %}
+        <option value="{{ m }}">{{ m }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Write brief</button>
+  </div>
+</form>
+<p class="meta"><a href="/settings/packs">Edit packs</a></p>
+{% if result %}
+<div class="card">
+  <p>{{ result.stamp }}</p>
+  <p class="meta">{{ result.path }}</p>
+  <p class="meta">cited {{ result.cited }} · refused {{ result.refused }}</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -9,9 +9,10 @@ cites a record. If the record will not carry the sentence, the claim is refused.
 You approve a card before it is paste-ready.
 
 Ask-the-corpus — “what did I actually do?” — is `dossier ask`. It answers from
-records already in the locker and prints citation URIs. A posting-shaped CV
-or letter is `dossier tailor`. What either command includes is in
-[status](status.md).
+records already in the locker and prints citation URIs. A pasted job spec
+becomes an ordered evidence list per requirement with `dossier match`. A
+posting-shaped CV or letter is `dossier tailor`. What each command includes
+is in [status](status.md).
 
 The product page and this guide share one sticky header. Build both with
 `make pages-site`.

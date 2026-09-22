@@ -182,7 +182,7 @@ def test_packet_quotes_spanned_cards_and_lists_the_rest(corpus: Corpus, tmp_path
     assert "> Convened" not in text
     path = write_packet(corpus, tmp_path / "packets")
     assert path.is_file()
-    assert path.read_text(encoding="utf-8") == text
+    assert path.read_text(encoding="utf-8") == "prompts: none\n" + text
 
 
 def test_cli_span_refuses_when_no_sentence(tmp_path: Path, monkeypatch, capsys) -> None:

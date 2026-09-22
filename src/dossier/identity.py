@@ -10,50 +10,11 @@ import os
 import re
 from pathlib import Path
 
+from dossier.lists import folder_is_activity, folder_is_noise, mail_closed
 from dossier.paths import _toml_list, _toml_section
 
-SKIP_BODY_FOLDERS = frozenset(
-    {
-        "sent mail",
-        "sent",
-        "sent messages",
-        "inbox",
-        "all mail",
-        "newsletters",
-        "receipts",
-        "la vie de l'iddri",
-        "news etc.",
-        "bounced",
-        "out of office",
-        "trash",
-        "spam",
-        "junk",
-        "drafts",
-        "templates",
-        "[gmail]",
-        "important",
-        "starred",
-        "chats",
-        "snoozed",
-    }
-)
-
-# Broadcast filing. Admin, budget, and finance stay out of this list on purpose:
-# a reimbursement or a budget note in those folders is evidence.
-# Matched on the lowercased folder name in SQL, and case-insensitively here.
-NOISE_FOLDER_PATTERN = (
-    r"newsletter|receipt|news etc|la vie de l.?iddri|out of office|"
-    r"google alerts?|amazon affiliate|"
-    r"(?:^|[^a-z])bounce[ds]?(?:[^a-z]|$)"
-)
-NOISE_FOLDER_RE = re.compile(NOISE_FOLDER_PATTERN, re.I)
-
-ACTIVITY_FOLDER_RE = re.compile(
-    r"teach|webinar|workshop|event|publicat|paper|book|policy|bbnj|iki|"
-    r"prog|ocean energy|mining|mrf|training|brief|review|consult|side event|"
-    r"mcs|oceans conference",
-    re.I,
-)
+# These stay closed even if a local list turns the others off.
+_HARD_CLOSED = frozenset({"sent mail", "sent", "sent messages", "inbox", "all mail"})
 
 DELIVERY_SUBJECT_RE = re.compile(
     r"attached|please find|draft|comments|revised|agenda|submitted|"
@@ -62,8 +23,6 @@ DELIVERY_SUBJECT_RE = re.compile(
 )
 
 DOC_ATTACH_RE = re.compile(r"\.(pdf|docx?|pptx?|xlsx?)\b", re.I)
-
-NOISE_SIGNALS = ("newsletter", "receipt", "subscription", "signup")
 
 
 def slack_user_ids_from_env() -> tuple[str, ...]:
@@ -123,16 +82,20 @@ def mail_account_map() -> dict[str, str]:
 
 
 def skip_folder(name: str) -> bool:
-    return (name or "").strip().lower() in SKIP_BODY_FOLDERS
+    """True for folders whose bodies are not opened. Sent and Inbox stay closed."""
+    folded = (name or "").strip().casefold()
+    if folded in _HARD_CLOSED:
+        return True
+    return folded in mail_closed()
 
 
 def noise_folder(name: str) -> bool:
-    """True for newsletter-style folders. Admin, budget, and finance are kept."""
-    return bool(NOISE_FOLDER_RE.search(name or ""))
+    """True for newsletter-style folders. Kept phrases (admin, budget, finance) win."""
+    return folder_is_noise(name)
 
 
 def activity_folder(name: str) -> bool:
-    return bool(ACTIVITY_FOLDER_RE.search(name or ""))
+    return folder_is_activity(name)
 
 
 def account_dir(mail_root: Path, account_key: str) -> Path:

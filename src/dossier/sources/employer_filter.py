@@ -14,115 +14,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dossier.lists import employer_dirs, employer_files, employer_suffixes, excluded
 from dossier.llm.budget import CallBudget
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
-
-# Directory names that are machinery, not work. Matched on one path part.
-SKIP_DIR_NAMES = frozenset(
-    {
-        ".git",
-        ".hg",
-        ".svn",
-        ".venv",
-        "venv",
-        "node_modules",
-        "bower_components",
-        "site-packages",
-        "__pycache__",
-        ".pytest_cache",
-        ".mypy_cache",
-        ".ruff_cache",
-        ".tox",
-        ".nox",
-        ".eggs",
-        ".ipynb_checkpoints",
-        "htmlcov",
-        "cache",
-        "caches",
-        ".cache",
-    }
-)
-
-# Types that are never career evidence. Office files and source text stay.
-SKIP_SUFFIXES = frozenset(
-    {
-        ".pkl",
-        ".pickle",
-        ".pyc",
-        ".pyo",
-        ".pyd",
-        ".so",
-        ".dylib",
-        ".dll",
-        ".exe",
-        ".o",
-        ".obj",
-        ".a",
-        ".lib",
-        ".class",
-        ".jar",
-        ".war",
-        ".woff",
-        ".woff2",
-        ".ttf",
-        ".otf",
-        ".eot",
-        ".parquet",
-        ".feather",
-        ".arrow",
-        ".npy",
-        ".npz",
-        ".h5",
-        ".hdf5",
-        ".sqlite",
-        ".sqlite3",
-        ".db",
-        ".pt",
-        ".pth",
-        ".ckpt",
-        ".onnx",
-        ".safetensors",
-        ".gz",
-        ".tgz",
-        ".bz2",
-        ".xz",
-        ".7z",
-        ".rar",
-        ".iso",
-        ".dmg",
-        ".zip",
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".gif",
-        ".webp",
-        ".svg",
-        ".ico",
-        ".bmp",
-        ".tif",
-        ".tiff",
-        ".mp4",
-        ".mov",
-        ".mp3",
-        ".wav",
-        ".avi",
-        ".mkv",
-        ".whl",
-    }
-)
-
-SKIP_FILE_NAMES = frozenset(
-    {
-        ".ds_store",
-        "thumbs.db",
-        "package-lock.json",
-        "yarn.lock",
-        "pnpm-lock.yaml",
-        "poetry.lock",
-        "cargo.lock",
-        "pipfile.lock",
-    }
-)
 
 _HEX_NAME = re.compile(r"^[0-9a-f]{16,}$")
 _COPY_PREFIX = re.compile(r"(?i)^copy of ")
@@ -299,6 +193,9 @@ def _walk(
                 stats.skip_files += 1
                 continue
             rel = _rel(root, Path(entry.path))
+            if excluded("employer", rel):
+                stats.skip_files += 1
+                continue
             found.append(KeptFile(path=Path(entry.path), rel=rel, mtime=mtime))
     return found
 
@@ -309,7 +206,7 @@ def _skip_dir(name: str, *, enabled: bool) -> bool:
         return True
     if not enabled:
         return False
-    if folded in SKIP_DIR_NAMES or folded.endswith(".egg-info"):
+    if folded in employer_dirs() or folded.endswith(".egg-info"):
         return True
     return False
 
@@ -320,10 +217,10 @@ def _skip_file(name: str, *, enabled: bool) -> bool:
         return True
     if not enabled:
         return False
-    if folded in SKIP_FILE_NAMES or folded.startswith("~$"):
+    if folded in employer_files() or folded.startswith("~$"):
         return True
     suffix = Path(folded).suffix
-    if suffix in SKIP_SUFFIXES:
+    if suffix in employer_suffixes():
         return True
     stem = Path(folded).stem
     if _HEX_NAME.match(stem):

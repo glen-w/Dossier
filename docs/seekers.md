@@ -39,6 +39,7 @@ Seek `thunderbird.messages` (Gloda: subject, folder, attachments, direction). Bo
 
 - Exclude newsletters, receipts, google alerts, affiliate mail, bounce folders, `la vie de l'iddri`, and out of office, plus Gloda `signals` of newsletter, receipt, subscription, and signup
 - Keep admin, budget, and finance folders. A reimbursement or a budget note there is evidence. One message tagged as a receipt still drops
+- Those lists are on without a config file. Each source has a section in gitignored `dossier.toml`: `[mail]`, `[names]`, `[slack]`, `[meetings]`, `[employer]`, and `exclude` on `[git]`, `[chatgpt]`, `[linkedin]`, `[transcripts]`, `[pubs]`, and `[applications]`. A list adds phrases. The matching `_off` key turns a built-in phrase off. Environment variables `DOSSIER_<SECTION>_<KEY>` override the file. Sent, Inbox, and All Mail stay closed. `.git` stays skipped
 - Prefer activity folders (Teaching, webinars, workshops, BBNJ, IKI, PROG, Review, …)
 - Rank sent+document in those folders; delivery-ish subjects; starred/replied
 - Sent+document outside activity folders is metadata only

@@ -69,22 +69,6 @@ _EVENT_KINDS = frozenset(
 )
 _DOC_EXT = re.compile(r"\.(pdf|docx?|pptx?|xlsx?|csv)$", re.I)
 
-# Logistics and life-admin. Shared by inventory listing and seeker year floor.
-_NOISE = re.compile(
-    r"(?:^|[^a-z])(?:"
-    r"form|consent|registration|invoice|receipt|passport|duplicat|bulletin|"
-    r"judging|appointment|engagement|timesheets?|time[- ]?sheets?|"
-    r"attendee report|logistics(?: note)?|ordonnance|holiday dates?|"
-    r"chatgpt|gemini testing|booking\.com|"
-    r"\*\s*done\s*\*|image\.png|image\.jpe?g"
-    r")(?:[^a-z]|$)|"
-    r"(?:^|/)agenda\.docx?$|"
-    r"^invitation\b|"
-    r"^thank you\b|"
-    r"^fwd:\s*$",
-    re.I,
-)
-
 
 def kinds_mentioned(text: str) -> tuple[str, ...]:
     """Kinds whose names or patterns appear in a local posting. No model."""
@@ -96,31 +80,15 @@ def kinds_mentioned(text: str) -> tuple[str, ...]:
     return tuple(found)
 
 
-# A form that records a budget, expense, or reimbursement is evidence.
-_BUDGET_EVIDENCE = re.compile(
-    r"frais|budgets?|expenses?|reimburs|rembours|ordre de mission|mission order",
-    re.I,
-)
-# Still noise when the name is a timesheet or a leave form, even if a project is named.
-_LIFE_ADMIN = re.compile(
-    r"timesheets?|time[- ]?sheets?|payslips?|bulletins? de paie|cong[eé]s?",
-    re.I,
-)
-
-
 def is_noise_name(*parts: str) -> bool:
     """True for logistics, life-admin, or status pings that are not career evidence.
 
     Expense and budget forms are kept. A timesheet or a leave form is not.
+    The phrases live in ``dossier.lists`` and can be edited in ``dossier.toml``.
     """
-    blob = " ".join(p for p in parts if p).strip()
-    if not blob:
-        return False
-    if _LIFE_ADMIN.search(blob):
-        return True
-    if _BUDGET_EVIDENCE.search(blob):
-        return False
-    return bool(_NOISE.search(blob))
+    from dossier.lists import name_is_noise
+
+    return name_is_noise(*parts)
 
 
 def infer_kind(

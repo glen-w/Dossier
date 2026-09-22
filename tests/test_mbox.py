@@ -63,6 +63,7 @@ def test_gloda_warehouse_skips_noise_and_does_not_open_sent_mail(
     sent = mail / "iddri" / "[Gmail].sbd" / "Sent Mail"
     sent.parent.mkdir(parents=True)
     sent.write_text("From ignored\n\nshould not be parsed\n", encoding="utf-8")
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path / "data"))
     monkeypatch.setenv("DOSSIER_MAIL_ROOT", str(mail))
     monkeypatch.setenv("DOSSIER_MAIL_ACCOUNTS", "person@example.test:iddri")
 
@@ -133,12 +134,18 @@ def test_admin_budget_stays_and_newsletter_folders_do_not(
     from dossier.fetch.mbox import mbox_openable
     from dossier.identity import noise_folder
 
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path / "data"))
+    monkeypatch.delenv("DOSSIER_MAIL_EXCLUDE", raising=False)
+    monkeypatch.delenv("DOSSIER_MAIL_EXCLUDE_OFF", raising=False)
+    monkeypatch.delenv("DOSSIER_MAIL_KEEP", raising=False)
+    monkeypatch.delenv("DOSSIER_MAIL_KEEP_OFF", raising=False)
     assert noise_folder("Newsletters")
     assert noise_folder("google alerts")
     assert noise_folder("bounced")
     assert noise_folder("bounced emails")
     assert noise_folder("ABC2 bounces")
-    assert noise_folder("Admin & receipts")
+    assert not noise_folder("Admin & receipts")
+    assert noise_folder("Receipts")
     assert not noise_folder("Admin")
     assert not noise_folder("Ocean Finance")
     assert not noise_folder("Blue finance")
@@ -174,7 +181,8 @@ def test_admin_budget_stays_and_newsletter_folders_do_not(
         (1, 'Admin', 'person@example.test'),
         (2, 'Newsletters', 'person@example.test'),
         (3, 'google alerts', 'person@example.test'),
-        (4, 'Ocean Finance', 'person@example.test')
+        (4, 'Ocean Finance', 'person@example.test'),
+        (5, 'Trash', 'person@example.test')
         """
     )
     conn.execute(
@@ -190,7 +198,9 @@ def test_admin_budget_stays_and_newsletter_folders_do_not(
          'Google Alert - marine renewable energy', 'alert.pdf', TRUE, 'sent',
          'Glen Wright', 2020, FALSE, FALSE),
         (5, 4, '<finance@example.test>',
-         'Ocean banking note', 'ocean-banking.pdf', TRUE, 'sent', 'Glen Wright', 2021, FALSE, FALSE)
+         'Ocean banking note', 'ocean-banking.pdf', TRUE, 'sent', 'Glen Wright', 2021, FALSE, FALSE),
+        (6, 5, '<trash@example.test>',
+         'Old draft attached', 'old-draft.pdf', TRUE, 'sent', 'Glen Wright', 2019, FALSE, FALSE)
         """
     )
     conn.execute(
@@ -205,6 +215,7 @@ def test_admin_budget_stays_and_newsletter_folders_do_not(
     assert "receipt@example.test" not in uris
     assert "news@example.test" not in uris
     assert "alert@example.test" not in uris
+    assert "trash@example.test" not in uris
 
 
 def test_oversize_mbox_is_not_opened(tmp_path: Path, monkeypatch) -> None:

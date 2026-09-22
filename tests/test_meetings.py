@@ -106,6 +106,36 @@ def _library(root: Path) -> None:
     (maps / "broken.speaker_map.json").write_text("{not json", encoding="utf-8")
 
 
+def test_library_layout_skips_imports(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from dossier.seekers.meetings import iter_meeting_pairs
+
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path / "empty-config"))
+    root = tmp_path / "library"
+    _write(
+        root,
+        "250610_ocean_webinar",
+        {"SPEAKER_00": "Glen Wright", "SPEAKER_01": "Ada Lovelace"},
+        [("SPEAKER_00", "I drafted the briefing."), ("SPEAKER_01", "Noted.")],
+    )
+    hidden = root / "imports"
+    hidden.mkdir()
+    (hidden / "250620_hidden.json").write_text(
+        (root / "250610_ocean_webinar.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    nest = root / "metadata" / "speaker_maps" / "imports"
+    nest.mkdir()
+    (nest / "250620_hidden.speaker_map.json").write_text(
+        (root / "metadata" / "speaker_maps" / "250610_ocean_webinar.speaker_map.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    stems = {path.stem for path, _side in iter_meeting_pairs(root)}
+    assert "250610_ocean_webinar" in stems
+    assert "250620_hidden" not in stems
+
+
 def test_named_speaker_meetings_keep_contributions(tmp_path: Path, corpus: Corpus) -> None:
     root = tmp_path / "library"
     _library(root)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dossier.lists import excluded
 from dossier.sources.warehouse import connect_readonly, has_table, resolve_warehouse
 from dossier.store import Corpus, Record
 from dossier.util import record_id
@@ -104,6 +105,8 @@ class LinkedInSource:
 
 
 def _put(corpus: Corpus, uri: str, title: str, text: str, table: str) -> None:
+    if excluded("linkedin", title):
+        return
     corpus.upsert_record(
         Record(
             id=record_id(uri),

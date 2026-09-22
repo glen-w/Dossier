@@ -40,7 +40,7 @@ Employer allowlist, ChatGPT export, Slack export, and git history, plus the meet
 
 ### 0.9 → 1.0 — User testing
 
-No new product surface. Find what breaks when it is not Glen’s laptop and not synthetic fixtures.
+Find what breaks when it is not Glen’s laptop and not synthetic fixtures. Match lists evidence for each requirement in a pasted job spec (`dossier match` and the workbench Match page). Tailor stays off that page. There is still no PDF.
 
 - Second person (or Glen running as a thin user) installs from the README, enables only adapters they have, and completes ingest → extract → approve → ask → packet (and optional brief, tailor, or referees).
 - Acceptance checklist: refusals that should refuse, citations that resolve, egress notice when cloud is opted in, Twenty read-only when used, no dumps or evidence DB in git.
@@ -48,9 +48,11 @@ No new product surface. Find what breaks when it is not Glen’s laptop and not 
 - Career inventory covers years across the locker (seeker year floor, employer career folders at read time), not only the three newest files per kind.
 - **1.0** means that path is boring enough to call done — not that every Later idea below has shipped.
 
-### After 1.0 — Workbench (ambition)
+### After 1.0 — Workbench
 
-After the user-testing freeze, an optional loopback workbench (`dossier gui`) can cover the daily loop the CLI already has: locker status, ingest, extract, review, ask, plus effort presets and saved profiles. Vocabulary for that surface is in [vocab](vocab.md). The 1.0 path stays CLI plus `dossier review` with no new dependency. Later waves add a prompt catalogue, heavier jobs (index, brief, run), then tailor, packet, prove, referees, and cited chat on the same ask path.
+The optional loopback workbench (`dossier gui`, `[web]` extra) covers the daily loop: locker, ingest, extract, review, ask, match, index, brief, and run, plus effort (context and timeout ladder; `balanced` matches today's defaults), saved profiles, a prompt catalogue, and editable question packs. Vocabulary is in [vocab](vocab.md). The 1.0 path stays CLI plus `dossier review` with no new dependency.
+
+Still later: tailor, packet, gaps, prove, and referees as pages, then cited chat streamed on the same ask path.
 
 ## Boundaries that stay
 

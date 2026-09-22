@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('run') }}</h1>
+<p class="lede">Ingest detected sources, extract, then write a brief on this locker.</p>
+<form method="post" action="/run/start">
+  <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Run</button>
+</form>
+<p class="meta">pack {{ cfg.run_pack }} · effort {{ cfg.effort }}</p>
+{% if result %}
+<div class="card">
+  <p>{{ result.ledger }}</p>
+</div>
+{% endif %}
+{% endblock %}

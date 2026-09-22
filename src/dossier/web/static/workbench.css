@@ -231,6 +231,10 @@ textarea {
   min-height: 6rem;
 }
 
+textarea.match-spec {
+  min-height: 16rem;
+}
+
 button,
 .btn {
   background: #fff;

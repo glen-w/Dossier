@@ -14,20 +14,10 @@ from dossier.cards import (
     sentences,
 )
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
+from dossier.prompts import ASK_BODY, active_prompt, render
 from dossier.store import Corpus, Record
 
-ASK_PROMPT = """You answer a question about someone's professional work.
-Use only the records below. Return JSON only:
-{"answer": "...", "citations": ["uri", ...]}
-Every citation must be a URI from the records. If the records do not answer
-the question, return {"answer": "", "citations": []}.
-Do not invent employers, dates, or titles.
-@@PRIOR@@
-Question: @@QUESTION@@
-
-Records:
-@@RECORDS@@
-"""
+ASK_PROMPT = ASK_BODY
 
 MAX_HITS = 8
 COSINE_NEIGHBOR = 0.34
@@ -317,6 +307,8 @@ def respond(
     *,
     mode: str = "auto",
     prior: list[str] | None = None,
+    max_num_ctx: int = 32_768,
+    timeout_seconds: float = 300.0,
 ) -> Answer:
     """exact quotes a span. auto tries that first. rich always asks the model."""
     if mode not in ASK_MODES:
@@ -331,7 +323,18 @@ def respond(
         exact = _exact(question, hits)
         if not exact.refused:
             return replace(exact, route="exact")
-    return replace(answer_question(question, hits, client, model, prior=prior), route="rich")
+    return replace(
+        answer_question(
+            question,
+            hits,
+            client,
+            model,
+            prior=prior,
+            max_num_ctx=max_num_ctx,
+            timeout_seconds=timeout_seconds,
+        ),
+        route="rich",
+    )
 
 
 def answer_question(
@@ -341,6 +344,8 @@ def answer_question(
     model: str,
     *,
     prior: list[str] | None = None,
+    max_num_ctx: int = 32_768,
+    timeout_seconds: float = 300.0,
 ) -> Answer:
     if not question.strip():
         return Answer(text="", citations=[], refused=True, reason="empty question")
@@ -354,16 +359,20 @@ def answer_question(
             + "\n".join(f"- {line}" for line in lines)
             + "\n\n"
         )
-    prompt = (
-        ASK_PROMPT.replace("@@PRIOR@@", prior_block)
-        .replace("@@QUESTION@@", question.strip())
-        .replace("@@RECORDS@@", _format_hits(hits))
+    prompt = render(
+        active_prompt("ask"),
+        {
+            "PRIOR": prior_block,
+            "QUESTION": question.strip(),
+            "RECORDS": _format_hits(hits),
+        },
     )
     req = CompletionRequest(
         model=model,
         prompt=prompt,
         json_mode=True,
-        num_ctx=ctx_tokens_for(prompt),
+        num_ctx=ctx_tokens_for(prompt, max_num_ctx=max_num_ctx),
+        timeout_seconds=timeout_seconds,
     )
     try:
         data = client.complete_json(req)

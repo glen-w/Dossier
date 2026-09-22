@@ -40,6 +40,7 @@ Use these words in the GUI and in new docs. Prefer the locked term over a synony
 | Term | Meaning |
 | --- | --- |
 | **Ask** | One cited answer from the locker, or a refusal. |
+| **Match** | Ordered evidence for each requirement in a pasted job spec, under `data/matches/`. |
 | **Chat** | Later multi-turn ask. Wave 1 of the workbench does not use this word. |
 | **Pack** | A list of questions for a brief. Not a prompt. |
 | **Brief** | Answers to a pack, under `data/briefs/`. |
@@ -51,10 +52,11 @@ Use these words in the GUI and in new docs. Prefer the locked term over a synony
 
 | Term | Meaning |
 | --- | --- |
-| **Effort** | Global LLM investment: `light`, `balanced`, or `high`. |
+| **Effort** | Global LLM investment: `light`, `balanced`, or `high`. Balanced matches today's defaults. Light and high also set a context cap and a timeout. |
 | **Profile** | A named saved overlay of tunable knobs. Not identity, not effort itself, not a referee. |
 | **Identity** | Slack ids, speaker names, and the mail-folder map in gitignored `dossier.toml`. |
-| **Prompt** | A versioned template (later). A pack is questions, not a prompt. |
+| **Prompt** | A versioned template for extract, ask, or tailor. |
+| **Pack** | A list of questions for a brief. Not a prompt. |
 
 ## Collisions to keep straight
 

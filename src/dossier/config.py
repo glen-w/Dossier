@@ -56,6 +56,10 @@ class Config:
     employer_filter_llm: bool = True
     employer_filter_llm_calls: int = 4
     effort: str = DEFAULT_EFFORT
+    llm_max_num_ctx: int = 32_768
+    effort_model_light: str = ""
+    effort_model_balanced: str = ""
+    effort_model_high: str = ""
 
     @classmethod
     def from_env(cls) -> Config:
@@ -67,6 +71,7 @@ class Config:
         run = file_cfg.get("run") if isinstance(file_cfg.get("run"), dict) else {}
         tailor = file_cfg.get("tailor") if isinstance(file_cfg.get("tailor"), dict) else {}
         employer = file_cfg.get("employer") if isinstance(file_cfg.get("employer"), dict) else {}
+        efforts = file_cfg.get("efforts") if isinstance(file_cfg.get("efforts"), dict) else {}
 
         provider = _env_str(
             "DOSSIER_LLM_PROVIDER",
@@ -193,8 +198,19 @@ class Config:
                 ),
             ),
             effort=effort,
+            llm_max_num_ctx=32_768,
+            effort_model_light=_effort_model(efforts, "light"),
+            effort_model_balanced=_effort_model(efforts, "balanced"),
+            effort_model_high=_effort_model(efforts, "high"),
         )
         return apply_effort(cfg)
+
+
+def _effort_model(efforts: dict, name: str) -> str:
+    block = efforts.get(name)
+    if not isinstance(block, dict):
+        return ""
+    return str(block.get("model") or "").strip()
 
 
 def _choice(value: str, allowed: tuple[str, ...], default: str) -> str:

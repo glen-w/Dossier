@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dossier.fetch.snippet import record_from_hit
+from dossier.lists import phrase_blocked, slack_exclude
 from dossier.identity import configured_slack_user_ids, resolve_speaker_names
 from dossier.lenses import infer_kind, infer_lenses, infer_org, infer_skills, primary_lens
 from dossier.seekers.hits import Hit, merge_hits
@@ -65,6 +66,8 @@ def load_slack_export(path: Path, corpus: Corpus) -> None:
 
 def _message(msg: object, channel: str, wanted: set[str]) -> tuple[Hit | None, str]:
     if not isinstance(msg, dict):
+        return None, ""
+    if phrase_blocked(slack_exclude(), channel):
         return None, ""
     if msg.get("subtype") in {"bot_message", "channel_join", "channel_leave"}:
         return None, ""

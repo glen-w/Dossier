@@ -11,6 +11,7 @@ from typing import Any
 from dossier.cards import ClaimCard, ProposedClaim, adjudicate, card_id
 from dossier.drafts import draft_record
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
+from dossier.prompts import EXTRACT_BODY, SEEKER_TAIL, active_prompt, render
 from dossier.store import Corpus, Record
 
 
@@ -27,24 +28,8 @@ class ExtractProgress:
     title: str = ""
     use_llm: bool = False
 
-EXTRACT_PROMPT = """You extract professional claim sentences for a CV locker.
-Return JSON only: {"claims": [{"claim": "...", "citations": ["@@URI@@"]}]}
-Each claim MUST be supported by the record text. Use only this URI in citations.
-If nothing is a sellable professional claim, return {"claims": []}.
-Do not invent employers, titles, or dates that are not in the text.
-
-URI: @@URI@@
-Title: @@TITLE@@
-Text:
-@@TEXT@@
-"""
-
-SEEKER_PROMPT_TAIL = """
-This record was sought as professional work evidence, not a full inbox dump.
-Optional keys per claim: "lens" (delivered|skills|contributions), "kind",
-"skills" (list of strings), "org", "period". Prefer the Lens/Kind/Org/Year
-header when present. Still refuse anything the text will not carry.
-"""
+EXTRACT_PROMPT = EXTRACT_BODY
+SEEKER_PROMPT_TAIL = SEEKER_TAIL
 
 DEFAULT_CHUNK_CHARS = 4000
 DEFAULT_MAX_CHUNKS = 4
@@ -146,23 +131,23 @@ def propose_with_llm(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     chunk_chars: int = DEFAULT_CHUNK_CHARS,
     max_chunks: int = DEFAULT_MAX_CHUNKS,
+    max_num_ctx: int = 32_768,
 ) -> list[ProposedClaim]:
     out: list[ProposedClaim] = []
+    role = "extract_seeker" if record.source in {"slack", "mbox", "meetings"} else "extract"
+    template = active_prompt(role)
     for piece in text_chunks(
         record.text, chunk_chars=chunk_chars, max_chunks=max_chunks
     ):
-        prompt = (
-            EXTRACT_PROMPT.replace("@@URI@@", record.uri)
-            .replace("@@TITLE@@", record.title)
-            .replace("@@TEXT@@", piece)
+        prompt = render(
+            template,
+            {"URI": record.uri, "TITLE": record.title, "TEXT": piece},
         )
-        if record.source in {"slack", "mbox", "meetings"}:
-            prompt = prompt + SEEKER_PROMPT_TAIL
         req = CompletionRequest(
             model=model,
             prompt=prompt,
             json_mode=True,
-            num_ctx=ctx_tokens_for(prompt),
+            num_ctx=ctx_tokens_for(prompt, max_num_ctx=max_num_ctx),
             timeout_seconds=timeout_seconds,
         )
         try:
@@ -182,6 +167,7 @@ def extract_record(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     chunk_chars: int = DEFAULT_CHUNK_CHARS,
     max_chunks: int = DEFAULT_MAX_CHUNKS,
+    max_num_ctx: int = 32_768,
 ) -> list[ClaimCard]:
     proposals = propose_with_llm(
         record,
@@ -190,6 +176,7 @@ def extract_record(
         timeout_seconds=timeout_seconds,
         chunk_chars=chunk_chars,
         max_chunks=max_chunks,
+        max_num_ctx=max_num_ctx,
     )
     evidence = {record.uri: record.text}
     for prop in proposals:
@@ -216,6 +203,7 @@ def extract_corpus(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     chunk_chars: int = DEFAULT_CHUNK_CHARS,
     max_chunks: int = DEFAULT_MAX_CHUNKS,
+    max_num_ctx: int = 32_768,
     on_progress: Callable[[ExtractProgress], None] | None = None,
 ) -> list[ClaimCard]:
     records = corpus.records(source)
@@ -274,6 +262,7 @@ def extract_corpus(
                 timeout_seconds=timeout_seconds,
                 chunk_chars=chunk_chars,
                 max_chunks=max_chunks,
+                max_num_ctx=max_num_ctx,
             )
             if not _client_has_budget(client):
                 llm_on = False

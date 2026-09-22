@@ -27,11 +27,22 @@ def test_normalize_effort() -> None:
 
 
 def test_apply_effort_balanced_leaves_knobs() -> None:
-    cfg = Config(ask_mode="rich", extract_llm=True, ask_planner="off", effort="balanced")
+    cfg = Config(
+        ask_mode="rich",
+        extract_llm=True,
+        ask_planner="off",
+        effort="balanced",
+        llm_timeout_seconds=90.0,
+        llm_model="qwen3.8:latest",
+        effort_model_high="other:27b",
+    )
     out = apply_effort(cfg)
     assert out.ask_mode == "rich"
     assert out.extract_llm is True
     assert out.effort == "balanced"
+    assert out.llm_timeout_seconds == 90.0
+    assert out.llm_max_num_ctx == 32_768
+    assert out.llm_model == "qwen3.8:latest"
 
 
 def test_apply_effort_light_and_high() -> None:
@@ -40,10 +51,49 @@ def test_apply_effort_light_and_high() -> None:
     assert light.extract_llm is False
     assert light.ask_mode == "exact"
     assert light.effort == "light"
+    assert light.llm_timeout_seconds == 120.0
+    assert light.llm_max_num_ctx == 8192
     high = apply_effort(base, "high")
     assert high.ask_mode == "rich"
     assert high.ask_planner == "rich"
     assert high.effort == "high"
+    assert high.llm_timeout_seconds == 600.0
+    assert high.llm_max_num_ctx == 32_768
+
+
+def test_high_model_override_does_not_leak() -> None:
+    cfg = Config(
+        llm_model="qwen3.8:latest",
+        effort="balanced",
+        effort_model_high="other:27b",
+    )
+    assert apply_effort(cfg, "balanced").llm_model == "qwen3.8:latest"
+    assert apply_effort(cfg, "high").llm_model == "other:27b"
+
+
+def test_from_env_keeps_high_model_off_balanced(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
+    (tmp_path / "dossier.toml").write_text(
+        '\n'.join(
+            [
+                'effort = "balanced"',
+                "",
+                "[efforts.high]",
+                'model = "other:27b"',
+                "",
+                "[llm]",
+                'model = "qwen3.8:latest"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    cfg = Config.from_env()
+    assert cfg.effort == "balanced"
+    assert cfg.llm_model == "qwen3.8:latest"
+    assert cfg.llm_timeout_seconds == 300.0
+    assert cfg.llm_max_num_ctx == 32_768
+    assert cfg.effort_model_high == "other:27b"
 
 
 def test_settings_round_trip(tmp_path: Path, monkeypatch) -> None:

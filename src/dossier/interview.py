@@ -19,14 +19,11 @@ from dossier.ask import (
 from dossier.cards import content_tokens, header_values
 from dossier.config import Config
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
+from dossier.prompts import PLAN_BODY, active_prompt, render
 from dossier.store import Corpus
 
 _AND = re.compile(r"\s*;\s*|\s+\band\b\s+", re.I)
-_PLAN = """Split the question into at most 4 shorter questions a record search can answer.
-Return JSON only: {"questions": ["...", ...]}
-Do not invent employers, dates, or titles.
-Question: @@QUESTION@@
-"""
+_PLAN = PLAN_BODY
 
 
 def conduct(
@@ -89,7 +86,15 @@ def conduct(
             return _partial(parts)
         reason = parts[0].reason if parts else "no matching records"
         return Answer(text="", citations=[], refused=True, reason=reason, route="exact")
-    rich = answer_question(question, merged, client, cfg.llm_model, prior=prior)
+    rich = answer_question(
+        question,
+        merged,
+        client,
+        cfg.llm_model,
+        prior=prior,
+        max_num_ctx=cfg.llm_max_num_ctx,
+        timeout_seconds=cfg.llm_timeout_seconds,
+    )
     return replace(rich, route="rich")
 
 
@@ -113,19 +118,33 @@ def _subquestions(
     mode: str,
 ) -> list[str]:
     if cfg.ask_planner == "rich" and mode != "exact":
-        planned = _plan(question, client, cfg.llm_model)
+        planned = _plan(
+            question,
+            client,
+            cfg.llm_model,
+            max_num_ctx=cfg.llm_max_num_ctx,
+            timeout_seconds=cfg.llm_timeout_seconds,
+        )
         if planned:
             return planned
     return decompose_question(question, cfg.ask_decompose)
 
 
-def _plan(question: str, client: LLMClient, model: str) -> list[str]:
-    prompt = _PLAN.replace("@@QUESTION@@", question.strip())
+def _plan(
+    question: str,
+    client: LLMClient,
+    model: str,
+    *,
+    max_num_ctx: int = 32_768,
+    timeout_seconds: float = 300.0,
+) -> list[str]:
+    prompt = render(active_prompt("ask_plan"), {"QUESTION": question.strip()})
     request = CompletionRequest(
         model=model,
         prompt=prompt,
         json_mode=True,
-        num_ctx=ctx_tokens_for(prompt),
+        num_ctx=ctx_tokens_for(prompt, max_num_ctx=max_num_ctx),
+        timeout_seconds=timeout_seconds,
     )
     try:
         data = client.complete_json(request)

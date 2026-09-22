@@ -183,7 +183,7 @@ def write_packet(corpus: Corpus, directory: Path) -> Path:
     if path.exists():
         stamp = datetime.now(UTC).strftime("%y%m%d-%H%M%S-%f")
         path = directory / f"{stamp}.md"
-    path.write_text(render_packet(corpus), encoding="utf-8")
+    path.write_text("prompts: none\n" + render_packet(corpus), encoding="utf-8")
     return path
 
 

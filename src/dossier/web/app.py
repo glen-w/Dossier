@@ -223,6 +223,36 @@ def create_app() -> FastAPI:
             modes=ASK_MODES,
         )
 
+    @app.get("/match", response_class=HTMLResponse)
+    async def match_page(request: Request) -> HTMLResponse:
+        cfg = Config.from_env()
+        job_id = request.query_params.get("job", "")
+        result = None
+        job = RUNNER.get(job_id) if job_id else None
+        if job is not None and job.status == "done" and isinstance(job.result, dict):
+            result = job.result
+        return _page(
+            request,
+            "match.html",
+            "match",
+            cfg=cfg,
+            busy=RUNNER.busy(),
+            result=result,
+            job=job.snapshot() if job else None,
+            notice=_egress_notice(cfg),
+        )
+
+    @app.post("/match/run")
+    async def match_run(spec: str = Form(...)) -> RedirectResponse:
+        text = spec.strip()
+        if not text:
+            return RedirectResponse("/match?err=Paste+a+job+spec", status_code=303)
+        try:
+            job = _start_match(text)
+        except LockerBusy:
+            return RedirectResponse("/match?err=busy", status_code=303)
+        return RedirectResponse(f"/match?job={job.id}", status_code=303)
+
     @app.post("/ask/run")
     async def ask_run(
         question: str = Form(...),
@@ -327,6 +357,228 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             return RedirectResponse(f"/settings?err={_q(str(exc))}", status_code=303)
         return RedirectResponse("/settings?saved=1", status_code=303)
+
+    @app.get("/index", response_class=HTMLResponse)
+    async def index_page(request: Request) -> HTMLResponse:
+        cfg = Config.from_env()
+        job = _job_from_query(request)
+        return _page(
+            request,
+            "index.html",
+            "index",
+            cfg=cfg,
+            busy=RUNNER.busy(),
+            result=job.result if job and job.status == "done" else None,
+            notice=_egress_notice(cfg),
+        )
+
+    @app.post("/index/run")
+    async def index_run() -> RedirectResponse:
+        try:
+            job = _start_index()
+        except LockerBusy:
+            return RedirectResponse("/index?err=busy", status_code=303)
+        return RedirectResponse(f"/index?job={job.id}", status_code=303)
+
+    @app.get("/brief", response_class=HTMLResponse)
+    async def brief_page(request: Request) -> HTMLResponse:
+        cfg = Config.from_env()
+        root = Path(cfg.data_dir)
+        from dossier.packs import list_saved_packs
+
+        job = _job_from_query(request)
+        return _page(
+            request,
+            "brief.html",
+            "brief",
+            cfg=cfg,
+            packs=["career", "posting", *list_saved_packs(root)],
+            busy=RUNNER.busy(),
+            result=job.result if job and job.status == "done" else None,
+            notice=_egress_notice(cfg),
+            modes=ASK_MODES,
+        )
+
+    @app.post("/brief/run")
+    async def brief_run(
+        pack: str = Form("career"),
+        posting: str = Form(""),
+        mode: str = Form(""),
+    ) -> RedirectResponse:
+        try:
+            job = _start_brief(pack.strip() or "career", posting.strip(), mode.strip() or None)
+        except LockerBusy:
+            return RedirectResponse("/brief?err=busy", status_code=303)
+        except ValueError as exc:
+            return RedirectResponse(f"/brief?err={_q(str(exc))}", status_code=303)
+        return RedirectResponse(f"/brief?job={job.id}", status_code=303)
+
+    @app.get("/run", response_class=HTMLResponse)
+    async def run_page(request: Request) -> HTMLResponse:
+        cfg = Config.from_env()
+        job = _job_from_query(request)
+        return _page(
+            request,
+            "run.html",
+            "run",
+            cfg=cfg,
+            busy=RUNNER.busy(),
+            result=job.result if job and job.status == "done" else None,
+            notice=_egress_notice(cfg),
+        )
+
+    @app.post("/run/start")
+    async def run_start() -> RedirectResponse:
+        try:
+            job = _start_run()
+        except LockerBusy:
+            return RedirectResponse("/run?err=busy", status_code=303)
+        return RedirectResponse(f"/run?job={job.id}", status_code=303)
+
+    @app.get("/settings/prompts", response_class=HTMLResponse)
+    async def prompts_page(request: Request) -> HTMLResponse:
+        from dossier.prompts import FAMILIES, ROLES, active_map, dry_run, list_catalogue, resolve
+
+        cfg = Config.from_env()
+        root = Path(cfg.data_dir)
+        catalogue = list_catalogue(root)
+        selected_id = request.query_params.get("id") or (catalogue[0].prompt_id if catalogue else "extract")
+        try:
+            selected = resolve(selected_id, root)
+        except KeyError:
+            selected = catalogue[0]
+        rendered = ""
+        if request.query_params.get("dry") == "1":
+            rendered = dry_run(selected)
+        return _page(
+            request,
+            "prompts.html",
+            "settings",
+            cfg=cfg,
+            catalogue=catalogue,
+            selected=selected,
+            families=FAMILIES,
+            roles=ROLES,
+            prompt_roles=active_map(root),
+            rendered=rendered,
+            notice=_egress_notice(cfg),
+            saved=request.query_params.get("saved") == "1",
+        )
+
+    @app.post("/settings/prompts/override")
+    async def prompts_override(
+        prompt_id: str = Form(...),
+        system_prompt: str = Form(""),
+        user_template: str = Form(""),
+    ) -> RedirectResponse:
+        from dossier.prompts import save_override
+
+        cfg = Config.from_env()
+        try:
+            save_override(
+                prompt_id.strip(),
+                system_prompt=system_prompt,
+                user_template=user_template,
+                root=Path(cfg.data_dir),
+            )
+        except (OSError, ValueError) as exc:
+            return RedirectResponse(
+                f"/settings/prompts?id={_q(prompt_id)}&err={_q(str(exc))}",
+                status_code=303,
+            )
+        return RedirectResponse(f"/settings/prompts?id={prompt_id}&saved=1", status_code=303)
+
+    @app.post("/settings/prompts/restore")
+    async def prompts_restore(prompt_id: str = Form(...)) -> RedirectResponse:
+        from dossier.prompts import restore_builtin
+
+        cfg = Config.from_env()
+        restore_builtin(prompt_id.strip(), Path(cfg.data_dir))
+        return RedirectResponse(f"/settings/prompts?id={prompt_id}&saved=1", status_code=303)
+
+    @app.post("/settings/prompts/custom")
+    async def prompts_custom(
+        prompt_id: str = Form(...),
+        title: str = Form(""),
+        family: str = Form("ask"),
+        system_prompt: str = Form(""),
+        user_template: str = Form(""),
+    ) -> RedirectResponse:
+        from dossier.prompts import save_custom
+
+        cfg = Config.from_env()
+        try:
+            saved = save_custom(
+                prompt_id,
+                title=title,
+                family=family,
+                system_prompt=system_prompt,
+                user_template=user_template,
+                root=Path(cfg.data_dir),
+            )
+        except (OSError, ValueError) as exc:
+            return RedirectResponse(f"/settings/prompts?err={_q(str(exc))}", status_code=303)
+        return RedirectResponse(f"/settings/prompts?id={saved.prompt_id}&saved=1", status_code=303)
+
+    @app.post("/settings/prompts/activate")
+    async def prompts_activate(role: str = Form(...), prompt_id: str = Form(...)) -> RedirectResponse:
+        from dossier.prompts import set_active
+
+        cfg = Config.from_env()
+        try:
+            set_active(role.strip(), prompt_id.strip(), Path(cfg.data_dir))
+        except (OSError, ValueError, KeyError) as exc:
+            return RedirectResponse(f"/settings/prompts?err={_q(str(exc))}", status_code=303)
+        return RedirectResponse("/settings/prompts?saved=1", status_code=303)
+
+    @app.get("/settings/packs", response_class=HTMLResponse)
+    async def packs_page(request: Request) -> HTMLResponse:
+        import json as _json
+
+        from dossier.packs import CAREER, list_saved_packs, questions_payload, resolve_pack
+
+        cfg = Config.from_env()
+        root = Path(cfg.data_dir)
+        selected = request.query_params.get("pack") or "career"
+        try:
+            questions = resolve_pack(selected, root) if selected != "career" else list(CAREER)
+            body = _json.dumps(questions_payload(questions), indent=2)
+        except (OSError, ValueError):
+            selected = "career"
+            body = _json.dumps(questions_payload(list(CAREER)), indent=2)
+        return _page(
+            request,
+            "packs.html",
+            "settings",
+            cfg=cfg,
+            pack_name=selected,
+            pack_body=body,
+            saved_packs=list_saved_packs(root),
+            notice=_egress_notice(cfg),
+            saved=request.query_params.get("saved") == "1",
+        )
+
+    @app.post("/settings/packs/save")
+    async def packs_save(name: str = Form(...), body: str = Form(...)) -> RedirectResponse:
+        from dossier.packs import save_named_pack
+
+        cfg = Config.from_env()
+        try:
+            save_named_pack(name, body, Path(cfg.data_dir))
+        except (OSError, ValueError) as exc:
+            return RedirectResponse(f"/settings/packs?err={_q(str(exc))}", status_code=303)
+        return RedirectResponse(f"/settings/packs?pack={name.strip().lower()}&saved=1", status_code=303)
+
+    @app.post("/settings/packs/delete")
+    async def packs_delete(name: str = Form(...)) -> RedirectResponse:
+        from dossier.packs import delete_named_pack
+
+        cfg = Config.from_env()
+        try:
+            delete_named_pack(name, Path(cfg.data_dir))
+        except ValueError as exc:
+            return RedirectResponse(f"/settings/packs?err={_q(str(exc))}", status_code=303)
+        return RedirectResponse("/settings/packs?saved=1", status_code=303)
 
     @app.get("/api/jobs/current")
     async def job_current() -> JSONResponse:
@@ -497,6 +749,7 @@ def _start_extract(source: str | None, limit: int | None) -> Job:
                 timeout_seconds=min(cfg.llm_timeout_seconds, 60.0),
                 chunk_chars=cfg.extract_chunk_chars,
                 max_chunks=cfg.extract_max_chunks,
+                max_num_ctx=cfg.llm_max_num_ctx,
                 on_progress=on_progress,
             )
             return {"cards": len(cards), "use_llm": use_llm}
@@ -559,3 +812,214 @@ def _start_ask(question: str, mode: str | None) -> Job:
             corpus.close()
 
     return RUNNER.start("ask", run)
+
+
+def _start_match(spec: str) -> Job:
+    def run(job: Job) -> dict[str, Any]:
+        from dossier.cli import _query_embedder
+        from dossier.match import match_posting, write_match
+
+        cfg = Config.from_env()
+        corpus = Corpus(evidence_db(Path(cfg.data_dir)))
+        try:
+            report = match_posting(
+                corpus,
+                spec,
+                cfg,
+                embedder=_query_embedder(cfg, corpus),
+            )
+            path = write_match(report, Path(cfg.data_dir) / "matches")
+            data = report.as_dict()
+            data["path"] = str(path)
+            return data
+        finally:
+            corpus.close()
+
+    return RUNNER.start("match", run)
+
+
+def _job_from_query(request: Request) -> Job | None:
+    job_id = request.query_params.get("job", "")
+    return RUNNER.get(job_id) if job_id else None
+
+
+def _start_index() -> Job:
+    def run(job: Job) -> dict[str, Any]:
+        from dossier.embed import EmbedError, OllamaEmbedder, index_passages
+        from dossier.llm.validate import LlmConfigError, validate_ollama_url
+        from dossier.ui import Progress
+
+        cfg = Config.from_env()
+        if not cfg.llm_enabled:
+            note("index: skipped (provider off)")
+            return {"skipped": "provider off", "vectors": 0}
+        remote = False
+        try:
+            validate_ollama_url(cfg.llm_base_url, False)
+        except LlmConfigError:
+            if not cfg.llm_allow_remote:
+                note("index: skipped (remote embeddings are not allowed)")
+                return {"skipped": "remote embeddings are not allowed", "vectors": 0}
+            remote = True
+        if remote and llm_egress_is_remote(cfg):
+            note("index: remote embeddings")
+        embedder = OllamaEmbedder(cfg.llm_base_url, cfg.llm_allow_remote, cfg.embed_model)
+        ready, msg = embedder.check()
+        if not ready:
+            note(f"index: skipped ({msg})")
+            return {"skipped": msg, "vectors": 0}
+        corpus = Corpus(evidence_db(Path(cfg.data_dir)))
+        try:
+            stage("index", cfg.embed_model)
+            bar: Progress | None = None
+
+            def on_batch(done: int, total: int) -> None:
+                nonlocal bar
+                if bar is None:
+                    bar = Progress(total, label="index")
+                    bar.__enter__()
+                bar.done = done
+                bar.tick(0)
+                if total and done >= total:
+                    bar.finish()
+                    bar.__exit__(None, None, None)
+
+            try:
+                count = index_passages(corpus, embedder, on_batch=on_batch)
+            except (EmbedError, LlmConfigError) as exc:
+                note(f"index: skipped ({exc})")
+                return {"skipped": str(exc), "vectors": 0}
+            return {"vectors": count, "skipped": ""}
+        finally:
+            corpus.close()
+
+    return RUNNER.start("index", run)
+
+
+def _start_brief(pack: str, posting: str, mode: str | None) -> Job:
+    def run(job: Job) -> dict[str, Any]:
+        from dossier.brief import run_pack, write_brief
+        from dossier.cli import _LazyClient, _client_for_mode, _query_embedder
+        from dossier.packs import posting_pack, resolve_pack
+        from dossier.prompts import start_prompt_log, stop_prompt_log
+        from dossier.ui import Progress
+
+        cfg = Config.from_env()
+        chosen = mode or cfg.ask_mode
+        if chosen not in ASK_MODES:
+            chosen = cfg.ask_mode
+        if pack == "posting" or posting:
+            if not posting:
+                raise ValueError("posting pack needs a posting path")
+            questions = posting_pack(Path(posting).expanduser().read_text(encoding="utf-8"))
+        else:
+            questions = resolve_pack(pack, Path(cfg.data_dir))
+        corpus = Corpus(evidence_db(Path(cfg.data_dir)))
+        try:
+            budget = CallBudget(cfg.llm_max_calls)
+            if chosen == "exact" or not cfg.llm_enabled:
+                client: LLMClient = NullLLMClient()
+            elif chosen == "auto":
+                client = budget.wrap(_LazyClient(cfg))
+            else:
+                client, code = _client_for_mode(cfg, chosen)
+                if code is not None:
+                    raise LLMClientError("model not ready for rich brief")
+                client = budget.wrap(client)
+            stage("brief", f"{len(questions)} questions · mode={chosen}")
+            cited = 0
+            refused = 0
+            token = start_prompt_log()
+            try:
+                with Progress(len(questions), label="brief") as bar:
+
+                    def on_progress(done: int, total: int, item, result) -> None:  # noqa: ANN001
+                        nonlocal cited, refused
+                        bar.set_total(total)
+                        if result.refused:
+                            refused += 1
+                        else:
+                            cited += 1
+                        bar.tick(cited=cited, refused=refused)
+                        bar.status(item.question[:40])
+
+                    items = run_pack(
+                        corpus,
+                        questions,
+                        cfg,
+                        client,
+                        mode=chosen,
+                        on_progress=on_progress,
+                        embedder=_query_embedder(cfg, corpus),
+                    )
+                    bar.finish(cited=cited, refused=refused)
+                prompt_stamp = stop_prompt_log(token, empty="ask=none")
+            except Exception:
+                stop_prompt_log(token, empty="ask=none")
+                raise
+            path = write_brief(
+                items,
+                Path(cfg.data_dir) / "briefs",
+                prompt_stamp=prompt_stamp,
+            )
+            return {
+                "path": str(path),
+                "cited": cited,
+                "refused": refused,
+                "stamp": prompt_stamp,
+            }
+        finally:
+            corpus.close()
+
+    return RUNNER.start("brief", run)
+
+
+def _start_run() -> Job:
+    def run(job: Job) -> dict[str, Any]:
+        from dossier.cli import _brief, _detected_targets, _extract_cards
+        from dossier.ingest_run import run_ingest_targets
+
+        cfg = Config.from_env()
+        corpus = Corpus(evidence_db(Path(cfg.data_dir)))
+        try:
+            targets, skipped = _detected_targets(cfg.run_adapters)
+            if targets:
+                stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
+                run_ingest_targets(targets, corpus)
+            extract_budget = CallBudget(cfg.llm_max_calls)
+            _extract_cards(
+                cfg,
+                corpus,
+                source=None,
+                limit=None,
+                strict_llm=False,
+                budget=extract_budget,
+            )
+            brief_budget = CallBudget(cfg.llm_max_calls)
+            from argparse import Namespace
+
+            code = 0
+            try:
+                code = _brief(
+                    Namespace(mode=None, pack=None, posting=None),
+                    cfg,
+                    corpus,
+                    budget=brief_budget,
+                )
+            except Exception as exc:  # noqa: BLE001
+                note(str(exc))
+                code = 1
+            calls = extract_budget.calls + brief_budget.calls
+            ledger = (
+                f"records={len(corpus.records())} "
+                f"adapters_skipped={len(skipped)} "
+                f"model_calls={calls} "
+                f"egress={'yes' if llm_egress_is_remote(cfg) else 'no'} "
+                f"brief_exit={code}"
+            )
+            note(ledger)
+            return {"ledger": ledger, "code": code}
+        finally:
+            corpus.close()
+
+    return RUNNER.start("run", run)

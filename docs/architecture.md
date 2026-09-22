@@ -16,6 +16,7 @@ adapters you enable
         → interview ask (approved claim, full text, vectors when thin, hops, one completion)
             → cited answer, or a refusal
             → data/briefs when you run a question pack
+            → data/matches when you match a job spec (evidence per requirement)
 ```
 
 Ask reads records already in the corpus, then the passage vectors in that same file when full text is thin. The order — approved card, quote, hops, one completion — and when a neighbor is quoted live in [status](status.md).

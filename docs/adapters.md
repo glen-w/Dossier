@@ -22,4 +22,6 @@ plugin directory and no entry-point scan. Turn on only the sources you have.
 LinkedIn still expects the warehouse schema. ChatGPT and Slack use that warehouse when you point them at it, and an export zip when you point them at one.
 Point `DATA_DUMPS_WAREHOUSE` at `catalog.duckdb`.
 
+Built-in include and exclude phrases apply on their own. Edit them in gitignored `dossier.toml`; the keys are listed in `dossier.example.toml` and [seekers](seekers.md).
+
 Behaviour detail: [status](status.md). Seekers: [seekers](seekers.md).

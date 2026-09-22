@@ -41,13 +41,15 @@ uv run dossier ingest --adapter employer /path/you/listed
 uv run dossier ingest --adapter git /path/to/repo
 uv run dossier index
 uv run dossier ask "what did I write about coastal governance?"
+uv run dossier match --posting ./posting.txt
 uv run dossier review
+uv run dossier gui
 uv run dossier defend
 uv run dossier tailor --posting ./posting.txt
 uv run dossier gaps
 ```
 
-The full command list and environment knobs are in [CLI](docs/cli.md). Copy `dossier.example.toml` to `data/dossier.toml` when you want file defaults. Environment variables win.
+The full command list and environment knobs are in [CLI](docs/cli.md). Copy `dossier.example.toml` to `data/dossier.toml` when you want file defaults. Environment variables win. `dossier gui` is the optional loopback workbench (`uv sync --extra web`). The install path without that extra stays the CLI plus `dossier review`.
 
 ## Privacy
 
@@ -55,7 +57,7 @@ Records stay on this machine. The only way text leaves is a remote LLM, and that
 
 ## Later
 
-`tailor` writes markdown from approved spans. A PDF or portal CV is still outside this repo. Live pubs ingest stays gated. Next is a second person installing from this README. See [Roadmap](docs/roadmap.md).
+`tailor` writes markdown from approved spans. A PDF or portal CV is still outside this repo. Own publications are the Zotero collection named in config. Next is a second person installing from this README. See [Roadmap](docs/roadmap.md).
 
 ## Docs
 
@@ -65,7 +67,7 @@ Records stay on this machine. The only way text leaves is a remote LLM, and that
 - [Architecture](docs/architecture.md) — pipeline and where an adapter plugs in
 - [Seekers](docs/seekers.md) — mail, Slack, meetings
 - [Prior art](docs/prior-art.md) — what this borrows
-- [Publications index](docs/zotero-rag-pubs.md) — own papers, ingest still off
+- [Publications index](docs/zotero-rag-pubs.md) — named Zotero collection
 - Product page and Sphinx guide: `uv sync --extra docs && make pages-site` → `_site/`
 
 MIT. Copyright 2026 Glen.

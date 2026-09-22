@@ -26,6 +26,7 @@ uv run dossier gaps
 uv run dossier packet
 uv run dossier tailor --posting ./posting.txt
 uv run dossier tailor --posting ./posting.txt --kind letter --arrange
+uv run dossier match --posting ./posting.txt
 uv run dossier index
 uv run dossier ask "what did I write about coastal governance?"
 uv run dossier ask --mode exact --source pubs "coastal governance"
@@ -67,12 +68,17 @@ first cited record's opening text sit on each card.
 
 `dossier gui` serves the optional workbench on `127.0.0.1:8766` (override with
 `--port`). It needs the `[web]` extra (`uv sync --extra web`). Pages cover
-locker status, ingest, extract, review, ask, effort, and saved profiles. Live
-job progress uses Server-Sent Events. The CLI stays the scriptable surface;
-`dossier review` stays available without the extra. See [vocab](vocab.md).
+locker status, ingest, extract, review, ask, match, index, brief, run, effort, saved
+profiles, prompts, and question packs. Live job progress uses Server-Sent
+Events. The CLI stays the scriptable surface; `dossier review` stays available
+without the extra. See [vocab](vocab.md).
 
 `dossier tailor` writes CV or letter markdown under `data/drafts/` from
 approved cards that already have a span. `--arrange` is letter-only.
+
+`dossier match --posting` writes an ordered evidence list under
+`data/matches/`, one section per requirement. An empty file is an error.
+It does not approve a card. See [status](status.md).
 
 `dossier index` embeds passages into `evidence.db` with the local Ollama
 embed model. `ask` uses those vectors when full text is empty or thin.
@@ -116,7 +122,7 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DOSSIER_GIT_USER` | Author name or email fragment. Empty keeps every author |
 | `DOSSIER_MBOX_MAX_FILES` | Max mbox files opened in one exported folder (default 40) |
 | `DOSSIER_LLM_MAX_CALLS` | Cap completions per process (`0` = unlimited, the default) |
-| `DOSSIER_EFFORT` | Global LLM investment: `light`, `balanced` (default), or `high` |
+| `DOSSIER_EFFORT` | Global LLM investment: `light`, `balanced` (default), or `high`. Balanced keeps the loaded model, timeout, and context cap. Light caps context at 8192 and timeout at 120s and turns extract LLM off. High uses ask `rich`, planner `rich`, and a 600s timeout. `[efforts.light]`, `[efforts.balanced]`, or `[efforts.high]` may set `model` only |
 | `DOSSIER_EXTRACT_LLM` | Ask the model after drafts (`true` by default) |
 | `DOSSIER_RUN_PACK` | Question pack for `brief` and `run` (default `career`) |
 | `DOSSIER_RUN_POSTING` | Local posting path for the posting pack |
@@ -127,6 +133,20 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DATA_DUMPS_WAREHOUSE` | DuckDB file for LinkedIn and the warehouse paths of ChatGPT, Slack, and mail |
 | `DOSSIER_MAIL_ROOT` | Thunderbird tree for mbox body fetch (default `~/email`) |
 | `DOSSIER_MAIL_ACCOUNTS` | `email:folder` pairs, comma-separated. Overlays `[identity.mail_accounts]` |
+| `DOSSIER_MAIL_EXCLUDE` | Extra folder phrases to drop, comma-separated. Adds to the built-in newsletter list. `[mail] exclude` in `dossier.toml` is the same knob |
+| `DOSSIER_MAIL_EXCLUDE_OFF` | Built-in folder phrases to stop dropping |
+| `DOSSIER_MAIL_KEEP` | Extra folder phrases to keep. A keep wins over an exclude |
+| `DOSSIER_MAIL_KEEP_OFF` | Built-in keep phrases to turn off (`admin`, `budget`, `finance`) |
+| `DOSSIER_MAIL_ACTIVITY` | Extra activity-folder phrases |
+| `DOSSIER_MAIL_ACTIVITY_OFF` | Built-in activity phrases to turn off |
+| `DOSSIER_MAIL_SIGNALS` | Extra Gloda signal kinds to drop |
+| `DOSSIER_MAIL_SIGNALS_OFF` | Built-in signal kinds to stop dropping |
+| `DOSSIER_NAME_DROP` | Extra file or subject phrases that always count as logistics |
+| `DOSSIER_NAME_DROP_OFF` | Built-in drop phrases to turn off (`timesheet`, leave, payslip) |
+| `DOSSIER_NAME_KEEP` | Extra phrases that stay even when an exclude phrase matches (`frais`, `budget`) |
+| `DOSSIER_NAME_KEEP_OFF` | Built-in keep phrases to turn off |
+| `DOSSIER_NAME_EXCLUDE` | Extra logistics phrases. A keep wins over these. A drop wins over a keep |
+| `DOSSIER_NAME_EXCLUDE_OFF` | Built-in logistics phrases to turn off |
 | `DOSSIER_SLACK_USER_IDS` | Comma-separated Slack user ids or display names to treat as you |
 | `DOSSIER_SEEKER_PER_STRATUM` | Max hits per lens/kind/year (default 20) |
 | `DOSSIER_SEEKER_OVERALL` | Max seeker records per ingest (default 1000) |
