@@ -47,6 +47,7 @@ Use these words in the GUI and in new docs. Prefer the locked term over a synony
 | **Tailor** | Posting-shaped CV or letter under `data/drafts/`. |
 | **Prove** | Disposable corpus pass; never approves. |
 | **Run** | Ingest, extract, then brief on the real locker. |
+| **Job** | One workbench background task (ingest, ask, …). The strip polls only while busy; errors and result counts show on the page. |
 
 ## Config surface
 

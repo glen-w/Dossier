@@ -23,7 +23,7 @@ List collection names without ingesting:
 uv run python scripts/list_zotero_collections.py
 ```
 
-`doctor` prints the collection and, when the file has items, `adapter pubs: detected rows=N`.
+`doctor` prints the collection and, when the file has items, `adapter pubs: detected rows=N`. When a collection is set but `rows=0`, it prints a warn (wrong name or missing `zotero.sqlite`). A configured collection blocks the optional HTTP `/search` fallback.
 
 ## Optional loopback search
 

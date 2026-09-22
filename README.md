@@ -53,7 +53,7 @@ The full command list and environment knobs are in [CLI](docs/cli.md). Copy `dos
 
 ## Privacy
 
-Records stay on this machine. The only way text leaves is a remote LLM, and that is off by default: provider `litellm`, or `DOSSIER_LLM_ALLOW_REMOTE=true` for a non-loopback Ollama. The CLI prints an egress notice before that call. `dossier doctor` prints `egress: no` or `egress: yes`. Dumps, the corpus, and exports stay out of git. Before every push, run `python3 scripts/release/check_gitignore.py` and do not push if it fails. Detail is in [Privacy](docs/privacy.md).
+Records stay on this machine. The only way text leaves is a remote LLM, and that is off by default: provider `litellm`, or `DOSSIER_LLM_ALLOW_REMOTE=true` for a non-loopback Ollama. The CLI prints an egress notice before that call (not when a remote URL is blocked). `dossier doctor` prints `egress: no` or `egress: yes`, and warns on empty identity, empty pubs, and Sent-folder metadata. Dumps, the corpus, exports, and local assessments stay out of git. Before every push, run `python3 scripts/release/check_gitignore.py` and do not push if it fails. Detail is in [Privacy](docs/privacy.md).
 
 ## Later
 

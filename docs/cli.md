@@ -70,7 +70,9 @@ first cited record's opening text sit on each card.
 `--port`). It needs the `[web]` extra (`uv sync --extra web`). Pages cover
 locker status, ingest, extract, review, ask, match, index, brief, run, effort, saved
 profiles, prompts, question packs, and phrase lists. Live job progress uses Server-Sent
-Events. The CLI stays the scriptable surface; `dossier review` stays available
+Events; the job strip polls only while a job is busy. Failed jobs and ingest/extract
+counts show on the page after reload. Known `err=` query keys map to short blurbs.
+The CLI stays the scriptable surface; `dossier review` stays available
 without the extra. See [vocab](vocab.md).
 
 `dossier tailor` writes CV or letter markdown under `data/drafts/` from
@@ -96,9 +98,9 @@ the CRM.
 `evidence.db` is created under `~/Documents/Dossier/data` unless you set
 `DOSSIER_DATA`. That file is gitignored.
 
-Copy `dossier.example.toml` to `$DOSSIER_DATA/dossier.toml`. Environment variables win over that file. Slack ids, speaker names, and the mail-folder map go in `[identity]` there. They are not built into the package.
+Copy `dossier.example.toml` to `$DOSSIER_DATA/dossier.toml`. Environment variables win over that file. Slack ids, speaker names, and the mail-folder map go in `[identity]` there. They are not built into the package. Invalid TOML fails load with exit code 2.
 
-Records stay on this machine. Text leaves only when a remote LLM is on, which is off by default (`litellm`, or `DOSSIER_LLM_ALLOW_REMOTE`). `dossier doctor` prints `egress: no` or `egress: yes`.
+Records stay on this machine. Text leaves only when a remote LLM is on, which is off by default (`litellm`, or `DOSSIER_LLM_ALLOW_REMOTE`). `dossier doctor` prints `egress: no` or `egress: yes`. A blocked non-loopback Ollama URL stays `egress: no` and does not print the remote notice. Doctor also warns on empty Slack/meetings identity, pubs `rows=0`, and Sent-folder metadata citations.
 
 | Variable | Use |
 | --- | --- |
@@ -156,6 +158,7 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DOSSIER_SEEKER_YEAR_FLOOR` | Extra document hits kept per year before score fill (default 15) |
 | `DOSSIER_SEEKER_YEAR_CEILING` | Max hits from one calendar year (default 80) |
 | `DOSSIER_APPLICATIONS` | Folder of prior application packs |
+| `DOSSIER_APPLICATIONS_MAX_FILES` | Cap kept files per applications ingest (default 2000); stderr warns when the walk stops early |
 | `DOSSIER_CURSOR_PROJECTS` | Cursor projects root (transcripts) |
 | `DOSSIER_GROK_BLOBS` | Optional extra transcript folder |
 | `DOSSIER_TRANSCRIPTX` | TranscriptX library root (default `~/Documents/transcripts`, or `TRANSCRIPTX_TRANSCRIPTS_DIR`) |

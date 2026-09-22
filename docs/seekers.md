@@ -31,7 +31,7 @@ IDDRI mail is research/teaching. REN21 Slack is GSR/GFR production. Quotas exist
 
 Glen: read `slack.*` in the data_dumps warehouse. Thin user: a Slack export zip or folder (`users.json` plus channel JSON), via `DOSSIER_SLACK_EXPORT` or the path you pass. Quotas apply to both. The export is not copied into git.
 
-Identity: `DOSSIER_SLACK_USER_IDS` (ids or a display name), or `[identity] slack_user_ids` in gitignored `$DOSSIER_DATA/dossier.toml`. Nothing is built in. Warehouse hunts stay on those rows: file posts, long messages, hot threads, file-conversations, files that mention you or sit in a thread you replied to, samples from GSR/research/events channels. The export path keeps messages from those ids. When ids are unset, speaker names from that same file can match a Slack display name.
+Identity: `DOSSIER_SLACK_USER_IDS` (ids or a display name), or `[identity] slack_user_ids` in gitignored `$DOSSIER_DATA/dossier.toml`. Nothing is built in. Warehouse hunts stay on those rows: file posts, long messages, hot threads, file-conversations, files that mention you or sit in a thread you replied to, samples from GSR/research/events channels. The export path keeps messages from those ids. When ids are unset, speaker names from that same file can match a Slack display name. When Slack detects and both ids and speaker names are empty, ingest is a silent no-op and `dossier doctor` prints a warn.
 
 ## Mail
 
@@ -43,7 +43,7 @@ Seek `thunderbird.messages` (Gloda: subject, folder, attachments, direction). Bo
 - Prefer activity folders (Teaching, webinars, workshops, BBNJ, IKI, PROG, Review, …)
 - Rank sent+document in those folders; delivery-ish subjects; starred/replied
 - Sent+document outside activity folders is metadata only
-- **Never** stream `~/email/iddri` or `Sent Mail`. Wrap rollup `parse_message` for **one** allowlisted mbox under `DOSSIER_MBOX_MAX_BYTES` (default 200MB). If the only copy is Sent Mail, keep subject + attachment names
+- **Never** stream `~/email/iddri` or `Sent Mail`. Wrap rollup `parse_message` for **one** allowlisted mbox under `DOSSIER_MBOX_MAX_BYTES` (default 200MB). If the only copy is Sent Mail, keep subject + attachment names. Those closed-folder hits can still appear as `mbox://…` citations (metadata only); `dossier doctor` counts them as `mbox_sent_metadata`.
 
 Glen: `uv run dossier ingest --adapter mbox` reads the warehouse and fetches from `DOSSIER_MAIL_ROOT` (default `~/email`). Thin user: one exported folder, same heuristics, no Gloda.
 
@@ -51,7 +51,7 @@ Glen: `uv run dossier ingest --adapter mbox` reads the warehouse and fetches fro
 
 Read a TranscriptX library (`DOSSIER_TRANSCRIPTX`, else `TRANSCRIPTX_TRANSCRIPTS_DIR`, else `~/Documents/transcripts`). Speaker names live in `metadata/speaker_maps/*.speaker_map.json`. A folder of JSON files with colocated `.speaker_map.json` sidecars works the same way. Dossier does not import the TranscriptX package.
 
-Identity: `DOSSIER_SPEAKER_NAMES` (comma-separated display names), or `[identity] speaker_names` in the gitignored toml. When both are empty, no speaker is you. A `SPEAKER_00` → `SPEAKER_00` self-map is not a name. Ignored speakers are skipped. A segment may name the diarized id (`SPEAKER_00`, `0`) or the display name.
+Identity: `DOSSIER_SPEAKER_NAMES` (comma-separated display names), or `[identity] speaker_names` in the gitignored toml. When both are empty, no speaker is you and meetings ingest stays empty; `dossier doctor` warns when meetings detect. A `SPEAKER_00` → `SPEAKER_00` self-map is not a name. Ignored speakers are skipped. A segment may name the diarized id (`SPEAKER_00`, `0`) or the display name.
 
 A meeting is kept when you are a named speaker and someone else spoke, or you are the only speaker and the filename is an event (workshop, webinar, teaching, slides). Solo notes are skipped. Conflicted copies and `__inbox` duplicates of a file already in the library are skipped. The stored text is your turns, capped, plus the other named people. Their speech stays in the library.
 

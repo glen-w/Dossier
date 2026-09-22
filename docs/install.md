@@ -22,9 +22,13 @@ overlap is the fallback when this interpreter was built without the module.
 - `python:` — the executable in use
 - `sqlite:` — SQLite version
 - `fts5: yes|no`
+- `egress:` — `no` until a remote LLM is opted in; a blocked non-loopback Ollama URL stays `egress: no` (no remote notice)
 - `embed_model:` and `vectors:` — passage vectors from `dossier index`
 - `employer_paths:` and `git_paths:` — how many folders you listed
 - `tailor:` — how many spanned approved cards a posting draft can quote. What that draft contains is in [status](status.md).
+- Warnings when Slack or meetings detect but identity is empty, when a pubs collection is set but `rows=0`, or when mbox records cite hard-closed folders (`mbox_sent_metadata`)
+
+Invalid `$DOSSIER_DATA/dossier.toml` fails the process with exit code 2 (`FAIL:` on stderr) instead of silently using empty config.
 
 Prefer an interpreter that reports `fts5: yes`. On this Mac the stock
 `uv` venv may report `fts5: no` while Homebrew Python 3.13 reports yes:
@@ -49,10 +53,10 @@ Publications come from the Zotero collection named under `[pubs]` in `data/dossi
 
 The default model is Ollama at `http://127.0.0.1:11434` with `allow_remote = false`. Completions are unlimited unless `DOSSIER_LLM_MAX_CALLS` (or `[llm] max_calls`) is a positive cap. Set `DOSSIER_LLM_PROVIDER=off` to skip model calls. `dossier ask --mode exact` still quotes from the corpus.
 
-Text leaves the machine only if you opt into a remote LLM. That is `DOSSIER_LLM_PROVIDER=litellm` (plus `dossier[llm]`), or `DOSSIER_LLM_ALLOW_REMOTE=true` so Ollama may use a non-loopback host. The prompt for that call is what is sent. The corpus file is not. The CLI prints an egress notice first. A remote Ollama URL without the flag is refused. `dossier doctor` prints `egress: no` until you opt in.
+Text leaves the machine only if you opt into a remote LLM. That is `DOSSIER_LLM_PROVIDER=litellm` (plus `dossier[llm]`), or `DOSSIER_LLM_ALLOW_REMOTE=true` so Ollama may use a non-loopback host. The prompt for that call is what is sent. The corpus file is not. The CLI prints an egress notice first. A remote Ollama URL without the flag is refused and does not print that notice. `dossier doctor` prints `egress: no` until you opt in (including `egress: no (remote URL blocked…)` when the URL is non-loopback without the flag).
 
 Copy `dossier.example.toml` to `$DOSSIER_DATA/dossier.toml` to change
-defaults; environment variables win.
+defaults; environment variables win. Bad TOML fails load (exit 2).
 
 ## Docs site (optional)
 
