@@ -168,7 +168,10 @@ def collect_hits(
     """Rank records, or their passages when that knob is on."""
     lexicon = getattr(cfg, "lexicon", None)
     used = list(tokens) if tokens is not None else expand_tokens(question, lexicon)
+    from dossier.scope import in_scope
+
     records = _filter_records(corpus.records(), source=source, lens=lens, kind=kind)
+    records = [rec for rec in records if in_scope(rec, cfg)]
     passages_on = bool(getattr(cfg, "ask_passages", True))
     fts_on = bool(getattr(cfg, "ask_fts", True))
     if not passages_on:
@@ -249,7 +252,17 @@ def _source_fallback(
     ]
 
 
-def approved_answer(corpus: Corpus, question: str) -> Answer | None:
+def _card_in_scope(corpus: Corpus, card, cfg: object) -> bool:
+    from dossier.scope import in_scope, source_in_scope
+
+    cited = [corpus.get_record(uri) for uri in card.citations]
+    cited = [rec for rec in cited if rec is not None]
+    if cited:
+        return any(in_scope(rec, cfg) for rec in cited)
+    return source_in_scope(card.source, cfg)
+
+
+def approved_answer(corpus: Corpus, question: str, cfg: object | None = None) -> Answer | None:
     """An approved claim that carries the question. Pending cards stay out.
 
     Every content word of the question has to be in the claim, and one of
@@ -262,6 +275,8 @@ def approved_answer(corpus: Corpus, question: str) -> Answer | None:
         return None
     for card in corpus.cards(STATUS_APPROVED):
         if not card.claim.strip() or not card.citations:
+            continue
+        if cfg is not None and not _card_in_scope(corpus, card, cfg):
             continue
         blob = content_token_set(card.claim)
         if any(token not in blob for token in qtokens):

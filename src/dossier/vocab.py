@@ -62,6 +62,7 @@ BLURBS = {
     "settings": "Common knobs. Phrase lists and the rest of the file stay in the gitignored dossier.toml.",
     "effort": "How hard the model should try: light, balanced, or high. Balanced matches today's defaults. Light and high also change context and timeout.",
     "profile": "A named overlay of tunable knobs. Not identity.",
+    "scope": "Sources, years, and effort for one request. Settings and profiles hold the defaults.",
     "prompt": "A versioned template for extract, ask, or tailor. A pack is a list of questions, not a prompt.",
     "pack": "A list of questions for a brief. Not a prompt.",
     "egress": "Text leaves the machine only when a remote LLM is opted in.",

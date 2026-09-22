@@ -3,6 +3,7 @@
 <h1>{{ label('brief') }}</h1>
 <p class="lede">Answer a question pack into data/briefs. A pack is questions, not a prompt.</p>
 <form method="post" action="/brief/run">
+  {% include "partials/request_scope.html" %}
   <div class="row">
     <label class="field">Pack
       <select name="pack">
@@ -30,7 +31,7 @@
 <div class="card">
   <p>{{ result.stamp }}</p>
   <p class="meta">{{ result.path }}</p>
-  <p class="meta">cited {{ result.cited }} · refused {{ result.refused }}</p>
+  <p class="meta">cited {{ result.cited }} · refused {{ result.refused }}{% if result.scope %} · {{ result.scope }}{% endif %}</p>
 </div>
 {% endif %}
 {% endblock %}

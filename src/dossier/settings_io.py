@@ -46,6 +46,7 @@ def common_settings_patch(
     ask_mode: str | None = None,
     extract_llm: bool | None = None,
     ask_planner: str | None = None,
+    scope: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     patch: dict[str, Any] = {}
     if effort is not None:
@@ -66,6 +67,8 @@ def common_settings_patch(
         patch["ask"] = ask
     if extract_llm is not None:
         patch["extract"] = {"llm": bool(extract_llm)}
+    if scope is not None:
+        patch["scope"] = scope
     return patch
 
 

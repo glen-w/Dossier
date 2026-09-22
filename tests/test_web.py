@@ -316,6 +316,104 @@ def test_match_refuses_while_the_locker_is_busy(client) -> None:
             __import__("time").sleep(0.02)
 
 
+def test_match_page_honours_checked_sources(client) -> None:
+    test_client, root = client
+    corpus = Corpus(root / "evidence.db")
+    try:
+        corpus.upsert_record(
+            Record(
+                id="ocean",
+                source="slack",
+                uri="slack://ocean",
+                title="Ocean workshop",
+                text="Led the ocean workshops for the coastal team.",
+            )
+        )
+        corpus.upsert_record(
+            Record(
+                id="tables",
+                source="employer",
+                uri="employer://tables",
+                title="Fisheries tables",
+                text="Led the ocean workshops for the harbour office.",
+            )
+        )
+    finally:
+        corpus.close()
+
+    resp = test_client.post(
+        "/match/run",
+        data={
+            "spec": "- Experience leading ocean workshops",
+            "scope_form": "1",
+            "sources": ["slack"],
+            "year_from": "",
+            "year_to": "",
+            "effort": "light",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    job_id = resp.headers["location"].split("job=", 1)[1]
+    job = RUNNER.get(job_id)
+    assert job is not None
+    deadline = __import__("time").time() + 5
+    while job.status not in {"done", "error"} and __import__("time").time() < deadline:
+        __import__("time").sleep(0.02)
+    assert job.status == "done", job.error
+    page = test_client.get(resp.headers["location"])
+    assert b"slack://ocean" in page.content
+    assert b"employer://tables" not in page.content
+    assert b"sources slack" in page.content
+    assert b"effort light" in page.content
+
+
+def test_settings_saves_scope_defaults(client) -> None:
+    test_client, root = client
+    resp = test_client.get("/settings")
+    assert b"Year from" in resp.content
+    assert b"slack" in resp.content
+    resp = test_client.post(
+        "/settings/save",
+        data={
+            "effort": "balanced",
+            "model": "qwen2.5:3b",
+            "max_calls": "0",
+            "ask_mode": "auto",
+            "extract_llm": "off",
+            "ask_planner": "off",
+            "scope_form": "1",
+            "sources": ["slack", "pubs"],
+            "year_from": "2018",
+            "year_to": "2022",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    toml = (root / "dossier.toml").read_text(encoding="utf-8")
+    assert "year_from = 2018" in toml
+    assert "slack" in toml
+    assert "pubs" in toml
+
+
+def test_match_rejects_a_bad_year(client) -> None:
+    test_client, _ = client
+    resp = test_client.post(
+        "/match/run",
+        data={
+            "spec": "- Experience leading ocean workshops",
+            "scope_form": "1",
+            "sources": ["slack"],
+            "year_from": "12",
+            "year_to": "",
+            "effort": "",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert "year" in resp.headers["location"]
+
+
 def test_match_page_lists_both_requirements(client) -> None:
     test_client, root = client
     corpus = Corpus(root / "evidence.db")
@@ -363,6 +461,16 @@ def test_match_page_lists_both_requirements(client) -> None:
     assert b"slack://ocean" in page.content
     assert b"employer://tables" in page.content
     assert b"Led the ocean workshops" in page.content
+
+
+def test_workbench_refuses_a_non_loopback_client(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
+    monkeypatch.setenv("DOSSIER_LLM_PROVIDER", "off")
+    app = create_app()
+    with TestClient(app, client=("192.0.2.1", 50000)) as remote:
+        resp = remote.get("/locker")
+    assert resp.status_code == 403
+    assert resp.text == "loopback only"
 
 
 def test_gui_cli_missing_extra_message(monkeypatch) -> None:

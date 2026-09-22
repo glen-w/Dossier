@@ -89,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     p_ask.add_argument("question")
     p_ask.add_argument("--limit", type=int, default=None)
     p_ask.add_argument("--source", help="Limit retrieval to one adapter name")
+    _add_scope_flags(p_ask)
     p_ask.add_argument("--lens", help="Limit retrieval to a seeker lens header")
     p_ask.add_argument("--kind", help="Limit retrieval to a seeker kind header")
     p_ask.add_argument("--mode", choices=ASK_MODES, default=None)
@@ -102,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     p_brief.add_argument("--pack", default=None, help="career, or a path to a JSON pack")
     p_brief.add_argument("--posting", type=Path, help="Local posting text for the posting pack")
     p_brief.add_argument("--mode", choices=ASK_MODES, default=None)
+    _add_scope_flags(p_brief)
 
     p_run = sub.add_parser(
         "run",
@@ -141,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         help="List evidence for each requirement in a job spec",
     )
     p_match.add_argument("--posting", type=Path, required=True)
+    _add_scope_flags(p_match)
     sub.add_parser("index", help="Embed passages into evidence.db with the local model")
 
     p_doc = sub.add_parser("doctor", help="Print local readiness without writing")
@@ -704,6 +707,11 @@ def _review(args: argparse.Namespace, corpus: Corpus) -> int:
 
 
 def _ask(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
+    try:
+        cfg = _with_request_scope(args, cfg)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     mode = args.mode or cfg.ask_mode
     limit = cfg.ask_limit if args.limit is None else args.limit
     budget = CallBudget(cfg.llm_max_calls)
@@ -750,6 +758,39 @@ def _ask(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
     return 0
 
 
+def _add_scope_flags(parser: argparse.ArgumentParser) -> None:
+    from dossier.effort import EFFORT_NAMES
+
+    parser.add_argument("--sources", help="Comma-separated sources for this command")
+    parser.add_argument("--year-from", type=int, default=None)
+    parser.add_argument("--year-to", type=int, default=None)
+    parser.add_argument("--effort", choices=EFFORT_NAMES, default=None)
+
+
+def _with_request_scope(args: argparse.Namespace, cfg: Config) -> Config:
+    from dossier.scope import RequestScope, apply_request_scope, parse_year, sources_for_request
+
+    sources = cfg.scope_sources
+    raw_sources = getattr(args, "sources", None)
+    if raw_sources:
+        sources = sources_for_request(
+            [part.strip() for part in str(raw_sources).split(",") if part.strip()]
+        )
+    year_from = cfg.scope_year_from
+    year_to = cfg.scope_year_to
+    if getattr(args, "year_from", None) is not None:
+        year_from = parse_year(str(args.year_from))
+    if getattr(args, "year_to", None) is not None:
+        year_to = parse_year(str(args.year_to))
+    if year_from and year_to and year_from > year_to:
+        raise ValueError("year range")
+    effort = str(getattr(args, "effort", None) or "")
+    return apply_request_scope(
+        cfg,
+        RequestScope(sources, year_from, year_to, effort),
+    )
+
+
 def _brief(
     args: argparse.Namespace,
     cfg: Config,
@@ -757,6 +798,11 @@ def _brief(
     *,
     budget: CallBudget | None = None,
 ) -> int:
+    try:
+        cfg = _with_request_scope(args, cfg)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     mode = args.mode or cfg.ask_mode
     try:
         questions = _pack_questions(args, cfg)
@@ -896,6 +942,11 @@ def _gaps(corpus: Corpus) -> int:
 
 
 def _match(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
+    try:
+        cfg = _with_request_scope(args, cfg)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     try:
         posting = args.posting.read_text(encoding="utf-8")
     except OSError as exc:

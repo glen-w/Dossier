@@ -60,6 +60,10 @@ class Config:
     effort_model_light: str = ""
     effort_model_balanced: str = ""
     effort_model_high: str = ""
+    # None means every source. An empty tuple means none.
+    scope_sources: tuple[str, ...] | None = None
+    scope_year_from: int = 0
+    scope_year_to: int = 0
 
     @classmethod
     def from_env(cls) -> Config:
@@ -72,6 +76,7 @@ class Config:
         tailor = file_cfg.get("tailor") if isinstance(file_cfg.get("tailor"), dict) else {}
         employer = file_cfg.get("employer") if isinstance(file_cfg.get("employer"), dict) else {}
         efforts = file_cfg.get("efforts") if isinstance(file_cfg.get("efforts"), dict) else {}
+        scope = file_cfg.get("scope") if isinstance(file_cfg.get("scope"), dict) else {}
 
         provider = _env_str(
             "DOSSIER_LLM_PROVIDER",
@@ -202,8 +207,29 @@ class Config:
             effort_model_light=_effort_model(efforts, "light"),
             effort_model_balanced=_effort_model(efforts, "balanced"),
             effort_model_high=_effort_model(efforts, "high"),
+            scope_sources=_scope_sources(scope),
+            scope_year_from=_scope_year("DOSSIER_SCOPE_YEAR_FROM", scope.get("year_from")),
+            scope_year_to=_scope_year("DOSSIER_SCOPE_YEAR_TO", scope.get("year_to")),
         )
         return apply_effort(cfg)
+
+
+def _scope_sources(scope: dict) -> tuple[str, ...] | None:
+    if "DOSSIER_SCOPE_SOURCES" in os.environ:
+        return tuple(_name_list(os.environ.get("DOSSIER_SCOPE_SOURCES", "")))
+    if scope.get("all") is True or "sources" not in scope:
+        return None
+    return tuple(_name_list(_join_list(scope.get("sources"))))
+
+
+def _scope_year(env_name: str, file_value: object) -> int:
+    raw = _env_str(env_name, str(file_value or "")).strip()
+    if not raw or not raw.isdigit() or len(raw) != 4:
+        return 0
+    year = int(raw)
+    if year < 1900 or year > 2100:
+        return 0
+    return year
 
 
 def _effort_model(efforts: dict, name: str) -> str:

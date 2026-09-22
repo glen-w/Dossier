@@ -7,6 +7,7 @@
   <label class="field">Question
     <textarea name="question" required placeholder="What did I deliver on coastal governance?"></textarea>
   </label>
+  {% include "partials/request_scope.html" %}
   <div class="row" style="margin-top:10px">
     <label class="field">Mode
       <select name="mode">
@@ -23,7 +24,7 @@
 {% if result %}
 <div class="card">
   <h3>{{ result.question }}</h3>
-  <p class="meta">mode {{ result.mode }}</p>
+  <p class="meta">mode {{ result.mode }}{% if result.scope %} · {{ result.scope }}{% endif %}</p>
   {% if result.refused %}
   <p class="err">Refused{% if result.reason %}: {{ result.reason }}{% endif %}</p>
   {% else %}

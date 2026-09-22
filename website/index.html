@@ -143,9 +143,10 @@
           <ul class="outcomes">
             <li>Claim cards with citation URIs in a local SQLite corpus</li>
             <li><code>dossier ask</code> with exact / auto / rich modes</li>
-            <li><code>dossier match</code> lists evidence for each requirement in a job spec</li>
+            <li><code>dossier match</code> lists evidence for each requirement in a job spec. A request can limit sources, years, and effort; settings and profiles hold the defaults</li>
             <li><code>span</code>, <code>defend</code>, <code>gaps</code>, <code>packet</code>, <code>tailor</code></li>
             <li><code>review</code> groups pending cards by source, lens, and kind</li>
+            <li><code>dossier gui</code> is the optional loopback workbench</li>
             <li><code>referees</code> from a JSON people file or Twenty read</li>
           </ul>
         </div>
@@ -176,8 +177,8 @@
             whose SQLite has FTS5 — <code>dossier doctor</code> reports it.
           </p>
           <pre class="code"><code>uv sync --extra dev
-uv run dossier doctor
-uv run dossier prove</code></pre>
+uv sync --extra web   # optional workbench (dossier gui)
+uv run dossier doctor</code></pre>
           <p>
             Full guide:
             <a href="./guide/install.html">install</a>,

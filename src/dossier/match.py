@@ -35,6 +35,8 @@ from dossier.cards import (
 )
 from dossier.interview import _query_vector
 from dossier.lenses import infer_skills, kinds_mentioned
+from dossier.scope import in_scope as _in_request_scope
+from dossier.scope import source_in_scope
 from dossier.store import Corpus
 from dossier.ui import note, stage
 
@@ -218,7 +220,7 @@ def _match_one(
             GAP_BROAD,
             (),
         )
-    ordered = _approved_rows(corpus, requirement.text, cards)
+    ordered = _approved_rows(corpus, requirement.text, cards, cfg)
     ordered.extend(_search_rows(corpus, requirement.text, cfg, embedder, cards))
     evidence = _cap(ordered)
     gap = "" if evidence else GAP_NONE
@@ -271,7 +273,13 @@ def _candidates(
     embed_model = str(getattr(embedder, "model", "") or "") if query_vec else ""
     if not query_vec or not embed_model:
         return lexical
-    neighbors = _vector_hits(corpus, query_vec, embed_model, corpus.records(), MAX_HITS)
+    neighbors = _vector_hits(
+        corpus,
+        query_vec,
+        embed_model,
+        [rec for rec in corpus.records() if _in_request_scope(rec, cfg)],
+        MAX_HITS,
+    )
     if not neighbors:
         return lexical
     if not lexical:
@@ -317,6 +325,7 @@ def _approved_rows(
     corpus: Corpus,
     requirement: str,
     cards: dict[str, ClaimCard],
+    cfg: object,
 ) -> list[_Row]:
     rows: list[_Row] = []
     approved = [card for card in cards.values() if card.status == STATUS_APPROVED]
@@ -336,6 +345,10 @@ def _approved_rows(
         if not uri:
             continue
         record = corpus.get_record(uri)
+        if record is not None and not _in_request_scope(record, cfg):
+            continue
+        if record is None and not source_in_scope(card.source, cfg):
+            continue
         year = ""
         title = card.claim
         source = card.source

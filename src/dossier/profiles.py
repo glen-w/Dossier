@@ -17,7 +17,8 @@ from dossier.paths import data_dir
 
 VIRTUAL_DEFAULT = "default"
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
-_ALLOWED_TOP = frozenset({"effort", "llm", "ask", "extract"})
+_ALLOWED_TOP = frozenset({"effort", "llm", "ask", "extract", "scope"})
+_ALLOWED_SCOPE = frozenset({"all_sources", "sources", "year_from", "year_to"})
 _ALLOWED_LLM = frozenset({"model", "max_calls", "provider", "timeout", "embed_model"})
 _ALLOWED_ASK = frozenset({"mode", "limit", "planner", "decompose", "hops"})
 _ALLOWED_EXTRACT = frozenset({"llm", "chunk_chars", "max_chunks"})
@@ -146,7 +147,38 @@ def profile_to_toml_patch(profile: Profile) -> dict[str, Any]:
         block = cfg.get(section)
         if isinstance(block, dict) and block:
             patch[section] = dict(block)
+    scope = cfg.get("scope")
+    if isinstance(scope, dict):
+        block: dict[str, Any] = {}
+        if scope.get("all_sources"):
+            block["all"] = True
+            block["sources"] = []
+        elif isinstance(scope.get("sources"), list):
+            block["all"] = False
+            block["sources"] = list(scope["sources"])
+        for key in ("year_from", "year_to"):
+            if key in scope:
+                block[key] = int(scope[key])
+        if block:
+            patch["scope"] = block
     return patch
+
+
+def _sanitize_scope(raw: dict[str, Any]) -> dict[str, Any]:
+    raw = {key: value for key, value in raw.items() if key in _ALLOWED_SCOPE}
+    cleaned: dict[str, Any] = {}
+    if raw.get("all_sources") is True:
+        cleaned["all_sources"] = True
+    elif isinstance(raw.get("sources"), list):
+        cleaned["sources"] = [str(item).strip() for item in raw["sources"] if str(item).strip()]
+    for key in ("year_from", "year_to"):
+        if key not in raw:
+            continue
+        try:
+            cleaned[key] = int(raw[key])
+        except (TypeError, ValueError):
+            continue
+    return cleaned
 
 
 def _sanitize_config(raw: dict[str, Any]) -> dict[str, Any]:
@@ -156,6 +188,12 @@ def _sanitize_config(raw: dict[str, Any]) -> dict[str, Any]:
             continue
         if key == "effort":
             out["effort"] = normalize_effort(str(value))
+            continue
+        if key == "scope":
+            if isinstance(value, dict):
+                cleaned_scope = _sanitize_scope(value)
+                if cleaned_scope:
+                    out["scope"] = cleaned_scope
             continue
         if not isinstance(value, dict):
             continue

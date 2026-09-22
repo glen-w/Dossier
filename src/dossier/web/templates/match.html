@@ -7,6 +7,7 @@
   <label class="field">Job spec
     <textarea class="match-spec" name="spec" required placeholder="Paste the job spec. Bullets become requirements."></textarea>
   </label>
+  {% include "partials/request_scope.html" %}
   <div class="row" style="margin-top:10px">
     <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Match</button>
   </div>
@@ -14,6 +15,7 @@
 
 {% if result %}
 <p class="meta">{{ result.path }}</p>
+{% if result.scope %}<p class="meta">{{ result.scope }}</p>{% endif %}
 {% for req in result.requirements %}
 <div class="card">
   <h3>{{ loop.index }}. {{ req.text }}</h3>

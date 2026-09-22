@@ -21,6 +21,28 @@
   </div>
 
   <div class="card">
+    <h3>Scope</h3>
+    <p class="meta">Default sources and years for ask, match, and brief. Leave every source checked to search all of them. A profile stores this with the effort above.</p>
+    <input type="hidden" name="scope_form" value="1">
+    <div class="checks">
+      {% for name in scope_names %}
+      <label>
+        <input type="checkbox" name="sources" value="{{ name }}" {% if name in scope_selected %}checked{% endif %}>
+        {{ name }}
+      </label>
+      {% endfor %}
+    </div>
+    <div class="row">
+      <label class="field">Year from
+        <input name="year_from" inputmode="numeric" placeholder="any" value="{{ scope_year_from }}">
+      </label>
+      <label class="field">Year to
+        <input name="year_to" inputmode="numeric" placeholder="any" value="{{ scope_year_to }}">
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
     <h3>Common knobs</h3>
     <div class="row">
       <label class="field">Model

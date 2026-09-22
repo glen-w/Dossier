@@ -34,6 +34,15 @@ from dossier.profiles import (
     save_profile,
 )
 from dossier.review import apply_action, list_cards, summary
+from dossier.scope import (
+    RequestScope,
+    apply_request_scope,
+    known_sources,
+    parse_year,
+    scope_label,
+    scope_toml,
+    sources_for_request,
+)
 from dossier.settings_io import common_settings_patch, save_common_settings
 from dossier.store import Corpus
 from dossier.ui import Progress, note, stage
@@ -222,6 +231,8 @@ def create_app() -> FastAPI:
             job=job.snapshot() if job else None,
             notice=_egress_notice(cfg),
             modes=ASK_MODES,
+            efforts=EFFORT_NAMES,
+            **_scope_template(cfg),
         )
 
     @app.get("/match", response_class=HTMLResponse)
@@ -241,31 +252,51 @@ def create_app() -> FastAPI:
             result=result,
             job=job.snapshot() if job else None,
             notice=_egress_notice(cfg),
+            efforts=EFFORT_NAMES,
+            **_scope_template(cfg),
         )
 
     @app.post("/match/run")
-    async def match_run(spec: str = Form(...)) -> RedirectResponse:
+    async def match_run(
+        spec: str = Form(...),
+        scope_form: str = Form(""),
+        sources: list[str] = Form(default=[]),
+        year_from: str = Form(""),
+        year_to: str = Form(""),
+        effort: str = Form(""),
+    ) -> RedirectResponse:
         text = spec.strip()
         if not text:
             return RedirectResponse("/match?err=Paste+a+job+spec", status_code=303)
         try:
-            job = _start_match(text)
+            scope = _posted_scope(scope_form, sources, year_from, year_to, effort)
+            job = _start_match(text, scope)
         except LockerBusy:
             return RedirectResponse("/match?err=busy", status_code=303)
+        except ValueError as exc:
+            return RedirectResponse(f"/match?err={_q(str(exc))}", status_code=303)
         return RedirectResponse(f"/match?job={job.id}", status_code=303)
 
     @app.post("/ask/run")
     async def ask_run(
         question: str = Form(...),
         mode: str = Form(""),
+        scope_form: str = Form(""),
+        sources: list[str] = Form(default=[]),
+        year_from: str = Form(""),
+        year_to: str = Form(""),
+        effort: str = Form(""),
     ) -> RedirectResponse:
         q = question.strip()
         if not q:
             return RedirectResponse("/ask?err=empty", status_code=303)
         try:
-            job = _start_ask(q, mode.strip() or None)
+            scope = _posted_scope(scope_form, sources, year_from, year_to, effort)
+            job = _start_ask(q, mode.strip() or None, scope)
         except LockerBusy:
             return RedirectResponse("/ask?err=busy", status_code=303)
+        except ValueError as exc:
+            return RedirectResponse(f"/ask?err={_q(str(exc))}", status_code=303)
         return RedirectResponse(f"/ask?job={job.id}", status_code=303)
 
     @app.get("/settings", response_class=HTMLResponse)
@@ -285,6 +316,7 @@ def create_app() -> FastAPI:
             notice=_egress_notice(cfg),
             saved=request.query_params.get("saved") == "1",
             err=request.query_params.get("err", ""),
+            **_scope_template(cfg),
         )
 
     @app.post("/settings/save")
@@ -295,6 +327,10 @@ def create_app() -> FastAPI:
         ask_mode: str = Form("auto"),
         extract_llm: str = Form(""),
         ask_planner: str = Form("off"),
+        scope_form: str = Form(""),
+        sources: list[str] = Form(default=[]),
+        year_from: str = Form(""),
+        year_to: str = Form(""),
     ) -> RedirectResponse:
         cfg = Config.from_env()
         path = Path(cfg.data_dir) / "dossier.toml"
@@ -304,6 +340,13 @@ def create_app() -> FastAPI:
             return RedirectResponse("/settings?err=max_calls", status_code=303)
         mode = ask_mode if ask_mode in ASK_MODES else "auto"
         planner = ask_planner if ask_planner in {"off", "rich"} else "off"
+        scope_patch = None
+        if scope_form == "1":
+            try:
+                posted = _posted_scope("1", sources, year_from, year_to, "")
+            except ValueError as exc:
+                return RedirectResponse(f"/settings?err={_q(str(exc))}", status_code=303)
+            scope_patch = scope_toml(posted.sources, posted.year_from, posted.year_to)
         patch = common_settings_patch(
             effort=normalize_effort(effort),
             model=model.strip() or cfg.llm_model,
@@ -311,6 +354,7 @@ def create_app() -> FastAPI:
             ask_mode=mode,
             extract_llm=extract_llm in {"1", "true", "on", "yes"},
             ask_planner=planner,
+            scope=scope_patch,
         )
         save_common_settings(path, patch)
         return RedirectResponse("/settings?saved=1", status_code=303)
@@ -363,6 +407,7 @@ def create_app() -> FastAPI:
                     "llm": {"model": cfg.llm_model, "max_calls": cfg.llm_max_calls},
                     "ask": {"mode": cfg.ask_mode, "planner": cfg.ask_planner},
                     "extract": {"llm": cfg.extract_llm},
+                    "scope": _profile_scope(cfg),
                 },
                 root=root,
             )
@@ -427,6 +472,8 @@ def create_app() -> FastAPI:
             result=job.result if job and job.status == "done" else None,
             notice=_egress_notice(cfg),
             modes=ASK_MODES,
+            efforts=EFFORT_NAMES,
+            **_scope_template(cfg),
         )
 
     @app.post("/brief/run")
@@ -434,9 +481,15 @@ def create_app() -> FastAPI:
         pack: str = Form("career"),
         posting: str = Form(""),
         mode: str = Form(""),
+        scope_form: str = Form(""),
+        sources: list[str] = Form(default=[]),
+        year_from: str = Form(""),
+        year_to: str = Form(""),
+        effort: str = Form(""),
     ) -> RedirectResponse:
         try:
-            job = _start_brief(pack.strip() or "career", posting.strip(), mode.strip() or None)
+            scope = _posted_scope(scope_form, sources, year_from, year_to, effort)
+            job = _start_brief(pack.strip() or "career", posting.strip(), mode.strip() or None, scope)
         except LockerBusy:
             return RedirectResponse("/brief?err=busy", status_code=303)
         except ValueError as exc:
@@ -692,6 +745,45 @@ def _open() -> tuple[Config, Corpus]:
     return cfg, Corpus(evidence_db(Path(cfg.data_dir)))
 
 
+def _scope_template(cfg: Config) -> dict[str, Any]:
+    names = known_sources()
+    selected = names if cfg.scope_sources is None else cfg.scope_sources
+    return {
+        "scope_names": names,
+        "scope_selected": set(selected),
+        "scope_year_from": cfg.scope_year_from or "",
+        "scope_year_to": cfg.scope_year_to or "",
+    }
+
+
+def _default_scope() -> RequestScope:
+    cfg = Config.from_env()
+    return RequestScope(cfg.scope_sources, cfg.scope_year_from, cfg.scope_year_to, "")
+
+
+def _posted_scope(
+    scope_form: str,
+    sources: list[str],
+    year_from: str,
+    year_to: str,
+    effort: str,
+) -> RequestScope:
+    if scope_form != "1":
+        return _default_scope()
+    start = parse_year(year_from)
+    end = parse_year(year_to)
+    if start and end and start > end:
+        raise ValueError("year range")
+    return RequestScope(sources_for_request(sources), start, end, effort.strip().lower())
+
+
+def _profile_scope(cfg: Config) -> dict[str, Any]:
+    years = {"year_from": cfg.scope_year_from, "year_to": cfg.scope_year_to}
+    if cfg.scope_sources is None:
+        return {"all_sources": True, **years}
+    return {"sources": list(cfg.scope_sources), **years}
+
+
 def _egress_notice(cfg: Config) -> str:
     if llm_egress_is_remote(cfg):
         return EGRESS_NOTICE
@@ -789,12 +881,12 @@ def _start_extract(source: str | None, limit: int | None) -> Job:
     return RUNNER.start("extract", run)
 
 
-def _start_ask(question: str, mode: str | None) -> Job:
+def _start_ask(question: str, mode: str | None, scope: RequestScope | None = None) -> Job:
     def run(job: Job) -> dict[str, Any]:
         from dossier.cli import _LazyClient, _client_for_mode, _query_embedder
         from dossier.sources.pubs import optional_pubs_hits
 
-        cfg = Config.from_env()
+        cfg = apply_request_scope(Config.from_env(), scope or _default_scope())
         corpus = Corpus(evidence_db(Path(cfg.data_dir)))
         try:
             chosen = mode or cfg.ask_mode
@@ -837,6 +929,7 @@ def _start_ask(question: str, mode: str | None) -> Job:
                 "citations": result.citations,
                 "refused": result.refused,
                 "reason": result.reason,
+                "scope": scope_label(cfg),
             }
         finally:
             corpus.close()
@@ -844,12 +937,12 @@ def _start_ask(question: str, mode: str | None) -> Job:
     return RUNNER.start("ask", run)
 
 
-def _start_match(spec: str) -> Job:
+def _start_match(spec: str, scope: RequestScope | None = None) -> Job:
     def run(job: Job) -> dict[str, Any]:
         from dossier.cli import _query_embedder
         from dossier.match import match_posting, write_match
 
-        cfg = Config.from_env()
+        cfg = apply_request_scope(Config.from_env(), scope or _default_scope())
         corpus = Corpus(evidence_db(Path(cfg.data_dir)))
         try:
             report = match_posting(
@@ -861,6 +954,7 @@ def _start_match(spec: str) -> Job:
             path = write_match(report, Path(cfg.data_dir) / "matches")
             data = report.as_dict()
             data["path"] = str(path)
+            data["scope"] = scope_label(cfg)
             return data
         finally:
             corpus.close()
@@ -926,7 +1020,12 @@ def _start_index() -> Job:
     return RUNNER.start("index", run)
 
 
-def _start_brief(pack: str, posting: str, mode: str | None) -> Job:
+def _start_brief(
+    pack: str,
+    posting: str,
+    mode: str | None,
+    scope: RequestScope | None = None,
+) -> Job:
     def run(job: Job) -> dict[str, Any]:
         from dossier.brief import run_pack, write_brief
         from dossier.cli import _LazyClient, _client_for_mode, _query_embedder
@@ -934,7 +1033,7 @@ def _start_brief(pack: str, posting: str, mode: str | None) -> Job:
         from dossier.prompts import start_prompt_log, stop_prompt_log
         from dossier.ui import Progress
 
-        cfg = Config.from_env()
+        cfg = apply_request_scope(Config.from_env(), scope or _default_scope())
         chosen = mode or cfg.ask_mode
         if chosen not in ASK_MODES:
             chosen = cfg.ask_mode
@@ -997,6 +1096,7 @@ def _start_brief(pack: str, posting: str, mode: str | None) -> Job:
                 "cited": cited,
                 "refused": refused,
                 "stamp": prompt_stamp,
+                "scope": scope_label(cfg),
             }
         finally:
             corpus.close()

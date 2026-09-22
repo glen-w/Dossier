@@ -8,6 +8,14 @@
 # high: ask rich, planner rich, timeout 600s.
 # effort = "balanced"
 
+# Default sources and years for ask, match, and brief.
+# Leave sources out (or all = true) to search every registered source.
+# A record with no Year header stays in when a range is set.
+# [scope]
+# all = true
+# year_from = 2016
+# year_to = 2024
+
 # Model-only override for one effort. Leave unset to keep [llm] model.
 # [efforts.high]
 # model = "qwen3.8:latest"

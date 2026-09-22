@@ -78,7 +78,10 @@ approved cards that already have a span. `--arrange` is letter-only.
 
 `dossier match --posting` writes an ordered evidence list under
 `data/matches/`, one section per requirement. An empty file is an error.
-It does not approve a card. See [status](status.md).
+It does not approve a card. `--sources`, `--year-from`, `--year-to`, and
+`--effort` narrow that command. Ask and brief take the same flags. Leave
+them off to use `[scope]` and the effort preset in `dossier.toml`. See
+[status](status.md).
 
 `dossier index` embeds passages into `evidence.db` with the local Ollama
 embed model. `ask` uses those vectors when full text is empty or thin.

@@ -47,7 +47,7 @@ def conduct(
     if not question.strip():
         return Answer(text="", citations=[], refused=True, reason="empty question", route="exact")
     if cfg.ask_cards_first:
-        card = approved_answer(corpus, question)
+        card = approved_answer(corpus, question, cfg)
         if card is not None:
             return card
     query_vec = _query_vector(embedder, question) if cfg.ask_embed else None
@@ -177,7 +177,7 @@ def _without_model(
     embed_model: str = "",
 ) -> tuple[Answer, list[Hit]]:
     if cfg.ask_cards_first and mode != "rich":
-        card = approved_answer(corpus, question)
+        card = approved_answer(corpus, question, cfg)
         if card is not None:
             return card, []
     hits = collect_hits(
