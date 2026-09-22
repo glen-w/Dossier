@@ -69,7 +69,7 @@ first cited record's opening text sit on each card.
 `dossier gui` serves the optional workbench on `127.0.0.1:8766` (override with
 `--port`). It needs the `[web]` extra (`uv sync --extra web`). Pages cover
 locker status, ingest, extract, review, ask, match, index, brief, run, effort, saved
-profiles, prompts, and question packs. Live job progress uses Server-Sent
+profiles, prompts, question packs, and phrase lists. Live job progress uses Server-Sent
 Events. The CLI stays the scriptable surface; `dossier review` stays available
 without the extra. See [vocab](vocab.md).
 

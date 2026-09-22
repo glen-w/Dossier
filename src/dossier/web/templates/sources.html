@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>{{ label('sources') }}</h1>
-<p class="lede">{{ blurbs.sources }}</p>
+<p class="lede">{{ blurbs.sources }} <a href="/settings/lists">Phrase lists</a> decide what each source drops.</p>
 
 <form class="row" method="post" action="/sources/ingest">
   <label class="field">Adapter

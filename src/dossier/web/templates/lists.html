@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Phrase lists</h1>
+<p class="lede">Built-in phrases are on. Uncheck one to turn it off. Add a phrase on its own line. Environment variables still win over this file.</p>
+<p class="meta"><a href="/settings">Settings</a> · <a href="/sources">Sources</a></p>
+
+{% if saved %}
+<div class="ok">Saved to {{ toml_path }}.</div>
+{% endif %}
+
+<form method="post" action="/settings/lists">
+  {% for section, rows in groups %}
+  <div class="card">
+    <h3>{{ section }}</h3>
+    {% for row in rows %}
+    <fieldset class="phrase-list">
+      <legend>{{ row.title }}</legend>
+      <p class="meta">{{ row.note }}</p>
+      {% if row.env %}
+      <p class="err">{{ row.env }} is set, so this file does not change that list until the variable is unset.</p>
+      {% endif %}
+      {% if row.default %}
+      <div class="checks">
+        {% for phrase in row.default %}
+        <label>
+          <input type="checkbox" name="on" value="{{ row.section }}|{{ row.key }}|{{ phrase }}"
+            {% if phrase in row.checked %}checked{% endif %}
+            {% if phrase in row.locked %}disabled{% endif %}>
+          <code>{{ phrase }}</code>{% if phrase in row.locked %} <span class="meta">stays on</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <label class="field">Also include
+        <textarea name="extra_{{ row.section }}_{{ row.key }}" rows="3">{{ row.extras }}</textarea>
+      </label>
+    </fieldset>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <button class="primary" type="submit">Save phrase lists</button>
+</form>
+{% endblock %}

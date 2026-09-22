@@ -7,12 +7,13 @@ from pathlib import Path
 import pytest
 
 from dossier.ask import Hit
-from dossier.cards import STATUS_APPROVED, ClaimCard
+from dossier.cards import STATUS_APPROVED, STATUS_PENDING, ClaimCard
 from dossier.cli import main
 from dossier.config import Config
 from dossier.match import (
     GAP_BROAD,
     GAP_NONE,
+    PER_REQUIREMENT,
     REQ_CAP,
     match_posting,
     split_requirements,
@@ -290,6 +291,107 @@ def test_fuses_neighbor_when_lexical_hits_already_exist(
     assert {hit.uri for hit in evidence} >= {"slack://1", "employer://1", "git://budget"}
     neighbor = next(hit for hit in evidence if hit.uri == "git://budget")
     assert neighbor.route == "neighbor"
+
+
+def test_split_keeps_numbered_lines_and_a_cue_inside_benefits() -> None:
+    numbered = split_requirements(
+        "1. Experience leading ocean workshops\n2) Knowledge of fisheries data tables\n"
+    )
+    assert [item.text for item in numbered] == [
+        "Experience leading ocean workshops",
+        "Knowledge of fisheries data tables",
+    ]
+    spec = """
+Benefits
+- Pension scheme
+You will coordinate coastal workshops.
+Requirements:
+- Experience leading ocean workshops
+"""
+    kept = split_requirements(spec)
+    assert [item.text for item in kept] == [
+        "You will coordinate coastal workshops.",
+        "Experience leading ocean workshops",
+    ]
+
+
+def test_kind_boost_sorts_ahead_of_a_richer_overlap(tmp_path: Path) -> None:
+    corpus = Corpus(tmp_path / "evidence.db")
+    try:
+        corpus.upsert_record(
+            _record(
+                "slack",
+                "slack://rich",
+                "Experience leading ocean workshops for the ministry last spring.",
+            )
+        )
+        corpus.upsert_record(
+            _record(
+                "employer",
+                "employer://kind",
+                "Kind: workshop\n\nLed ocean workshops last year.",
+            )
+        )
+        report = match_posting(corpus, "- Experience leading ocean workshops", _cfg())
+    finally:
+        corpus.close()
+    assert [hit.uri for hit in report.requirements[0].evidence] == [
+        "employer://kind",
+        "slack://rich",
+    ]
+
+
+def test_pending_card_is_cited_and_does_not_jump_or_approve(tmp_path: Path) -> None:
+    corpus = Corpus(tmp_path / "evidence.db")
+    try:
+        corpus.upsert_record(
+            _record(
+                "slack",
+                "slack://z",
+                "Experience leading ocean workshops for the ministry last spring.",
+            )
+        )
+        corpus.upsert_record(
+            _record("employer", "employer://a", "Led ocean workshops last year.")
+        )
+        corpus.put_card(
+            ClaimCard(
+                id="card-pending",
+                claim="Led ocean workshops",
+                citations=["employer://a"],
+                source="employer",
+                status=STATUS_PENDING,
+                extras={"span": "Led ocean workshops last year.", "span_uri": "employer://a"},
+            )
+        )
+        report = match_posting(corpus, "- Experience leading ocean workshops", _cfg())
+        cards = corpus.cards()
+    finally:
+        corpus.close()
+    evidence = report.requirements[0].evidence
+    assert [hit.uri for hit in evidence] == ["slack://z", "employer://a"]
+    assert evidence[1].card_id == "card-pending"
+    assert evidence[1].card_status == "pending"
+    assert evidence[1].route == "passage"
+    assert len(cards) == 1
+    assert cards[0].status == STATUS_PENDING
+
+
+def test_keeps_five_hits_from_different_sources(tmp_path: Path) -> None:
+    corpus = Corpus(tmp_path / "evidence.db")
+    sources = ("chatgpt", "employer", "git", "meetings", "pubs", "slack")
+    try:
+        for source in sources:
+            corpus.upsert_record(
+                _record(source, f"{source}://1", "Led ocean workshops for coastal teams.")
+            )
+        report = match_posting(corpus, "- Experience leading ocean workshops", _cfg())
+    finally:
+        corpus.close()
+    evidence = report.requirements[0].evidence
+    assert len(evidence) == PER_REQUIREMENT
+    assert [hit.uri for hit in evidence] == [f"{source}://1" for source in sources[:PER_REQUIREMENT]]
+    assert "slack://1" not in {hit.uri for hit in evidence}
 
 
 def test_cli_match_prints_counts(

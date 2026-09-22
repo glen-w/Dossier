@@ -59,7 +59,7 @@ BLURBS = {
     "review": "Human gate: approve, refuse, or reopen cards.",
     "ask": "One cited answer from the locker, or a refusal.",
     "match": "Ordered evidence for each requirement in a pasted job spec.",
-    "settings": "Common knobs. Full config stays in the gitignored dossier.toml.",
+    "settings": "Common knobs. Phrase lists and the rest of the file stay in the gitignored dossier.toml.",
     "effort": "How hard the model should try: light, balanced, or high. Balanced matches today's defaults. Light and high also change context and timeout.",
     "profile": "A named overlay of tunable knobs. Not identity.",
     "prompt": "A versioned template for extract, ask, or tailor. A pack is a list of questions, not a prompt.",

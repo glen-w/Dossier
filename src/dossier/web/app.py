@@ -20,6 +20,7 @@ from dossier.extract import ExtractProgress, extract_corpus
 from dossier.ingest_run import run_ingest_targets
 from dossier.interview import conduct
 from dossier.jobs import LockerBusy, RUNNER, Job
+from dossier.lists import PHRASE_LISTS, phrase_list_groups, phrase_list_patch
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
 from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
@@ -313,6 +314,35 @@ def create_app() -> FastAPI:
         )
         save_common_settings(path, patch)
         return RedirectResponse("/settings?saved=1", status_code=303)
+
+    @app.get("/settings/lists", response_class=HTMLResponse)
+    async def lists_page(request: Request) -> HTMLResponse:
+        cfg = Config.from_env()
+        root = Path(cfg.data_dir)
+        return _page(
+            request,
+            "lists.html",
+            "settings",
+            groups=phrase_list_groups(),
+            toml_path=str(root / "dossier.toml"),
+            saved=request.query_params.get("saved") == "1",
+        )
+
+    @app.post("/settings/lists")
+    async def lists_save(request: Request) -> RedirectResponse:
+        form = await request.form()
+        checked: set[tuple[str, str, str]] = set()
+        for raw in form.getlist("on"):
+            parts = str(raw).split("|", 2)
+            if len(parts) == 3 and parts[0] and parts[1]:
+                checked.add((parts[0], parts[1], parts[2]))
+        extras = {
+            (spec.section, spec.key): str(form.get(f"extra_{spec.section}_{spec.key}") or "")
+            for spec in PHRASE_LISTS
+        }
+        path = Path(Config.from_env().data_dir) / "dossier.toml"
+        save_common_settings(path, phrase_list_patch(checked, extras))
+        return RedirectResponse("/settings/lists?saved=1", status_code=303)
 
     @app.post("/settings/profile/save")
     async def profile_save(

@@ -32,6 +32,8 @@ def test_locker_page(client) -> None:
     assert resp.status_code == 200
     assert b"Locker" in resp.content
     assert b"records" in resp.content
+    assert b"/static/logo.png" in resp.content
+    assert b'alt="Dossier"' in resp.content
 
 
 def test_settings_save_and_profile(client) -> None:
@@ -68,6 +70,54 @@ def test_settings_save_and_profile(client) -> None:
     )
     assert resp.status_code == 303
     assert 'effort = "balanced"' in (root / "dossier.toml").read_text(encoding="utf-8")
+
+
+def test_phrase_lists_round_trip_into_the_seek(client, monkeypatch) -> None:
+    test_client, root = client
+    for name in (
+        "DOSSIER_MAIL_EXCLUDE",
+        "DOSSIER_MAIL_EXCLUDE_OFF",
+        "DOSSIER_MAIL_KEEP",
+        "DOSSIER_MAIL_KEEP_OFF",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    (root / "dossier.toml").write_text(
+        '[identity]\nslack_user_ids = ["UEXAMPLE"]\n',
+        encoding="utf-8",
+    )
+    page = test_client.get("/settings/lists")
+    assert page.status_code == 200
+    assert b"Drop folders" in page.content
+    assert b"newsletter" in page.content
+    assert b"Phrase lists" in test_client.get("/settings").content
+    assert b"Phrase lists" in test_client.get("/sources").content
+
+    ons = []
+    for line in page.text.split("name=\"on\""):
+        if "value=\"" not in line:
+            continue
+        value = line.split("value=\"", 1)[1].split("\"", 1)[0]
+        if value.startswith("mail|exclude|newsletter"):
+            continue
+        ons.append(value)
+    resp = test_client.post(
+        "/settings/lists",
+        data={"on": ons, "extra_mail_exclude": "promo\n"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    toml = (root / "dossier.toml").read_text(encoding="utf-8")
+    assert "UEXAMPLE" in toml
+
+    from dossier.identity import noise_folder
+    from dossier.lists import mail_exclude, mail_keep
+
+    assert "promo" in mail_exclude()
+    assert "newsletter" not in mail_exclude()
+    assert "admin" in mail_keep()
+    assert noise_folder("Promo")
+    assert not noise_folder("Newsletters")
+    assert not noise_folder("Admin")
 
 
 def test_review_approve(client) -> None:
@@ -207,6 +257,63 @@ def test_pack_brief_and_prompt_override(client) -> None:
     )
     assert resp.status_code == 303
     assert not (root / "prompts" / "overrides" / "ask.json").is_file()
+
+
+def test_phrase_lists_page_saves_a_change(client) -> None:
+    from dossier.lists import PHRASE_LISTS
+
+    test_client, root = client
+    page = test_client.get("/settings/lists")
+    assert page.status_code == 200
+    assert b"Drop folders" in page.content
+    assert b"newsletter" in page.content
+
+    data = {
+        "on": [
+            f"{spec.section}|{spec.key}|{phrase}"
+            for spec in PHRASE_LISTS
+            for phrase in spec.default
+            if not (spec.section == "mail" and spec.key == "exclude" and phrase == "receipt")
+        ],
+        "extra_mail_exclude": "promo",
+    }
+    resp = test_client.post("/settings/lists", data=data, follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"].endswith("/settings/lists?saved=1")
+    saved = test_client.get("/settings/lists?saved=1")
+    assert b"Saved" in saved.content
+    toml = (root / "dossier.toml").read_text(encoding="utf-8")
+    assert "receipt" in toml
+    assert "promo" in toml
+
+
+def test_match_refuses_while_the_locker_is_busy(client) -> None:
+    import threading
+
+    test_client, _ = client
+    started = threading.Event()
+    release = threading.Event()
+
+    def work(job):  # noqa: ANN001
+        started.set()
+        release.wait(2)
+        return {"ok": 1}
+
+    job = RUNNER.start("demo", work)
+    try:
+        assert started.wait(2)
+        resp = test_client.post(
+            "/match/run",
+            data={"spec": "- Experience leading ocean workshops"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 303
+        assert "err=busy" in resp.headers["location"]
+    finally:
+        release.set()
+        deadline = __import__("time").time() + 2
+        while job.status not in {"done", "error"} and __import__("time").time() < deadline:
+            __import__("time").sleep(0.02)
 
 
 def test_match_page_lists_both_requirements(client) -> None:

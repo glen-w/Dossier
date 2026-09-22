@@ -94,6 +94,24 @@ def test_toml_adds_and_turns_off_phrases(isolated: Path) -> None:
     assert is_noise_name("registration form.pdf") is True
 
 
+def test_phrase_list_patch_turns_a_builtin_off_and_adds_one(isolated: Path) -> None:
+    from dossier.lists import PHRASE_LISTS, phrase_list_patch
+    from dossier.settings_io import save_common_settings
+
+    checked = {
+        (spec.section, spec.key, phrase)
+        for spec in PHRASE_LISTS
+        for phrase in spec.default
+        if not (spec.section == "mail" and spec.key == "exclude" and phrase == "receipt")
+    }
+    extras = {(spec.section, spec.key): "" for spec in PHRASE_LISTS}
+    extras[("mail", "exclude")] = "promo\n"
+    save_common_settings(isolated / "dossier.toml", phrase_list_patch(checked, extras))
+    assert not noise_folder("Receipts")
+    assert noise_folder("Promo")
+    assert noise_folder("Newsletters")
+
+
 def test_source_lists_follow_the_same_edit(isolated: Path) -> None:
     from dossier.identity import skip_folder
     from dossier.lists import (

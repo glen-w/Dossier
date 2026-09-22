@@ -55,6 +55,7 @@ Use these words in the GUI and in new docs. Prefer the locked term over a synony
 | **Effort** | Global LLM investment: `light`, `balanced`, or `high`. Balanced matches today's defaults. Light and high also set a context cap and a timeout. |
 | **Profile** | A named saved overlay of tunable knobs. Not identity, not effort itself, not a referee. |
 | **Identity** | Slack ids, speaker names, and the mail-folder map in gitignored `dossier.toml`. |
+| **Phrase list** | Built-in include and exclude words for a source. The workbench edits them in that same file. |
 | **Prompt** | A versioned template for extract, ask, or tailor. |
 | **Pack** | A list of questions for a brief. Not a prompt. |
 

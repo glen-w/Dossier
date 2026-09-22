@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import dataclass
 
 from dossier.paths import _toml_list, _toml_section
 
@@ -256,6 +257,166 @@ DEFAULT_MEETINGS_DIRS = (
 )
 DEFAULT_MEETINGS_SOLO = ("workshop", "webinar", "teaching", "side_event", "slides")
 DEFAULT_APPLICATION_FILES = (".ds_store", "thumbs.db")
+
+
+@dataclass(frozen=True)
+class PhraseList:
+    """One editable include or exclude list. The workbench writes the toml keys."""
+
+    section: str
+    key: str
+    title: str
+    note: str
+    default: tuple[str, ...]
+    locked: tuple[str, ...] = ()
+
+
+# Order is the settings page order. Locked phrases stay on; the code ignores an off switch.
+PHRASE_LISTS: tuple[PhraseList, ...] = (
+    PhraseList(
+        "mail",
+        "exclude",
+        "Drop folders",
+        "A keep phrase wins. Trash and spam are on the closed list.",
+        DEFAULT_MAIL_EXCLUDE,
+    ),
+    PhraseList(
+        "mail",
+        "keep",
+        "Keep folders",
+        "These stay even when a drop phrase also matches.",
+        DEFAULT_MAIL_KEEP,
+    ),
+    PhraseList(
+        "mail",
+        "activity",
+        "Activity folders",
+        "Preferred folders. A body may be fetched when the folder is not closed.",
+        DEFAULT_MAIL_ACTIVITY,
+    ),
+    PhraseList(
+        "mail",
+        "signals",
+        "Gloda signals",
+        "A message tagged with one of these is dropped.",
+        DEFAULT_MAIL_SIGNALS,
+    ),
+    PhraseList(
+        "mail",
+        "closed",
+        "Do not open",
+        "Sent, Inbox, and All Mail stay closed and are not listed here.",
+        DEFAULT_MAIL_CLOSED,
+    ),
+    PhraseList(
+        "names",
+        "drop",
+        "Always drop names",
+        "A timesheet stays out even when the name also says budget.",
+        DEFAULT_NAME_DROP,
+    ),
+    PhraseList(
+        "names",
+        "keep",
+        "Keep names",
+        "A budget or expense form stays. A drop phrase still wins.",
+        DEFAULT_NAME_KEEP,
+    ),
+    PhraseList(
+        "names",
+        "exclude",
+        "Logistics names",
+        "Dropped unless a keep phrase matches.",
+        DEFAULT_NAME_EXCLUDE,
+    ),
+    PhraseList(
+        "slack",
+        "activity",
+        "Sample channels",
+        "Channel-name phrases for the sample hunt.",
+        DEFAULT_SLACK_ACTIVITY,
+    ),
+    PhraseList("slack", "exclude", "Drop channels", "Dropped from every Slack hunt.", ()),
+    PhraseList(
+        "meetings",
+        "exclude",
+        "Skip directories",
+        "Transcripts under these directory names are skipped.",
+        DEFAULT_MEETINGS_DIRS,
+    ),
+    PhraseList(
+        "meetings",
+        "solo",
+        "Solo kinds",
+        "Kept when you are the only speaker.",
+        DEFAULT_MEETINGS_SOLO,
+    ),
+    PhraseList(
+        "employer",
+        "dir_exclude",
+        "Skip directories",
+        ".git and .hg stay skipped.",
+        DEFAULT_EMPLOYER_DIRS,
+        (".git", ".hg"),
+    ),
+    PhraseList(
+        "employer",
+        "suffix_exclude",
+        "Skip file types",
+        "Office files and source text stay.",
+        DEFAULT_EMPLOYER_SUFFIXES,
+    ),
+    PhraseList(
+        "employer",
+        "file_exclude",
+        "Skip file names",
+        ".DS_Store and thumbs.db stay skipped.",
+        DEFAULT_EMPLOYER_FILES,
+        (".ds_store", "thumbs.db"),
+    ),
+    PhraseList(
+        "employer",
+        "roots",
+        "Career folders",
+        "Subfolders counted on the career list.",
+        DEFAULT_EMPLOYER_ROOTS,
+    ),
+    PhraseList(
+        "employer",
+        "slug_exclude",
+        "Skip employer roots",
+        "A folder whose name is one of these is left off the career list.",
+        DEFAULT_EMPLOYER_SLUGS,
+    ),
+    PhraseList(
+        "employer",
+        "exclude",
+        "Drop path phrases",
+        "A matching relative path is not ingested.",
+        (),
+    ),
+    PhraseList(
+        "applications",
+        "dir_exclude",
+        "Skip directories",
+        "Same idea as employer cache directories.",
+        DEFAULT_EMPLOYER_DIRS,
+        (".git", ".hg"),
+    ),
+    PhraseList(
+        "applications",
+        "file_exclude",
+        "Skip file names",
+        "Junk names left out of a job-application folder.",
+        DEFAULT_APPLICATION_FILES,
+    ),
+    PhraseList("applications", "exclude", "Drop path phrases", "A matching path is not ingested.", ()),
+    PhraseList("git", "exclude", "Drop commit phrases", "Matched against the subject and file names.", ()),
+    PhraseList("chatgpt", "exclude", "Drop titles", "Matched against the conversation title.", ()),
+    PhraseList("linkedin", "exclude", "Drop titles", "Matched against the record title.", ()),
+    PhraseList("transcripts", "exclude", "Drop names", "Matched against the project and file name.", ()),
+    PhraseList("pubs", "exclude", "Drop titles", "Matched against the publication title.", ()),
+)
 
 
 def terms(section: str, key: str, default: tuple[str, ...] = ()) -> tuple[str, ...]:
@@ -507,3 +668,75 @@ def _name_exclude_hit(terms: tuple[str, ...], folded: str) -> bool:
         if re.search(rf"(?:^|[^a-z0-9]){re.escape(raw)}(?:[^a-z0-9]|$)", folded):
             return True
     return False
+
+
+def phrase_list_groups() -> list[tuple[str, list[dict[str, object]]]]:
+    """File state for the workbench. Environment overrides are named, not edited."""
+    grouped: dict[str, list[dict[str, object]]] = {}
+    order: list[str] = []
+    for spec in PHRASE_LISTS:
+        if spec.section not in grouped:
+            grouped[spec.section] = []
+            order.append(spec.section)
+        adds = _file_layer(spec.section, spec.key) or ()
+        offs = _file_layer(spec.section, f"{spec.key}_off") or ()
+        off_folded = {_fold(item) for item in offs}
+        locked = {_fold(item) for item in spec.locked}
+        default_folded = {_fold(item) for item in spec.default}
+        checked = [
+            phrase
+            for phrase in spec.default
+            if _fold(phrase) in locked or _fold(phrase) not in off_folded
+        ]
+        extras = [phrase for phrase in adds if _fold(phrase) not in default_folded]
+        env = f"DOSSIER_{spec.section.upper()}_{spec.key.upper()}"
+        override = env if env in os.environ or f"{env}_OFF" in os.environ else ""
+        grouped[spec.section].append(
+            {
+                "section": spec.section,
+                "key": spec.key,
+                "title": spec.title,
+                "note": spec.note,
+                "default": spec.default,
+                "checked": checked,
+                "locked": spec.locked,
+                "extras": "\n".join(extras),
+                "env": override,
+            }
+        )
+    return [(name, grouped[name]) for name in order]
+
+
+def phrase_list_patch(
+    checked: set[tuple[str, str, str]],
+    extras: dict[tuple[str, str], str],
+) -> dict[str, dict[str, list[str]]]:
+    """Toml patch. Locked built-ins stay on. Blank extra lines are dropped."""
+    patch: dict[str, dict[str, list[str]]] = {}
+    for spec in PHRASE_LISTS:
+        section = patch.setdefault(spec.section, {})
+        on = {
+            phrase
+            for sec, key, phrase in checked
+            if sec == spec.section and key == spec.key
+        }
+        on.update(phrase for phrase in spec.locked if phrase in spec.default)
+        section[f"{spec.key}_off"] = [phrase for phrase in spec.default if phrase not in on]
+        seen = {_fold(phrase) for phrase in spec.default}
+        added: list[str] = []
+        for line in extras.get((spec.section, spec.key), "").splitlines():
+            phrase = line.strip()
+            folded = _fold(phrase)
+            if not folded or folded in seen:
+                continue
+            seen.add(folded)
+            added.append(phrase)
+        section[spec.key] = added
+    return patch
+
+
+def _file_layer(section: str, key: str) -> tuple[str, ...] | None:
+    block = _toml_section(section)
+    if key not in block:
+        return None
+    return tuple(_toml_list(section, key))
