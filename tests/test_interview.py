@@ -441,6 +441,7 @@ def test_doctor_prints_fts(tmp_path: Path, monkeypatch, capsys) -> None:
     assert "embed_model:" in out
     assert "vectors: 0" in out
     assert "ask.pubs: no" in out
+    assert "egress: no" in out
     assert "tailor: 0" in out
     assert "approve and defend before tailor will quote" in out
     assert "adapter pubs:" in out

@@ -16,7 +16,7 @@ from dossier.contributions import CONTRIBUTIONS, contribution
 from dossier.extract import ExtractProgress, extract_corpus
 from dossier.ingest_run import run_ingest_targets
 from dossier.interview import conduct
-from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
+from dossier.llm import EGRESS_NOTICE, egress_status, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
 from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
 from dossier.packs import load_pack, posting_pack
@@ -33,6 +33,7 @@ from dossier.paths import (
     grok_blobs_dir,
     pubs_collection,
     slack_export,
+    zotero_db,
     transcriptx_library,
     warehouse_db,
 )
@@ -166,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     p_prove.add_argument(
         "--pubs",
         action="store_true",
-        help="Include pubs adapter (empty until /search returns rows)",
+        help="Include the pubs adapter (the named Zotero collection)",
     )
 
     p_ref = sub.add_parser("referees", help="Read-only referee shortlist")
@@ -933,6 +934,7 @@ def _doctor(cfg: Config) -> int:
         print(f"sqlite: {sqlite3.sqlite_version}")
         print(f"fts5: {'yes' if corpus.fts_ok else 'no'}")
         print(f"provider: {cfg.llm_provider}")
+        print(egress_status(cfg))
         print(
             "max_calls: "
             + ("unlimited" if cfg.llm_max_calls == 0 else str(cfg.llm_max_calls))
@@ -970,7 +972,7 @@ def _doctor(cfg: Config) -> int:
             default = _default_path(item.name)
             seen = default is not None and item.source.detect(default)
             if item.name == "pubs" and seen:
-                rows = len(item.source.retriever.records())  # type: ignore[attr-defined]
+                rows = len(item.source.records_for(default))  # type: ignore[attr-defined]
                 print(f"adapter pubs: detected rows={rows}")
             else:
                 print(f"adapter {item.name}: {'detected' if seen else 'not detected'}")
@@ -1091,8 +1093,8 @@ def _default_path(name: str) -> Path | None:
     if name == "meetings":
         return transcriptx_library()
     if name == "pubs":
-        # Sentinel; PubsSource.detect uses retriever.ping(), not this path.
-        return Path("/nonexistent/zotero-rag-pubs")
+        # Detection uses the named collection inside this file, not the path.
+        return zotero_db()
     return None
 
 

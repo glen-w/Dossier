@@ -80,8 +80,9 @@ the CRM.
 `evidence.db` is created under `~/Documents/Dossier/data` unless you set
 `DOSSIER_DATA`. That file is gitignored.
 
-Copy `dossier.example.toml` to `$DOSSIER_DATA/dossier.toml`. Environment
-variables win over that file.
+Copy `dossier.example.toml` to `$DOSSIER_DATA/dossier.toml`. Environment variables win over that file. Slack ids, speaker names, and the mail-folder map go in `[identity]` there. They are not built into the package.
+
+Records stay on this machine. Text leaves only when a remote LLM is on, which is off by default (`litellm`, or `DOSSIER_LLM_ALLOW_REMOTE`). `dossier doctor` prints `egress: no` or `egress: yes`.
 
 | Variable | Use |
 | --- | --- |
@@ -112,14 +113,17 @@ variables win over that file.
 | `DOSSIER_RUN_PACK` | Question pack for `brief` and `run` (default `career`) |
 | `DOSSIER_RUN_POSTING` | Local posting path for the posting pack |
 | `DOSSIER_RUN_ADAPTERS` | Comma-separated adapter allowlist for `run` |
-| `DOSSIER_LLM_BASE_URL` | Ollama root |
-| `DOSSIER_LLM_ALLOW_REMOTE` | Allow a non-loopback Ollama URL |
-| `DOSSIER_LLM_API_BASE` | Base URL when provider is `litellm` |
+| `DOSSIER_LLM_BASE_URL` | Ollama root (default `http://127.0.0.1:11434`) |
+| `DOSSIER_LLM_ALLOW_REMOTE` | Off by default. Set `true` to allow a non-loopback Ollama host. The prompt may then leave this machine |
+| `DOSSIER_LLM_API_BASE` | Base URL when provider is `litellm`. That provider is remote LLM and prints an egress notice |
 | `DATA_DUMPS_WAREHOUSE` | DuckDB file for LinkedIn and the warehouse paths of ChatGPT, Slack, and mail |
 | `DOSSIER_MAIL_ROOT` | Thunderbird tree for mbox body fetch (default `~/email`) |
+| `DOSSIER_MAIL_ACCOUNTS` | `email:folder` pairs, comma-separated. Overlays `[identity.mail_accounts]` |
 | `DOSSIER_SLACK_USER_IDS` | Comma-separated Slack user ids or display names to treat as you |
 | `DOSSIER_SEEKER_PER_STRATUM` | Max hits per lens/kind/year (default 20) |
-| `DOSSIER_SEEKER_OVERALL` | Max seeker records per ingest (default 400) |
+| `DOSSIER_SEEKER_OVERALL` | Max seeker records per ingest (default 1000) |
+| `DOSSIER_SEEKER_YEAR_FLOOR` | Extra document hits kept per year before score fill (default 15) |
+| `DOSSIER_SEEKER_YEAR_CEILING` | Max hits from one calendar year (default 80) |
 | `DOSSIER_APPLICATIONS` | Folder of prior application packs |
 | `DOSSIER_CURSOR_PROJECTS` | Cursor projects root (transcripts) |
 | `DOSSIER_GROK_BLOBS` | Optional extra transcript folder |

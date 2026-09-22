@@ -81,6 +81,8 @@ def pubs_top_k() -> int:
 
 
 def pubs_collection() -> str:
+    if raw := os.environ.get("DOSSIER_PUBS_COLLECTION", "").strip():
+        return raw
     return _toml_str("pubs", "collection")
 
 

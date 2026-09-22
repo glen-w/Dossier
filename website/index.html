@@ -153,9 +153,12 @@
         <div class="wrap">
           <h2>Stays on your machine</h2>
           <p class="section-lead">
-            Ollama on loopback by default. Cloud completions are opt-in and print
-            an egress notice. Dumps, warehouse files, and <code>evidence.db</code>
-            stay out of git. No Twenty writes. No auto-attach of a referee name.
+            Records stay on this machine. The only way text leaves is a remote
+            LLM, off by default: a LiteLLM provider, or
+            <code>DOSSIER_LLM_ALLOW_REMOTE</code> for a non-loopback Ollama.
+            That prints an egress notice first. Dumps, warehouse files, and
+            <code>evidence.db</code> stay out of git. No Twenty writes. No
+            auto-attach of a referee name.
           </p>
         </div>
       </section>

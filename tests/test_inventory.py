@@ -147,15 +147,16 @@ def test_career_brief_lists_records_not_a_shared_verb(corpus: Corpus) -> None:
     assert "LinkedIn: Pedagogy, Facilitation" in skills.text
     assert "slack://report" in skills.citations
     delivered = by_id["delivered"]
-    assert "cooling sidebar.docx" in delivered.text
+    assert "Cooling sidebar" in delivered.text or "cooling sidebar.docx" in delivered.text
     assert "image.png" not in delivered.text
     assert "gsr ocean chapter.docx" not in delivered.text
+    assert "Ocean chapter" not in delivered.text
     contributions = by_id["contributions"]
-    assert "peer review.docx" in contributions.text
-    assert "cooling sidebar.docx" not in contributions.text
+    assert "Peer review" in contributions.text or "peer review.docx" in contributions.text
+    assert "cooling sidebar" not in contributions.text.casefold()
     publications = by_id["publications"]
     assert "See the library" in publications.text
-    assert "gsr ocean chapter.docx" in publications.text
+    assert "Ocean chapter" in publications.text or "gsr ocean chapter.docx" in publications.text
     assert "https://example.test/library" in publications.citations
 
 
@@ -187,6 +188,85 @@ def test_draft_copies_do_not_crowd_out_an_older_file(corpus: Corpus) -> None:
     assert "ocean mcs paper.docx" in text
     assert "registration form" not in text
     assert text.count("cooling sidebar") == 1
+
+
+def test_year_spread_keeps_early_and_late_reports(corpus: Corpus) -> None:
+    for name, year in (
+        ("early ocean report.docx", "2012"),
+        ("mid ocean report.docx", "2018"),
+        ("late ocean report.docx", "2025"),
+        ("agenda.docx", "2024"),
+        ("timesheet 2020.xlsx", "2020"),
+    ):
+        corpus.upsert_record(
+            Record(
+                id=name,
+                source="mbox",
+                uri=f"mbox://glen@example/{name}",
+                title=name,
+                text=(
+                    f"Lens: delivered\nKind: report\nYear: {year}\n"
+                    f"Org: IDDRI\nArtifacts: {name}"
+                ),
+            )
+        )
+    corpus.upsert_record(
+        Record(
+            id="done-ping",
+            source="slack",
+            uri="slack://done",
+            title="*Done*",
+            text="Lens: delivered\nKind: report\nYear: 2024\nArtifacts: status.docx",
+        )
+    )
+    items = run_pack(
+        corpus,
+        [PackQuestion("delivered", "What work did I deliver?", lens="delivered")],
+        _cfg(),
+        _Boom(),
+        mode="exact",
+    )
+    text = items[0][1].text
+    assert "2012" in text
+    assert "2025" in text
+    assert "agenda.docx" not in text
+    assert "timesheet" not in text
+    assert "*Done*" not in text
+
+
+def test_employer_publication_joins_publications_without_dup_stem(corpus: Corpus) -> None:
+    corpus.upsert_record(
+        Record(
+            id="mail-paper",
+            source="mbox",
+            uri="mbox://iddri/Publications/mid-1",
+            title="MCS paper draft",
+            text=(
+                "Lens: delivered\nKind: paper\nYear: 2014\nOrg: IDDRI\n"
+                "Artifacts: mcs paper.docx"
+            ),
+        )
+    )
+    corpus.upsert_record(
+        Record(
+            id="emp-paper",
+            source="employer",
+            uri="file://employer/work/publications/2014/mcs paper.pdf",
+            title="mcs paper.pdf",
+            text="Employer folder file 'publications/2014/mcs paper.pdf'. Binary body not ingested.",
+            table="employer.files",
+        )
+    )
+    items = run_pack(
+        corpus,
+        [PackQuestion("publications", "What did I publish?")],
+        _cfg(),
+        _Boom(),
+        mode="exact",
+    )
+    text = items[0][1].text
+    assert "mcs paper" in text.casefold()
+    assert text.casefold().count("mcs paper") == 1
 
 
 def test_loose_approved_card_does_not_answer_roles(corpus: Corpus) -> None:

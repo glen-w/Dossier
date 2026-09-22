@@ -31,7 +31,7 @@ IDDRI mail is research/teaching. REN21 Slack is GSR/GFR production. Quotas exist
 
 Glen: read `slack.*` in the data_dumps warehouse. Thin user: a Slack export zip or folder (`users.json` plus channel JSON), via `DOSSIER_SLACK_EXPORT` or the path you pass. Quotas apply to both. The export is not copied into git.
 
-Identity: `U05E73N5733` and `UUDS0NJ9W`, or `DOSSIER_SLACK_USER_IDS` (ids or a display name). Warehouse hunts stay on Glen-touched rows: file posts, long messages, hot threads, file-conversations, files that mention him or sit in a thread he replied to, samples from GSR/research/events channels. The export path keeps messages from those ids.
+Identity: `DOSSIER_SLACK_USER_IDS` (ids or a display name), or `[identity] slack_user_ids` in gitignored `$DOSSIER_DATA/dossier.toml`. Nothing is built in. Warehouse hunts stay on those rows: file posts, long messages, hot threads, file-conversations, files that mention you or sit in a thread you replied to, samples from GSR/research/events channels. The export path keeps messages from those ids. When ids are unset, speaker names from that same file can match a Slack display name.
 
 ## Mail
 
@@ -49,14 +49,14 @@ Glen: `uv run dossier ingest --adapter mbox` reads the warehouse and fetches fro
 
 Read a TranscriptX library (`DOSSIER_TRANSCRIPTX`, else `TRANSCRIPTX_TRANSCRIPTS_DIR`, else `~/Documents/transcripts`). Speaker names live in `metadata/speaker_maps/*.speaker_map.json`. A folder of JSON files with colocated `.speaker_map.json` sidecars works the same way. Dossier does not import the TranscriptX package.
 
-Identity: `DOSSIER_SPEAKER_NAMES` (comma-separated display names). When unset, `Glen Wright` and `Glen`. A `SPEAKER_00` → `SPEAKER_00` self-map is not a name. Ignored speakers are skipped. A segment may name the diarized id (`SPEAKER_00`, `0`) or the display name.
+Identity: `DOSSIER_SPEAKER_NAMES` (comma-separated display names), or `[identity] speaker_names` in the gitignored toml. When both are empty, no speaker is you. A `SPEAKER_00` → `SPEAKER_00` self-map is not a name. Ignored speakers are skipped. A segment may name the diarized id (`SPEAKER_00`, `0`) or the display name.
 
 A meeting is kept when you are a named speaker and someone else spoke, or you are the only speaker and the filename is an event (workshop, webinar, teaching, slides). Solo notes are skipped. Conflicted copies and `__inbox` duplicates of a file already in the library are skipped. The stored text is your turns, capped, plus the other named people. Their speech stays in the library.
 
 ## Quotas
 
-Default 20 hits per (source, lens, kind, year), 400 overall. Override `DOSSIER_SEEKER_PER_STRATUM` / `DOSSIER_SEEKER_OVERALL`. At least one hit per populated stratum when possible.
+Default 20 hits per (source, lens, kind, year), 1000 overall. After one hit per stratum, a year floor keeps up to 15 further document hits per calendar year (round-robin across years, skipping logistics noise) before score fill. A year ceiling (default 80) stops a busy recent year from eating the budget. Override `DOSSIER_SEEKER_PER_STRATUM`, `DOSSIER_SEEKER_OVERALL`, `DOSSIER_SEEKER_YEAR_FLOOR`, and `DOSSIER_SEEKER_YEAR_CEILING`. At least one hit per populated stratum when possible.
 
 ## Extract
 
-`dossier extract --source slack` (or `mbox`, or `meetings`) sends only those snippets to Ollama. Cloud still prints an egress notice. Work mail, Slack, and meeting transcripts do not leave the machine by default.
+`dossier extract --source slack` (or `mbox`, or `meetings`) sends only those snippets to the model. By default that model is Ollama on loopback, so the snippets stay on this machine. A remote LLM is off unless you set provider `litellm` or `DOSSIER_LLM_ALLOW_REMOTE`; the CLI then prints an egress notice before the prompt is sent.

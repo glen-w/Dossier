@@ -7,7 +7,7 @@ provider = "ollama" # ollama | litellm | off
 model = "qwen3.8:latest"
 embed_model = "nomic-embed-text"
 base_url = "http://127.0.0.1:11434"
-allow_remote = false
+allow_remote = false # off. true permits a non-loopback Ollama host; the prompt may then leave
 max_calls = 0 # 0 = unlimited; set a positive cap to stop early
 timeout = 300 # seconds per Ollama generate call
 # api_base = "https://example.invalid/v1"
@@ -26,6 +26,15 @@ pubs = false # one /search per ask; hits are not written into the corpus
 
 [tailor]
 # name = "Your Name"
+
+[identity]
+# Slack ids, the names meetings should treat as you, and which mail
+# folder holds each account. This block stays in the gitignored copy.
+# slack_user_ids = ["U00000000"]
+# speaker_names = ["Your Name"]
+
+# [identity.mail_accounts]
+# "you@example.com" = "mail-folder"
 
 [employer]
 # paths = ["/absolute/path/to/one/employer/folder"]
@@ -57,5 +66,5 @@ pack = "career"
 # collection = "your-zotero-collection"
 # seed = "publications"
 # top_k = 50
-# url = "http://127.0.0.1:8012"
+# url = "http://127.0.0.1:8012" # loopback only; a remote host is not contacted
 # zotero_db = "/absolute/path/to/zotero.sqlite"

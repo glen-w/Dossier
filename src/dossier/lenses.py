@@ -25,20 +25,21 @@ KINDS = (
     "other",
 )
 
+# Folder and subject patterns first. Extension is a fallback when nothing matches.
 _KIND_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("workshop", re.compile(r"workshop")),
     ("webinar", re.compile(r"webinar")),
-    ("teaching", re.compile(r"teach|course|lecture|\bseminar\b")),
+    ("teaching", re.compile(r"teach|course|lecture|\bseminar\b|\bpanel\b")),
     ("side_event", re.compile(r"side[- ]event")),
-    ("review", re.compile(r"peer review|\breview\b")),
-    ("brief", re.compile(r"\bbrief")),
-    ("paper", re.compile(r"\bpaper\b|marine policy|publication")),
+    ("review", re.compile(r"peer[- ]?review|\bto review\b|\breviewer")),
+    ("brief", re.compile(r"\bbrief|\bfactsheet")),
+    ("paper", re.compile(r"\bpaper\b|marine policy|publication|\bjournal\b|\bsubmission\b|\bhandbook\b")),
     ("book", re.compile(r"\bbook\b")),
     ("chapter", re.compile(r"chapter|\bsection_|\bgsr_section")),
     ("editing", re.compile(r"\bedit|\bdesign_")),
-    ("outreach", re.compile(r"outreach|\bcomms|\bcomm_")),
-    ("report", re.compile(r"\bgsr_|\bgfr_|\breport\b")),
-    ("data", re.compile(r"\bdata\b|knowledge")),
+    ("outreach", re.compile(r"outreach|\bcomms|\bcomm_|\bblog\b|\bspeech\b")),
+    ("report", re.compile(r"\bgsr_|\bgfr_|\breport\b|\bconsultation\b")),
+    ("data", re.compile(r"\bdataset\b|\bknowledge[- ]?product\b")),
 )
 
 _SKILL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -68,6 +69,22 @@ _EVENT_KINDS = frozenset(
 )
 _DOC_EXT = re.compile(r"\.(pdf|docx?|pptx?|xlsx?|csv)$", re.I)
 
+# Logistics and life-admin. Shared by inventory listing and seeker year floor.
+_NOISE = re.compile(
+    r"(?:^|[^a-z])(?:"
+    r"form|consent|registration|invoice|receipt|passport|duplicat|bulletin|"
+    r"judging|appointment|engagement|timesheet|time[- ]?sheet|"
+    r"attendee report|logistics(?: note)?|ordonnance|"
+    r"chatgpt|gemini testing|"
+    r"\*\s*done\s*\*|image\.png|image\.jpe?g"
+    r")(?:[^a-z]|$)|"
+    r"(?:^|/)agenda\.docx?$|"
+    r"^invitation\b|"
+    r"^thank you\b|"
+    r"^fwd:\s*$",
+    re.I,
+)
+
 
 def kinds_mentioned(text: str) -> tuple[str, ...]:
     """Kinds whose names or patterns appear in a local posting. No model."""
@@ -79,6 +96,14 @@ def kinds_mentioned(text: str) -> tuple[str, ...]:
     return tuple(found)
 
 
+def is_noise_name(*parts: str) -> bool:
+    """True for logistics, life-admin, or status pings that are not career evidence."""
+    blob = " ".join(p for p in parts if p).strip()
+    if not blob:
+        return False
+    return bool(_NOISE.search(blob))
+
+
 def infer_kind(
     *,
     folder: str = "",
@@ -86,15 +111,16 @@ def infer_kind(
     subject: str = "",
     artifacts: tuple[str, ...] = (),
 ) -> str:
+    """Folder and subject beat file extension. Bare spreadsheets stay tables."""
     arts = " ".join(artifacts).lower()
-    if re.search(r"\.pptx?$", arts):
-        return "slides"
-    if re.search(r"\.(xlsx?|csv)$", arts):
-        return "tables"
     blob = f"{folder} {channel} {subject} {arts}".lower()
     for kind, pattern in _KIND_PATTERNS:
         if pattern.search(blob):
             return kind
+    if re.search(r"\.pptx?$", arts):
+        return "slides"
+    if re.search(r"\.(xlsx?|csv)$", arts):
+        return "tables"
     return "other"
 
 

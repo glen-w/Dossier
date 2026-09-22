@@ -1,4 +1,8 @@
-"""Own-pubs retrieve. Does not embed hoops/ocean. Live ingest stays gated."""
+"""Own-pubs retrieve. The named Zotero collection, or a loopback /search.
+
+Does not embed a library and does not read PDFs. A configured collection is
+the whole scope: other collections are not ingested.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,9 @@ from typing import Protocol
 
 import httpx
 
+from dossier.llm.validate import host_is_local
 from dossier.paths import pubs_seed, pubs_top_k, pubs_url
+from dossier.sources.zotero import collection_records
 from dossier.store import Corpus, Record
 from dossier.util import record_id
 
@@ -51,10 +57,11 @@ class StubPubsRetriever:
 
 
 class HttpPubsRetriever:
-    """HTTP client for zotero-rag-pubs.
+    """HTTP client for zotero-rag-pubs on loopback.
 
     Contract: ``POST {url}/search`` with ``{"query", "top_k"}`` returns
     ``{"hits": [{"uri","title","text", ...}]}``. Ping tries ``/health`` then ``/``.
+    A host other than localhost, 127.0.0.1, or ::1 is not contacted.
     Live ingest stays off until the collection name and scope are confirmed.
     """
 
@@ -62,6 +69,8 @@ class HttpPubsRetriever:
         self.url = (url or pubs_url()).rstrip("/")
 
     def ping(self) -> bool:
+        if not host_is_local(self.url):
+            return False
         for path in ("/health", "/"):
             try:
                 with httpx.Client(timeout=2.0) as client:
@@ -77,7 +86,7 @@ class HttpPubsRetriever:
 
     def search(self, query: str, *, top_k: int = 5) -> list[Record]:
         text = query.strip()
-        if not text:
+        if not text or not host_is_local(self.url):
             return []
         try:
             with httpx.Client(timeout=30.0) as client:
@@ -124,14 +133,21 @@ class PubsSource:
     def detect(self, path: Path) -> bool:
         if _is_pubs_fixture(path):
             return True
+        local = collection_records()
+        if local is not None:
+            return bool(local)
         return self.retriever.ping()
 
-    def load(self, path: Path, corpus: Corpus) -> None:
+    def records_for(self, path: Path) -> list[Record]:
         if _is_pubs_fixture(path):
-            for rec in _records_from_fixture(path):
-                corpus.upsert_record(rec)
-            return
-        for rec in self.retriever.records():
+            return _records_from_fixture(path)
+        local = collection_records()
+        if local is not None:
+            return local
+        return list(self.retriever.records())
+
+    def load(self, path: Path, corpus: Corpus) -> None:
+        for rec in self.records_for(path):
             corpus.upsert_record(rec)
 
     def tables(self) -> list[str]:

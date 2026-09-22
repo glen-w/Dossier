@@ -11,7 +11,7 @@ from dossier.store import Corpus
 
 @pytest.fixture(autouse=True)
 def _default_speaker(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("DOSSIER_SPEAKER_NAMES", raising=False)
+    monkeypatch.setenv("DOSSIER_SPEAKER_NAMES", "Glen Wright,Glen")
 
 
 def _write(

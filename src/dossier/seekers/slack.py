@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 import duckdb
 
-from dossier.identity import DEFAULT_SLACK_USER_IDS, slack_user_ids_from_env
+from dossier.identity import configured_slack_user_ids, resolve_speaker_names
 from dossier.lenses import infer_kind, infer_lenses, infer_org, infer_skills, primary_lens
 from dossier.seekers.hits import Hit
 from dossier.sources.warehouse import has_table
@@ -21,29 +21,31 @@ SAMPLE_MIN_LEN = 80
 
 
 def resolve_slack_user_ids(conn: duckdb.DuckDBPyConnection) -> tuple[str, ...]:
-    env = slack_user_ids_from_env()
-    if env:
-        return env
-    if not has_table(conn, "slack.users"):
-        return DEFAULT_SLACK_USER_IDS
-    placeholders = ",".join("?" for _ in DEFAULT_SLACK_USER_IDS)
-    present = conn.execute(
-        f"SELECT user_id FROM slack.users WHERE user_id IN ({placeholders})",
-        list(DEFAULT_SLACK_USER_IDS),
-    ).fetchall()
-    ids = tuple(str(r[0]) for r in present if r and r[0])
-    if ids:
-        return ids
+    configured = configured_slack_user_ids()
+    if configured:
+        return configured
+    names = resolve_speaker_names()
+    if not names or not has_table(conn, "slack.users"):
+        return ()
+    clauses: list[str] = []
+    params: list[str] = []
+    for name in names:
+        needle = f"%{name.casefold()}%"
+        clauses.append(
+            "("
+            "lower(coalesce(real_name, '')) LIKE ? "
+            "OR lower(coalesce(handle, '')) LIKE ? "
+            "OR lower(coalesce(display_name, '')) LIKE ?"
+            ")"
+        )
+        params.extend((needle, needle, needle))
     rows = conn.execute(
-        """
+        f"""
         SELECT user_id FROM slack.users
         WHERE is_bot IS NOT TRUE
-          AND (
-            lower(coalesce(real_name, '')) LIKE '%glen%'
-            OR lower(coalesce(handle, '')) LIKE '%glen%'
-            OR lower(coalesce(display_name, '')) LIKE '%glen%'
-          )
-        """
+          AND ({" OR ".join(clauses)})
+        """,
+        params,
     ).fetchall()
     return tuple(str(r[0]) for r in rows if r and r[0])
 

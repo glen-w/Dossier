@@ -43,7 +43,7 @@ def test_http_retriever_maps_search_hits(monkeypatch) -> None:
             super().__init__(*args, **kwargs)
 
     monkeypatch.setattr("dossier.sources.pubs.httpx.Client", Client)
-    retriever = HttpPubsRetriever("http://pubs.test")
+    retriever = HttpPubsRetriever("http://127.0.0.1:8012")
     assert retriever.ping()
     rows = retriever.records()
     assert len(rows) == 2
@@ -63,7 +63,18 @@ def test_http_retriever_empty_on_error(monkeypatch) -> None:
             super().__init__(*args, **kwargs)
 
     monkeypatch.setattr("dossier.sources.pubs.httpx.Client", Client)
-    assert HttpPubsRetriever("http://pubs.test").records() == []
+    assert HttpPubsRetriever("http://127.0.0.1:8012").records() == []
+
+
+def test_non_loopback_pubs_url_is_not_contacted(monkeypatch) -> None:
+    def boom(*_args, **_kwargs):
+        raise AssertionError("pubs must not open a socket to a remote host")
+
+    monkeypatch.setattr("dossier.sources.pubs.httpx.Client", boom)
+    remote = HttpPubsRetriever("http://pubs.example")
+    assert remote.ping() is False
+    assert remote.records() == []
+    assert remote.search("coastal governance") == []
 
 
 def test_pubs_load_from_http_search(tmp_path: Path, corpus: Corpus, monkeypatch) -> None:
@@ -91,7 +102,7 @@ def test_pubs_load_from_http_search(tmp_path: Path, corpus: Corpus, monkeypatch)
             super().__init__(*args, **kwargs)
 
     monkeypatch.setattr("dossier.sources.pubs.httpx.Client", Client)
-    src = PubsSource(retriever=HttpPubsRetriever("http://pubs.test"))
+    src = PubsSource(retriever=HttpPubsRetriever("http://127.0.0.1:8012"))
     src.load(Path("/nonexistent/zotero-rag-pubs"), corpus)
     assert len(corpus.records("pubs")) == 1
     assert corpus.records("pubs")[0].uri == "zotero://pubs/live"

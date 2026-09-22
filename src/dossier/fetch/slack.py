@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 import duckdb
 
-from dossier.identity import DEFAULT_SLACK_USER_IDS, slack_user_ids_from_env
+from dossier.identity import configured_slack_user_ids
 from dossier.seekers.hits import Hit
 from dossier.sources.warehouse import has_table
 
@@ -19,7 +19,7 @@ def fetch_slack_body(
 ) -> str:
     if not hit.channel_id or not hit.ts:
         return hit.preview
-    ids = tuple(glen_ids or slack_user_ids_from_env() or DEFAULT_SLACK_USER_IDS)
+    ids = tuple(glen_ids or configured_slack_user_ids())
     row = conn.execute(
         """
         SELECT coalesce(text, ''), coalesce(thread_ts, ts),

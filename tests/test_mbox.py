@@ -64,6 +64,7 @@ def test_gloda_warehouse_skips_noise_and_does_not_open_sent_mail(
     sent.parent.mkdir(parents=True)
     sent.write_text("From ignored\n\nshould not be parsed\n", encoding="utf-8")
     monkeypatch.setenv("DOSSIER_MAIL_ROOT", str(mail))
+    monkeypatch.setenv("DOSSIER_MAIL_ACCOUNTS", "person@example.test:iddri")
 
     db = tmp_path / "catalog.duckdb"
     conn = duckdb.connect(str(db))
@@ -87,9 +88,9 @@ def test_gloda_warehouse_skips_noise_and_does_not_open_sent_mail(
     conn.execute(
         """
         INSERT INTO thunderbird.folders VALUES
-        (1, 'Teaching', 'glen.wright@sciencespo.fr'),
-        (2, 'Newsletters', 'glen.wright@sciencespo.fr'),
-        (3, 'Sent Mail', 'glen.wright@sciencespo.fr')
+        (1, 'Teaching', 'person@example.test'),
+        (2, 'Newsletters', 'person@example.test'),
+        (3, 'Sent Mail', 'person@example.test')
         """
     )
     conn.execute(
@@ -118,7 +119,7 @@ def test_gloda_warehouse_skips_noise_and_does_not_open_sent_mail(
     assert "bbnj-brief.pdf" in sent_rec.text
     assert fetch_mbox_body(
         mail,
-        account_key="glen.wright@sciencespo.fr",
+        account_key="person@example.test",
         folder_name="Sent Mail",
         header_message_id="<sent-1@example.test>",
     ) == ""
@@ -132,9 +133,10 @@ def test_oversize_mbox_is_not_opened(tmp_path: Path, monkeypatch) -> None:
     path.parent.mkdir(parents=True)
     path.write_text(_MBOX, encoding="utf-8")
     monkeypatch.setenv("DOSSIER_MBOX_MAX_BYTES", "1")
+    monkeypatch.setenv("DOSSIER_MAIL_ACCOUNTS", "person@example.test:iddri")
     body = fetch_mbox_body(
         mail,
-        account_key="glen.wright@sciencespo.fr",
+        account_key="person@example.test",
         folder_name="Teaching",
         header_message_id="<fixture-1@example.test>",
         max_bytes=1,

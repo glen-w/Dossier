@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dossier.fetch.snippet import record_from_hit
-from dossier.identity import DEFAULT_SLACK_USER_IDS, slack_user_ids_from_env
+from dossier.identity import configured_slack_user_ids, resolve_speaker_names
 from dossier.lenses import infer_kind, infer_lenses, infer_org, infer_skills, primary_lens
 from dossier.seekers.hits import Hit, merge_hits
 from dossier.seekers.quota import apply_quotas
@@ -124,10 +124,10 @@ def _year(ts: str) -> int:
 
 def _wanted_ids(users: list[dict]) -> set[str]:
     by_id = {str(user.get("id") or ""): user for user in users if user.get("id")}
-    env = slack_user_ids_from_env()
-    if env:
+    configured = configured_slack_user_ids()
+    if configured:
         wanted: set[str] = set()
-        for token in env:
+        for token in configured:
             if token in by_id:
                 wanted.add(token)
                 continue
@@ -136,13 +136,13 @@ def _wanted_ids(users: list[dict]) -> set[str]:
                 if any(needle in name.casefold() for name in _names(user)):
                     wanted.add(user_id)
         return wanted
-    present = {user_id for user_id in DEFAULT_SLACK_USER_IDS if user_id in by_id}
-    if present:
-        return present
+    names = tuple(name.casefold() for name in resolve_speaker_names())
+    if not names:
+        return set()
     return {
         user_id
         for user_id, user in by_id.items()
-        if any("glen" in name.casefold() for name in _names(user))
+        if any(needle in label.casefold() for needle in names for label in _names(user))
     }
 
 

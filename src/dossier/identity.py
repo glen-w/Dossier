@@ -1,4 +1,8 @@
-"""Local identities for seekers. No CRM. Override with env."""
+"""Local identities for seekers. No CRM.
+
+Shipped defaults are empty. Names, Slack ids, and the mail-folder map
+come from the environment or from gitignored ``$DOSSIER_DATA/dossier.toml``.
+"""
 
 from __future__ import annotations
 
@@ -6,14 +10,7 @@ import os
 import re
 from pathlib import Path
 
-DEFAULT_SLACK_USER_IDS = ("U05E73N5733", "UUDS0NJ9W")
-DEFAULT_SPEAKER_NAMES = ("Glen Wright", "Glen")
-
-DEFAULT_MAIL_ACCOUNTS: dict[str, str] = {
-    "glen.wright@sciencespo.fr": "iddri",
-    "glen.w.wright@gmail.com": "gmail",
-    "garedebao@gmail.com": "gdb",
-}
+from dossier.paths import _toml_list, _toml_section
 
 SKIP_BODY_FOLDERS = frozenset(
     {
@@ -71,6 +68,13 @@ def slack_user_ids_from_env() -> tuple[str, ...]:
     return ()
 
 
+def configured_slack_user_ids() -> tuple[str, ...]:
+    """Env, else ``[identity] slack_user_ids`` in the local toml. Never a built-in id."""
+    if env := slack_user_ids_from_env():
+        return env
+    return tuple(_toml_list("identity", "slack_user_ids"))
+
+
 def speaker_names_from_env() -> tuple[str, ...]:
     raw = os.environ.get("DOSSIER_SPEAKER_NAMES", "").strip()
     if raw:
@@ -79,14 +83,30 @@ def speaker_names_from_env() -> tuple[str, ...]:
 
 
 def resolve_speaker_names() -> tuple[str, ...]:
-    return speaker_names_from_env() or DEFAULT_SPEAKER_NAMES
+    """Env, else ``[identity] speaker_names``. Empty means you are not named."""
+    if env := speaker_names_from_env():
+        return env
+    return tuple(_toml_list("identity", "speaker_names"))
+
+
+def _file_mail_accounts() -> dict[str, str]:
+    block = _toml_section("identity").get("mail_accounts")
+    if not isinstance(block, dict):
+        return {}
+    out: dict[str, str] = {}
+    for email, folder in block.items():
+        key, name = str(email).strip().lower(), str(folder).strip()
+        if key and name:
+            out[key] = name
+    return out
 
 
 def mail_account_map() -> dict[str, str]:
+    """Local toml, with ``DOSSIER_MAIL_ACCOUNTS`` (``email:folder`` pairs) overlaid."""
+    out = _file_mail_accounts()
     raw = os.environ.get("DOSSIER_MAIL_ACCOUNTS", "").strip()
     if not raw:
-        return dict(DEFAULT_MAIL_ACCOUNTS)
-    out: dict[str, str] = dict(DEFAULT_MAIL_ACCOUNTS)
+        return out
     for part in raw.split(","):
         if ":" not in part:
             continue

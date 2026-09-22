@@ -45,6 +45,7 @@ No new product surface. Find what breaks when it is not Glen’s laptop and not 
 - Second person (or Glen running as a thin user) installs from the README, enables only adapters they have, and completes ingest → extract → approve → ask → packet (and optional brief, tailor, or referees).
 - Acceptance checklist: refusals that should refuse, citations that resolve, egress notice when cloud is opted in, Twenty read-only when used, no dumps or evidence DB in git.
 - Docs and `doctor` messages fixed for every footgun found; features deferred, not patched in as drive-bys.
+- Career inventory covers years across the locker (seeker year floor, employer career folders at read time), not only the three newest files per kind.
 - **1.0** means that path is boring enough to call done — not that every Later idea below has shipped.
 
 ## Boundaries that stay
@@ -53,8 +54,8 @@ These are not delayed features; they are refuse lines.
 
 - No Twenty writes (Tasks, Opportunities, Notes, last-contacted)
 - No auto-attach of a referee name to an application
-- No cloud LLM default; egress notice when a completion can leave the machine
+- No cloud LLM default. Text leaves the machine only when the provider is `litellm` or `DOSSIER_LLM_ALLOW_REMOTE` is set. The CLI prints an egress notice first. `dossier doctor` reports `egress: no` or `egress: yes`
 - No 26G IDDRI mbox stream; no Sent Mail as a folder walker; no re-embed of hoops/ocean
 - No plugin directory or entry-point scan
 - No Docker image for the locker. It installs with `uv` on the host. A pubs compose project, if any, stays separate and gated
-- Dumps, warehouse, LanceDB, `evidence.db`, `.env`, mbox, and PDFs stay off git
+- Dumps, warehouse, LanceDB, `evidence.db`, `.env`, mbox, and PDFs stay off git. Before every push, `python3 scripts/release/check_gitignore.py` must pass

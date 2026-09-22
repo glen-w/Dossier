@@ -6,7 +6,11 @@ from urllib.parse import urlparse
 
 LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
-EGRESS_NOTICE = "Remote LLM provider — record text may leave this machine."
+EGRESS_NOTICE = (
+    "Remote LLM is on — the prompt for this call may leave this machine. "
+    "The corpus file stays local. This stays off unless the provider is litellm "
+    "or DOSSIER_LLM_ALLOW_REMOTE is set."
+)
 
 
 class LlmConfigError(Exception):
@@ -49,8 +53,19 @@ def validate_llm_api_base(url: str | None) -> None:
         raise LlmConfigError("llm.api_base must use http or https.")
 
 
+def host_is_local(url: str) -> bool:
+    """True for loopback hosts. Anything else can leave the machine."""
+    host = urlparse((url or "").strip()).hostname
+    return bool(host) and host in LOCAL_HOSTS
+
+
 def llm_egress_is_remote(cfg) -> bool:
-    """True when completions may leave the machine."""
+    """True when a model call is allowed to leave the machine.
+
+    Off by default. On only for provider ``litellm``, or Ollama with
+    ``allow_remote``. A non-loopback Ollama URL without that flag is
+    refused by the client; this still reports it so the CLI can say why.
+    """
     if not cfg.llm_enabled:
         return False
     if cfg.llm_provider == "litellm":
@@ -62,3 +77,19 @@ def llm_egress_is_remote(cfg) -> bool:
         return False
     except LlmConfigError:
         return True
+
+
+def egress_status(cfg) -> str:
+    """One line for ``dossier doctor``. Records stay local unless remote LLM is on."""
+    if not cfg.llm_enabled:
+        return "egress: no (provider off; records stay on this machine)"
+    if cfg.llm_provider == "litellm" or cfg.llm_allow_remote:
+        return "egress: yes (remote LLM; the prompt may leave this machine)"
+    try:
+        validate_ollama_url(cfg.llm_base_url, False)
+    except LlmConfigError:
+        return (
+            "egress: no (remote URL blocked; "
+            "set DOSSIER_LLM_ALLOW_REMOTE to opt in)"
+        )
+    return "egress: no (Ollama on loopback; records stay on this machine)"

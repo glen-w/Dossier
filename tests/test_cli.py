@@ -213,6 +213,7 @@ def test_cli_ingest_slack_synthetic_warehouse(tmp_path: Path, monkeypatch) -> No
     import duckdb
 
     monkeypatch.setenv("DOSSIER_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("DOSSIER_SLACK_USER_IDS", "UTESTSLACK")
     db = tmp_path / "catalog.duckdb"
     conn = duckdb.connect(str(db))
     conn.execute("CREATE SCHEMA slack")
@@ -232,7 +233,7 @@ def test_cli_ingest_slack_synthetic_warehouse(tmp_path: Path, monkeypatch) -> No
     conn.execute(
         """
         INSERT INTO slack.messages VALUES
-        ('C1', '1.0', 'policy', 'U05E73N5733', 'Glen', ?, 2023, ?, 0, 0, 0,
+        ('C1', '1.0', 'policy', 'UTESTSLACK', 'Glen', ?, 2023, ?, 0, 0, 0,
          FALSE, FALSE, FALSE, NULL)
         """,
         [long_text, len(long_text)],

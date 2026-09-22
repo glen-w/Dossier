@@ -1,26 +1,77 @@
-# Corpus and secrets stay off git
+# Corpus, exports, and secrets stay off git.
+# The required shape is checked by scripts/release/check_gitignore.py.
+# Run that before every push. A failure means do not push.
+# Identity (mail map, Slack ids, speaker names) belongs in
+# $DOSSIER_DATA/dossier.toml, which this file ignores.
+
+# Local config
 .env
 .env.*
+dossier.toml
 private/
+secrets/
+credentials.json
+credentials*.json
+*.pem
+*.key
+
+# Corpus and indexes
 data/
 warehouse/
-*.duckdb
-*.lance
-lancedb/
-evidence.db
-*.mbox
-*.pdf
 data_dumps_raw/
+lancedb/
+*.duckdb
+*.duckdb.wal
+*.lance
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+evidence.db
+corpus.db
 ledger.json
 ledger.md
 briefs/
 packets/
+drafts/
+
+# Mail, chat, and document exports
+*.mbox
+*.mbx
+*.eml
+*.msf
+conversations.json
+*.jsonl
+*.zip
+*.pdf
+*.docx
+*.doc
+*.pptx
+*.ppt
+*.xlsx
+*.xls
+*.csv
+*.rtf
+*.odt
+*.pages
+/email/
+/transcripts/
+/exports/
 
 # Python
 .venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 *.egg-info/
 dist/
 build/
@@ -29,5 +80,6 @@ build/
 docs/_build/
 _site/
 
-# Local Cursor state
+# Local editor and OS state
 .cursor/
+.DS_Store

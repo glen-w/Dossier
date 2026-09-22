@@ -33,6 +33,27 @@ def test_remote_ollama_rejected_without_flag() -> None:
         validate_ollama_url("http://example.invalid:11434", allow_remote=False)
 
 
+def test_egress_status_names_the_only_way_text_leaves() -> None:
+    from dossier.llm import egress_status
+
+    local = Config(llm_enabled=True, llm_provider="ollama", llm_base_url="http://127.0.0.1:11434")
+    assert egress_status(local).startswith("egress: no")
+    remote = Config(
+        llm_enabled=True,
+        llm_provider="litellm",
+        llm_allow_remote=False,
+        llm_api_base="https://api.example/v1",
+    )
+    assert egress_status(remote).startswith("egress: yes")
+    blocked = Config(
+        llm_enabled=True,
+        llm_provider="ollama",
+        llm_base_url="http://example.invalid:11434",
+        llm_allow_remote=False,
+    )
+    assert "blocked" in egress_status(blocked)
+
+
 def test_ollama_timeout_is_llm_client_error() -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434", allow_remote=False)
     req = CompletionRequest(model="toy", prompt="hi", timeout_seconds=1.0)

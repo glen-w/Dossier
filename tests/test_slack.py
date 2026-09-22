@@ -45,7 +45,7 @@ def _warehouse(path: Path) -> Path:
     conn.execute(
         """
         INSERT INTO slack.messages VALUES
-        ('C1', '1.0', 'policy', 'U05E73N5733', 'Glen', ?, 2023, ?, 0, 0, 0,
+        ('C1', '1.0', 'policy', 'UTESTSLACK', 'Glen', ?, 2023, ?, 0, 0, 0,
          FALSE, FALSE, FALSE, NULL),
         ('C1', '2.0', 'policy', 'UOTHER', 'Other', ?, 2023, ?, 0, 0, 0,
          FALSE, FALSE, FALSE, NULL)
@@ -56,7 +56,10 @@ def _warehouse(path: Path) -> Path:
     return db
 
 
-def test_slack_keeps_a_long_message_from_the_known_user(tmp_path: Path, corpus: Corpus) -> None:
+def test_slack_keeps_a_long_message_from_the_known_user(
+    tmp_path: Path, corpus: Corpus, monkeypatch
+) -> None:
+    monkeypatch.setenv("DOSSIER_SLACK_USER_IDS", "UTESTSLACK")
     db = _warehouse(tmp_path)
     src = SlackSource()
     assert src.detect(db)
@@ -68,7 +71,10 @@ def test_slack_keeps_a_long_message_from_the_known_user(tmp_path: Path, corpus: 
     assert "milk" not in recs[0].text
 
 
-def test_slack_keeps_glen_file_and_skips_unrelated(tmp_path: Path, corpus: Corpus) -> None:
+def test_slack_keeps_glen_file_and_skips_unrelated(
+    tmp_path: Path, corpus: Corpus, monkeypatch
+) -> None:
+    monkeypatch.setenv("DOSSIER_SLACK_USER_IDS", "UTESTSLACK")
     db = tmp_path / "catalog.duckdb"
     conn = duckdb.connect(str(db))
     conn.execute("CREATE SCHEMA slack")
@@ -96,7 +102,7 @@ def test_slack_keeps_glen_file_and_skips_unrelated(tmp_path: Path, corpus: Corpu
     conn.execute(
         """
         INSERT INTO slack.messages VALUES
-        ('COCEAN', '1.0', 'gsr_section_ocean', 'U05E73N5733', 'Glen',
+        ('COCEAN', '1.0', 'gsr_section_ocean', 'UTESTSLACK', 'Glen',
          'Draft of the GSR ocean chapter attached.', 2024, 40, 1, 1, 2,
          FALSE, TRUE, FALSE, '1.0'),
         ('COCEAN', '9.0', 'gsr_section_ocean', 'UOTHER', 'Other',

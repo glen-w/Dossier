@@ -17,6 +17,7 @@ from dossier.llm.validate import (
     EGRESS_NOTICE,
     LlmConfigError,
     LlmExtraMissingError,
+    egress_status,
     llm_egress_is_remote,
     reject_litellm_ollama_model,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "ctx_tokens_for",
     "get_client",
     "get_client_impl",
+    "egress_status",
     "llm_egress_is_remote",
     "reject_litellm_ollama_model",
 ]

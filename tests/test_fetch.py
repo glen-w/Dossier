@@ -50,8 +50,8 @@ def test_slack_fetch_includes_thread_root(tmp_path: Path) -> None:
     conn.execute(
         """
         INSERT INTO slack.messages VALUES
-        ('C1', '1.0', 'U05E73N5733', 'Glen', 'Root: ocean chapter plan', '1.0', TRUE, FALSE),
-        ('C1', '1.1', 'U05E73N5733', 'Glen', 'Reply with the draft notes', '1.0', FALSE, TRUE)
+        ('C1', '1.0', 'UTESTSLACK', 'Glen', 'Root: ocean chapter plan', '1.0', TRUE, FALSE),
+        ('C1', '1.1', 'UTESTSLACK', 'Glen', 'Reply with the draft notes', '1.0', FALSE, TRUE)
         """
     )
     hit = Hit(
@@ -73,13 +73,14 @@ def test_slack_fetch_includes_thread_root(tmp_path: Path) -> None:
         channel_id="C1",
         ts="1.1",
     )
-    body = fetch_slack_body(conn, hit, ["U05E73N5733"])
+    body = fetch_slack_body(conn, hit, ["UTESTSLACK"])
     conn.close()
     assert "Reply with the draft notes" in body
     assert "ocean chapter plan" in body
 
 
-def test_one_message_fetch_by_id(tmp_path: Path) -> None:
+def test_one_message_fetch_by_id(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DOSSIER_MAIL_ACCOUNTS", "person@example.test:iddri")
     mail = tmp_path / "email" / "iddri"
     mail.mkdir(parents=True)
     (mail / "Teaching").write_text(
@@ -94,7 +95,7 @@ def test_one_message_fetch_by_id(tmp_path: Path) -> None:
     )
     body = fetch_mbox_body(
         mail.parent,
-        account_key="glen.wright@sciencespo.fr",
+        account_key="person@example.test",
         folder_name="Teaching",
         header_message_id="<one@test>",
     )

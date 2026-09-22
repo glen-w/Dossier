@@ -269,7 +269,7 @@ def test_git_user_keeps_matching_author_only(
         [
             "git",
             "-c",
-            "user.email=6459622+glen-w@users.noreply.github.com",
+            "user.email=glen-w@example.com",
             "-c",
             "user.name=Glen",
             "commit",
@@ -316,6 +316,43 @@ def test_local_toml_names_git_author_and_pubs_collection(
     assert pubs_collection() == "my pubs"
     assert pubs_seed() == "my pubs"
     assert pubs_top_k() == 353
+
+
+def test_identity_is_empty_until_the_local_toml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dossier.identity import (
+        configured_slack_user_ids,
+        mail_account_map,
+        resolve_speaker_names,
+    )
+
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
+    monkeypatch.delenv("DOSSIER_SLACK_USER_IDS", raising=False)
+    monkeypatch.delenv("DOSSIER_SPEAKER_NAMES", raising=False)
+    monkeypatch.delenv("DOSSIER_MAIL_ACCOUNTS", raising=False)
+    assert configured_slack_user_ids() == ()
+    assert resolve_speaker_names() == ()
+    assert mail_account_map() == {}
+    (tmp_path / "dossier.toml").write_text(
+        "\n".join(
+            [
+                "[identity]",
+                'slack_user_ids = ["UEXAMPLE"]',
+                'speaker_names = ["Case Speaker"]',
+                "",
+                "[identity.mail_accounts]",
+                '"person@example.test" = "acct"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert configured_slack_user_ids() == ("UEXAMPLE",)
+    assert resolve_speaker_names() == ("Case Speaker",)
+    assert mail_account_map() == {"person@example.test": "acct"}
+    monkeypatch.setenv("DOSSIER_MAIL_ACCOUNTS", "other@example.test:other")
+    assert mail_account_map()["other@example.test"] == "other"
+    assert mail_account_map()["person@example.test"] == "acct"
 
 
 def test_run_detects_every_listed_employer_and_git_path(

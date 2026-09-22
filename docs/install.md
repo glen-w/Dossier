@@ -46,12 +46,9 @@ The pubs search server, when you run one, is its own compose project. This repo 
 
 ## Model
 
-The default model is Ollama at `http://127.0.0.1:11434`. Completions are
-unlimited unless `DOSSIER_LLM_MAX_CALLS` (or `[llm] max_calls`) is a positive
-cap. Set `DOSSIER_LLM_PROVIDER=off` to skip model calls. `dossier ask --mode exact`
-still quotes from the corpus. An OpenAI-compatible API is opt-in
-(`DOSSIER_LLM_PROVIDER=litellm`, plus `dossier[llm]`). If a completion can
-leave the machine, the CLI prints an egress notice before it runs.
+The default model is Ollama at `http://127.0.0.1:11434` with `allow_remote = false`. Completions are unlimited unless `DOSSIER_LLM_MAX_CALLS` (or `[llm] max_calls`) is a positive cap. Set `DOSSIER_LLM_PROVIDER=off` to skip model calls. `dossier ask --mode exact` still quotes from the corpus.
+
+Text leaves the machine only if you opt into a remote LLM. That is `DOSSIER_LLM_PROVIDER=litellm` (plus `dossier[llm]`), or `DOSSIER_LLM_ALLOW_REMOTE=true` so Ollama may use a non-loopback host. The prompt for that call is what is sent. The corpus file is not. The CLI prints an egress notice first. A remote Ollama URL without the flag is refused. `dossier doctor` prints `egress: no` until you opt in.
 
 Copy `dossier.example.toml` to `$DOSSIER_DATA/dossier.toml` to change
 defaults; environment variables win.

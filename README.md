@@ -51,7 +51,7 @@ The full command list and environment knobs are in [CLI](docs/cli.md). Copy `dos
 
 ## Privacy
 
-Do not commit dumps, DuckDB files, LanceDB, `evidence.db`, `.env`, mbox, or PDFs. Work stays on loopback unless you opt into a remote model. The longer refuse list is in [Privacy](docs/privacy.md) and on the [roadmap](docs/roadmap.md).
+Records stay on this machine. The only way text leaves is a remote LLM, and that is off by default: provider `litellm`, or `DOSSIER_LLM_ALLOW_REMOTE=true` for a non-loopback Ollama. The CLI prints an egress notice before that call. `dossier doctor` prints `egress: no` or `egress: yes`. Dumps, the corpus, and exports stay out of git. Before every push, run `python3 scripts/release/check_gitignore.py` and do not push if it fails. Detail is in [Privacy](docs/privacy.md).
 
 ## Later
 
