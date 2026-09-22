@@ -26,6 +26,18 @@ def client(tmp_path: Path, monkeypatch):
         yield test_client, tmp_path
 
 
+def test_checkbox_sets_offer_select_all_and_clear(client) -> None:
+    test_client, _ = client
+    for path in ("/ask", "/match", "/brief", "/settings", "/settings/lists"):
+        page = test_client.get(path)
+        assert page.status_code == 200
+        html = page.text
+        sets = html.count('class="checks"')
+        assert sets >= 1
+        assert html.count('data-checks="all"') == sets
+        assert html.count('data-checks="none"') == sets
+
+
 def test_locker_page(client) -> None:
     test_client, _ = client
     resp = test_client.get("/locker")
@@ -224,6 +236,9 @@ def test_pack_brief_and_prompt_override(client) -> None:
     assert briefs
     text = briefs[0].read_text(encoding="utf-8")
     assert text.startswith("prompts: ask=none")
+    page = test_client.get(f"/brief?job={job_id}")
+    assert page.status_code == 200
+    assert b"What did I deliver?" in page.content
 
     resp = test_client.post("/index/run", follow_redirects=False)
     assert resp.status_code == 303
@@ -257,6 +272,47 @@ def test_pack_brief_and_prompt_override(client) -> None:
     )
     assert resp.status_code == 303
     assert not (root / "prompts" / "overrides" / "ask.json").is_file()
+
+
+def test_brief_viewer_shows_newest_and_rejects_other_paths(client) -> None:
+    test_client, root = client
+    empty = test_client.get("/brief")
+    assert b"No briefs in data/briefs yet." in empty.content
+
+    briefs = root / "briefs"
+    briefs.mkdir()
+    (briefs / "notes.md").write_text("NOT-A-STAMP", encoding="utf-8")
+    (root / "secret.md").write_text("SECRET-TOKEN", encoding="utf-8")
+    (briefs / "260101-000000.md").write_text(
+        "prompts: ask=none\n# Dossier brief\n\n## one\n\nWhat did I deliver?\n\nAn older report.\nmode: exact\n",
+        encoding="utf-8",
+    )
+    (briefs / "260923-120000.md").write_text(
+        "# Dossier brief\n\n## two\n\nWhat did I publish?\n\nA <script>alert(1)</script> paper.\ncitations: rec-1\n",
+        encoding="utf-8",
+    )
+
+    page = test_client.get("/brief")
+    assert b"What did I publish?" in page.content
+    assert b"An older report." not in page.content
+    assert b"NOT-A-STAMP" not in page.content
+    assert b"<script>alert" not in page.content
+    assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in page.content
+    assert b'<p class="meta">citations: rec-1</p>' in page.content
+
+    older = test_client.get("/brief?file=260101-000000")
+    assert b"What did I deliver?" in older.content
+    assert b"An older report." in older.content
+    assert b'<p class="meta">prompts: ask=none</p>' in older.content
+    assert b"<h2>Dossier brief</h2>" in older.content
+    assert b'<p class="meta">mode: exact</p>' in older.content
+    assert b"An older report.\nmode:" not in older.content
+
+    sneaky = test_client.get("/brief?file=../secret")
+    assert sneaky.status_code == 200
+    assert b"SECRET-TOKEN" not in sneaky.content
+    assert b"No brief with that name." in sneaky.content
+    assert b"What did I publish?" not in sneaky.content
 
 
 def test_phrase_lists_page_saves_a_change(client) -> None:

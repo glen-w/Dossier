@@ -499,6 +499,7 @@ def create_app() -> FastAPI:
             modes=ASK_MODES,
             efforts=EFFORT_NAMES,
             **_scope_template(cfg),
+            **_brief_view(root, request, job),
         )
 
     @app.post("/brief/run")
@@ -1044,6 +1045,36 @@ def _start_index() -> Job:
             corpus.close()
 
     return RUNNER.start("index", run)
+
+
+def _brief_view(root: Path, request: Request, job: Job | None) -> dict[str, Any]:
+    from dossier.brief import brief_blocks, list_briefs, read_brief
+
+    directory = root / "briefs"
+    names = list_briefs(directory)
+    asked = request.query_params.get("file", "").strip()
+    chosen = ""
+    missing = False
+    if asked:
+        if asked in names:
+            chosen = asked
+        else:
+            missing = True
+    elif job and job.status == "done" and isinstance(job.result, dict):
+        stem = Path(str(job.result.get("path") or "")).name
+        if stem.endswith(".md"):
+            stem = stem[: -len(".md")]
+        if stem in names:
+            chosen = stem
+    if not chosen and not missing and names:
+        chosen = names[0]
+    text = read_brief(directory, chosen) if chosen else None
+    return {
+        "brief_names": names,
+        "brief_name": chosen,
+        "brief_blocks": brief_blocks(text) if text else [],
+        "brief_missing": missing,
+    }
 
 
 def _start_brief(

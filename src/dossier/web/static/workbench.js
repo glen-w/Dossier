@@ -41,6 +41,19 @@
     };
   }
 
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("[data-checks]");
+    if (!btn) return;
+    var actions = btn.closest(".check-actions");
+    if (!actions) return;
+    var group = actions.nextElementSibling;
+    if (!group || !group.classList.contains("checks")) return;
+    var on = btn.getAttribute("data-checks") === "all";
+    group.querySelectorAll('input[type="checkbox"]:not(:disabled)').forEach(function (box) {
+      box.checked = on;
+    });
+  });
+
   document.addEventListener("DOMContentLoaded", function () {
     var root = document.body;
     var jobId = root.getAttribute("data-job-id");

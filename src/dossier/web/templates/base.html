@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dossier · {{ label(active) }}</title>
-  <link rel="stylesheet" href="/static/workbench.css">
+  <link rel="stylesheet" href="/static/workbench.css?v=3">
   <script src="/static/htmx.min.js" defer></script>
-  <script src="/static/workbench.js" defer></script>
+  <script src="/static/workbench.js?v=2" defer></script>
 </head>
 <body data-job-id="{{ job_id or (job.id if job else '') }}">
   <div class="shell">
