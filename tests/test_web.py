@@ -463,6 +463,83 @@ def test_match_page_lists_both_requirements(client) -> None:
     assert b"Led the ocean workshops" in page.content
 
 
+def test_err_query_uses_blurb(client) -> None:
+    test_client, _ = client
+    resp = test_client.get("/ask?err=empty")
+    assert resp.status_code == 200
+    assert b"non-empty question" in resp.content
+    assert b"err=empty" not in resp.content
+
+
+def test_settings_subnav_on_lists(client) -> None:
+    test_client, _ = client
+    resp = test_client.get("/settings/lists")
+    assert resp.status_code == 200
+    assert b'href="/settings/prompts"' in resp.content
+    assert b'href="/settings/packs"' in resp.content
+
+
+def test_job_strip_idle_skips_htmx_poll(client) -> None:
+    test_client, _ = client
+    resp = test_client.get("/locker")
+    assert resp.status_code == 200
+    assert b"hx-trigger" not in resp.content
+
+
+def test_sources_shows_ingest_summary_after_job(client, monkeypatch) -> None:
+    test_client, root = client
+    apps = root / "job applications"
+    apps.mkdir()
+    (apps / "note.md").write_text("Glen led a coastal workshop.\n", encoding="utf-8")
+    monkeypatch.setenv("DOSSIER_APPLICATIONS", str(apps))
+    resp = test_client.post(
+        "/sources/ingest",
+        data={"adapter": "applications"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert "job=" in resp.headers["location"]
+    job_id = resp.headers["location"].split("job=")[-1]
+    deadline = __import__("time").time() + 10
+    job = RUNNER.get(job_id)
+    assert job is not None
+    while job.status not in {"done", "error"} and __import__("time").time() < deadline:
+        __import__("time").sleep(0.05)
+    assert job.status == "done", job.error
+    page = test_client.get(f"/sources?job={job_id}")
+    assert page.status_code == 200
+    assert b"Ingest finished" in page.content
+    assert b"records" in page.content
+
+
+def test_ask_surfaces_job_error(client, monkeypatch) -> None:
+    test_client, _ = client
+
+    def boom(job):  # noqa: ANN001
+        raise RuntimeError("synthetic ask failure")
+
+    monkeypatch.setattr(
+        "dossier.web.app._start_ask",
+        lambda *a, **k: RUNNER.start("ask", boom),
+    )
+    resp = test_client.post(
+        "/ask/run",
+        data={"question": "coastal governance"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    job_id = resp.headers["location"].split("job=")[-1]
+    deadline = __import__("time").time() + 10
+    job = RUNNER.get(job_id)
+    assert job is not None
+    while job.status not in {"done", "error"} and __import__("time").time() < deadline:
+        __import__("time").sleep(0.05)
+    assert job.status == "error"
+    page = test_client.get(f"/ask?job={job_id}")
+    assert page.status_code == 200
+    assert b"synthetic ask failure" in page.content
+
+
 def test_workbench_refuses_a_non_loopback_client(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
     monkeypatch.setenv("DOSSIER_LLM_PROVIDER", "off")

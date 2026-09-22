@@ -19,4 +19,15 @@
 </form>
 
 <p class="meta">Current: extract LLM {{ 'on' if cfg.extract_llm else 'off' }} · effort {{ cfg.effort }} · model {{ cfg.llm_model }}</p>
+
+{% if result %}
+<div class="card">
+  <p class="ok">Extract finished.</p>
+  <p class="meta">cards {{ result.cards }} · llm {{ 'on' if result.use_llm else 'off' }}</p>
+</div>
+{% elif job and job.status == 'error' %}
+<div class="err">{{ job.error or 'Extract failed.' }}</div>
+{% elif job and job.status in ('running', 'queued') %}
+<p class="meta">Waiting for extract…</p>
+{% endif %}
 {% endblock %}

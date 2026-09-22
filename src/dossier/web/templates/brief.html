@@ -33,5 +33,9 @@
   <p class="meta">{{ result.path }}</p>
   <p class="meta">cited {{ result.cited }} · refused {{ result.refused }}{% if result.scope %} · {{ result.scope }}{% endif %}</p>
 </div>
+{% elif job and job.status == 'error' %}
+<div class="err">{{ job.error or 'Brief job failed.' }}</div>
+{% elif job and job.status in ('running', 'queued') %}
+<p class="meta">Waiting for the brief job…</p>
 {% endif %}
 {% endblock %}

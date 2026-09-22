@@ -117,6 +117,7 @@ filter_llm_calls = 4 # own cap; does not spend DOSSIER_LLM_MAX_CALLS
 
 # The same exclude / exclude_off pair exists for chatgpt, linkedin, transcripts,
 # pubs, and applications. applications also has file_exclude for junk names.
+# Cap kept files with DOSSIER_APPLICATIONS_MAX_FILES (default 2000).
 # [chatgpt]
 # exclude = ["scratch"]
 

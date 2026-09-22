@@ -10,7 +10,8 @@ from typing import Any
 from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED
 from dossier.config import Config
 from dossier.contributions import CONTRIBUTIONS, contribution
-from dossier.llm import egress_status, llm_egress_is_remote
+from dossier.llm import EGRESS_NOTICE, egress_status, get_client, llm_egress_is_remote
+from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
 from dossier.paths import (
     applications_dir,
     chatgpt_export,
@@ -138,3 +139,106 @@ def locker_snapshot(cfg: Config, corpus: Corpus) -> dict[str, Any]:
         "git_user": git_user() or "",
         "adapters": source_rows(),
     }
+
+
+_YELLOW = "\033[33m"
+_RESET = "\033[0m"
+
+
+def note_egress(cfg: Config) -> None:
+    """Print the yellow egress notice once per process when remote LLM is on."""
+    if getattr(note_egress, "done", False) or not llm_egress_is_remote(cfg):
+        return
+    note_egress.done = True  # type: ignore[attr-defined]
+    print(f"{_YELLOW}{EGRESS_NOTICE}{_RESET}", file=sys.stderr)
+
+
+class LazyClient:
+    """Open the model on the first completion. Exact answers never get that far."""
+
+    provider = "lazy"
+
+    def __init__(self, cfg: Config) -> None:
+        self.cfg = cfg
+        self._inner: LLMClient | None = None
+
+    def check_config(self, model: str) -> tuple[bool, str]:
+        return True, "ok"
+
+    def complete(self, request):  # noqa: ANN001
+        return self._client().complete(request)
+
+    def complete_json(self, request):  # noqa: ANN001
+        return self._client().complete_json(request)
+
+    def _client(self) -> LLMClient:
+        if self._inner is None:
+            note_egress(self.cfg)
+            inner = get_client(self.cfg)
+            ok, msg = inner.check_config(self.cfg.llm_model)
+            if not ok:
+                raise LLMClientError(msg)
+            self._inner = inner
+        return self._inner
+
+
+def client_for_mode(cfg: Config, mode: str) -> tuple[LLMClient, int | None]:
+    """A client, and an exit code when rich mode cannot reach a model."""
+    if mode == "exact" or not cfg.llm_enabled:
+        return NullLLMClient(), None
+    if llm_egress_is_remote(cfg):
+        note_egress(cfg)
+    client = get_client(cfg)
+    ok, msg = client.check_config(cfg.llm_model)
+    if ok:
+        return client, None
+    if mode == "rich":
+        print(msg, file=sys.stderr)
+        return client, 2
+    print(msg, file=sys.stderr)
+    return NullLLMClient(), None
+
+
+def query_embedder(cfg: Config, corpus: Corpus):
+    """Embed the question only when this model already has vectors."""
+    from dossier.embed import OllamaEmbedder
+    from dossier.llm.validate import LlmConfigError, validate_ollama_url
+
+    if not cfg.ask_embed or not cfg.llm_enabled:
+        return None
+    if corpus.vector_count(cfg.embed_model) < 1:
+        return None
+    try:
+        validate_ollama_url(cfg.llm_base_url, False)
+    except LlmConfigError:
+        if not cfg.llm_allow_remote:
+            return None
+        note_egress(cfg)
+    return OllamaEmbedder(cfg.llm_base_url, cfg.llm_allow_remote, cfg.embed_model)
+
+
+def detected_targets_report(
+    allowlist: tuple[str, ...] | None = None,
+) -> tuple[list[tuple[Any, Path]], list[str]]:
+    """Targets plus skip lines for ``run`` / doctor-style reports."""
+    names = allowlist or tuple(item.name for item in CONTRIBUTIONS)
+    targets: list[tuple[Any, Path]] = []
+    skipped: list[str] = []
+    for name in names:
+        item = contribution(name)
+        if item is None:
+            skipped.append(f"skip {name}: unknown adapter")
+            continue
+        paths: list[Path] = []
+        default = default_path(name)
+        if default is not None and item.source.detect(default):
+            paths.append(default)
+        for extra in extra_paths(name):
+            if item.source.detect(extra):
+                paths.append(extra)
+        if not paths:
+            skipped.append(f"skip {name}: not detected")
+            continue
+        for path in paths:
+            targets.append((item, path))
+    return targets, skipped

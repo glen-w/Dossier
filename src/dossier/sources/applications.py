@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 
 from dossier.lists import application_dirs, application_files, excluded
@@ -10,6 +12,18 @@ from dossier.util import record_id
 
 TEXT_SUFFIXES = {".txt", ".md", ".html", ".htm", ".json", ".tex", ".csv"}
 TEXT_CAP = 20_000
+DEFAULT_MAX_FILES = 2_000
+
+
+def applications_max_files() -> int:
+    raw = os.environ.get("DOSSIER_APPLICATIONS_MAX_FILES", "").strip()
+    if not raw:
+        return DEFAULT_MAX_FILES
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_MAX_FILES
+    return value if value > 0 else DEFAULT_MAX_FILES
 
 
 class ApplicationsSource:
@@ -26,6 +40,9 @@ class ApplicationsSource:
         if not root.is_dir():
             return
         skipped = application_dirs()
+        limit = applications_max_files()
+        seen = 0
+        capped = False
         for child in sorted(root.rglob("*")):
             if not child.is_file():
                 continue
@@ -40,6 +57,10 @@ class ApplicationsSource:
             rel = rel_path.as_posix()
             if excluded("applications", child.name, rel):
                 continue
+            if seen >= limit:
+                capped = True
+                break
+            seen += 1
             uri = f"file://applications/{rel}"
             parent = child.parent.name
             suffix = child.suffix.lower()
@@ -67,6 +88,12 @@ class ApplicationsSource:
                     text=text,
                     table="applications.files",
                 )
+            )
+        if capped:
+            print(
+                f"applications: stopped after {limit} files "
+                f"(set DOSSIER_APPLICATIONS_MAX_FILES to raise)",
+                file=sys.stderr,
             )
 
     def tables(self) -> list[str]:

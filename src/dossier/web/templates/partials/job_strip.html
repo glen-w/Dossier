@@ -1,13 +1,16 @@
 <div id="job-strip"
      class="job-strip {{ 'idle' if not busy else '' }}"
+     {% if busy %}
      hx-get="/partials/job-strip"
      hx-trigger="every 3s"
-     hx-swap="outerHTML">
+     hx-swap="outerHTML"
+     {% endif %}>
   {% if job %}
   <strong>{{ job.kind }}</strong>
   <span class="meta">· {{ job.status }} · id {{ job.id }}</span>
   <div data-job-line>
-    {% if job.latest and job.latest.line %}{{ job.latest.line }}
+    {% if job.status == 'error' and job.error %}{{ job.error }}
+    {% elif job.latest and job.latest.line %}{{ job.latest.line }}
     {% elif job.latest and job.latest.title %}{{ job.latest.title }}{% if job.latest.detail %} · {{ job.latest.detail }}{% endif %}
     {% elif job.error %}{{ job.error }}
     {% else %}Running…{% endif %}

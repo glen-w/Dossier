@@ -18,12 +18,23 @@
   <p class="meta">evidence_db: {{ snap.evidence_db }}</p>
   <p class="meta">fts5: {{ 'yes' if snap.fts5 else 'no' }} · sqlite {{ snap.sqlite }}</p>
   <p class="meta">provider: {{ snap.provider }} · {{ snap.egress }}</p>
-  <p class="meta">effort: {{ snap.effort }} · model: {{ snap.model }} · ask: {{ snap.ask_mode }}</p>
+  <p class="meta">effort: {{ snap.effort }} · model: {{ snap.model }} · ask: {{ snap.ask_mode }}
+    · <a href="/settings">Settings</a></p>
   <p class="meta">extract LLM: {{ 'on' if snap.extract_llm else 'off' }} · max_calls: {{ 'unlimited' if snap.max_calls == 0 else snap.max_calls }}</p>
+  {% if not snap.fts5 %}
+  <p class="err">FTS5 is off — prove and ask prefer it. Check your Python SQLite build. <a href="/settings">Settings</a></p>
+  {% endif %}
+  {% if snap.spanned == 0 and snap.approved %}
+  <p class="meta">Approved cards need <code>defend</code> before tailor can quote. Review spans on the CLI for now.</p>
+  {% endif %}
+  {% if snap.pending %}
+  <p class="meta"><a href="/review">Review {{ snap.pending }} pending card{{ 's' if snap.pending != 1 else '' }}</a></p>
+  {% endif %}
 </div>
 
 <div class="card">
   <h3>Sources</h3>
+  <p class="meta"><a href="/sources">Ingest</a> · <a href="/settings/lists">Phrase lists</a></p>
   <table>
     <thead><tr><th>Adapter</th><th>Detected</th><th>Path</th></tr></thead>
     <tbody>

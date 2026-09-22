@@ -31,7 +31,9 @@
   {% endfor %}
 </div>
 {% endfor %}
-{% elif job and job.status == 'running' %}
+{% elif job and job.status == 'error' %}
+<div class="err">{{ job.error or 'Match job failed.' }}</div>
+{% elif job and job.status in ('running', 'queued') %}
 <p class="meta">Waiting for the match job…</p>
 {% endif %}
 {% endblock %}

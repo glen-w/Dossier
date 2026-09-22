@@ -24,7 +24,15 @@ from dossier.lists import PHRASE_LISTS, phrase_list_groups, phrase_list_patch
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
 from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
-from dossier.ops import detected_targets, locker_snapshot, source_rows
+from dossier.ops import (
+    LazyClient,
+    client_for_mode,
+    detected_targets,
+    detected_targets_report,
+    locker_snapshot,
+    query_embedder,
+    source_rows,
+)
 from dossier.paths import evidence_db
 from dossier.profiles import (
     VIRTUAL_DEFAULT,
@@ -46,7 +54,7 @@ from dossier.scope import (
 from dossier.settings_io import common_settings_patch, save_common_settings
 from dossier.store import Corpus
 from dossier.ui import Progress, note, stage
-from dossier.vocab import BLURBS, NAV, label
+from dossier.vocab import BLURBS, NAV, err_message, label
 
 _PKG = Path(__file__).resolve().parent
 _TEMPLATES = Jinja2Templates(directory=str(_PKG / "templates"))
@@ -87,6 +95,12 @@ def create_app() -> FastAPI:
     @app.get("/sources", response_class=HTMLResponse)
     async def sources_page(request: Request) -> HTMLResponse:
         cfg = Config.from_env()
+        job = _job_from_query(request)
+        result = (
+            job.result
+            if job is not None and job.status == "done" and isinstance(job.result, dict)
+            else None
+        )
         return _page(
             request,
             "sources.html",
@@ -94,6 +108,8 @@ def create_app() -> FastAPI:
             cfg=cfg,
             rows=source_rows(),
             busy=RUNNER.busy(),
+            result=result,
+            job=job.snapshot() if job else None,
             notice=_egress_notice(cfg),
         )
 
@@ -113,6 +129,12 @@ def create_app() -> FastAPI:
     @app.get("/extract", response_class=HTMLResponse)
     async def extract_page(request: Request) -> HTMLResponse:
         cfg = Config.from_env()
+        job = _job_from_query(request)
+        result = (
+            job.result
+            if job is not None and job.status == "done" and isinstance(job.result, dict)
+            else None
+        )
         return _page(
             request,
             "extract.html",
@@ -120,6 +142,8 @@ def create_app() -> FastAPI:
             cfg=cfg,
             rows=source_rows(),
             busy=RUNNER.busy(),
+            result=result,
+            job=job.snapshot() if job else None,
             notice=_egress_notice(cfg),
         )
 
@@ -366,7 +390,7 @@ def create_app() -> FastAPI:
         return _page(
             request,
             "lists.html",
-            "settings",
+            "lists",
             groups=phrase_list_groups(),
             toml_path=str(root / "dossier.toml"),
             saved=request.query_params.get("saved") == "1",
@@ -470,6 +494,7 @@ def create_app() -> FastAPI:
             packs=["career", "posting", *list_saved_packs(root)],
             busy=RUNNER.busy(),
             result=job.result if job and job.status == "done" else None,
+            job=job.snapshot() if job else None,
             notice=_egress_notice(cfg),
             modes=ASK_MODES,
             efforts=EFFORT_NAMES,
@@ -507,6 +532,7 @@ def create_app() -> FastAPI:
             cfg=cfg,
             busy=RUNNER.busy(),
             result=job.result if job and job.status == "done" else None,
+            job=job.snapshot() if job else None,
             notice=_egress_notice(cfg),
         )
 
@@ -536,7 +562,7 @@ def create_app() -> FastAPI:
         return _page(
             request,
             "prompts.html",
-            "settings",
+            "prompts",
             cfg=cfg,
             catalogue=catalogue,
             selected=selected,
@@ -632,7 +658,7 @@ def create_app() -> FastAPI:
         return _page(
             request,
             "packs.html",
-            "settings",
+            "packs",
             cfg=cfg,
             pack_name=selected,
             pack_body=body,
@@ -732,7 +758,7 @@ def _page(
         "blurbs": BLURBS,
         "job": job.snapshot() if job else None,
         "busy": RUNNER.busy(),
-        "err": request.query_params.get("err", ""),
+        "err": err_message(request.query_params.get("err", "")),
         "job_id": request.query_params.get("job", ""),
         "statuses": (STATUS_PENDING, STATUS_APPROVED, STATUS_REFUSED),
     }
@@ -883,7 +909,7 @@ def _start_extract(source: str | None, limit: int | None) -> Job:
 
 def _start_ask(question: str, mode: str | None, scope: RequestScope | None = None) -> Job:
     def run(job: Job) -> dict[str, Any]:
-        from dossier.cli import _LazyClient, _client_for_mode, _query_embedder
+        from dossier.ops import LazyClient, client_for_mode, query_embedder
         from dossier.sources.pubs import optional_pubs_hits
 
         cfg = apply_request_scope(Config.from_env(), scope or _default_scope())
@@ -896,9 +922,9 @@ def _start_ask(question: str, mode: str | None, scope: RequestScope | None = Non
             if chosen == "exact" or not cfg.llm_enabled:
                 client: LLMClient = NullLLMClient()
             elif chosen == "auto":
-                client = budget.wrap(_LazyClient(cfg))
+                client = budget.wrap(LazyClient(cfg))
             else:
-                client, code = _client_for_mode(cfg, chosen)
+                client, code = client_for_mode(cfg, chosen)
                 if code is not None:
                     raise LLMClientError("model not ready for rich ask")
                 client = budget.wrap(client)
@@ -911,7 +937,7 @@ def _start_ask(question: str, mode: str | None, scope: RequestScope | None = Non
                 client,
                 mode=chosen,
                 limit=cfg.ask_limit,
-                embedder=_query_embedder(cfg, corpus),
+                embedder=query_embedder(cfg, corpus),
                 extra_hits=extra or None,
             )
             corpus.add_answer(
@@ -939,8 +965,8 @@ def _start_ask(question: str, mode: str | None, scope: RequestScope | None = Non
 
 def _start_match(spec: str, scope: RequestScope | None = None) -> Job:
     def run(job: Job) -> dict[str, Any]:
-        from dossier.cli import _query_embedder
         from dossier.match import match_posting, write_match
+        from dossier.ops import query_embedder
 
         cfg = apply_request_scope(Config.from_env(), scope or _default_scope())
         corpus = Corpus(evidence_db(Path(cfg.data_dir)))
@@ -949,7 +975,7 @@ def _start_match(spec: str, scope: RequestScope | None = None) -> Job:
                 corpus,
                 spec,
                 cfg,
-                embedder=_query_embedder(cfg, corpus),
+                embedder=query_embedder(cfg, corpus),
             )
             path = write_match(report, Path(cfg.data_dir) / "matches")
             data = report.as_dict()
@@ -1028,7 +1054,7 @@ def _start_brief(
 ) -> Job:
     def run(job: Job) -> dict[str, Any]:
         from dossier.brief import run_pack, write_brief
-        from dossier.cli import _LazyClient, _client_for_mode, _query_embedder
+        from dossier.ops import LazyClient, client_for_mode, query_embedder
         from dossier.packs import posting_pack, resolve_pack
         from dossier.prompts import start_prompt_log, stop_prompt_log
         from dossier.ui import Progress
@@ -1049,9 +1075,9 @@ def _start_brief(
             if chosen == "exact" or not cfg.llm_enabled:
                 client: LLMClient = NullLLMClient()
             elif chosen == "auto":
-                client = budget.wrap(_LazyClient(cfg))
+                client = budget.wrap(LazyClient(cfg))
             else:
-                client, code = _client_for_mode(cfg, chosen)
+                client, code = client_for_mode(cfg, chosen)
                 if code is not None:
                     raise LLMClientError("model not ready for rich brief")
                 client = budget.wrap(client)
@@ -1079,7 +1105,7 @@ def _start_brief(
                         client,
                         mode=chosen,
                         on_progress=on_progress,
-                        embedder=_query_embedder(cfg, corpus),
+                        embedder=query_embedder(cfg, corpus),
                     )
                     bar.finish(cited=cited, refused=refused)
                 prompt_stamp = stop_prompt_log(token, empty="ask=none")
@@ -1106,13 +1132,16 @@ def _start_brief(
 
 def _start_run() -> Job:
     def run(job: Job) -> dict[str, Any]:
-        from dossier.cli import _brief, _detected_targets, _extract_cards
+        from argparse import Namespace
+
+        from dossier.cli import _brief, _extract_cards
         from dossier.ingest_run import run_ingest_targets
+        from dossier.ops import detected_targets_report
 
         cfg = Config.from_env()
         corpus = Corpus(evidence_db(Path(cfg.data_dir)))
         try:
-            targets, skipped = _detected_targets(cfg.run_adapters)
+            targets, skipped = detected_targets_report(cfg.run_adapters)
             if targets:
                 stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
                 run_ingest_targets(targets, corpus)
@@ -1126,8 +1155,6 @@ def _start_run() -> Job:
                 budget=extract_budget,
             )
             brief_budget = CallBudget(cfg.llm_max_calls)
-            from argparse import Namespace
-
             code = 0
             try:
                 code = _brief(

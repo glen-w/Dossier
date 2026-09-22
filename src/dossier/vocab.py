@@ -69,6 +69,17 @@ BLURBS = {
     "locker_busy": "The locker is busy with another job.",
 }
 
+# Query-string err= keys → human lines (unknown keys pass through).
+ERR = {
+    "busy": "The locker is busy with another job.",
+    "empty": "Ask needs a non-empty question.",
+    "limit": "Limit must be a positive integer.",
+    "year range": "Year from must be less than or equal to year to.",
+    "Paste a job spec": "Paste a job spec before matching.",
+    "max_calls": "max_calls must be zero (unlimited) or a positive integer.",
+    "default": "Could not restore the default profile.",
+}
+
 
 def label(key: str) -> str:
     return LABELS.get(key, key.replace("_", " ").title())
@@ -76,3 +87,12 @@ def label(key: str) -> str:
 
 def blurb(key: str) -> str:
     return BLURBS.get(key, "")
+
+
+def err_message(key: str) -> str:
+    if not key:
+        return ""
+    from urllib.parse import unquote
+
+    cleaned = unquote(key)
+    return ERR.get(cleaned, cleaned)

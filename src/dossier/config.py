@@ -7,12 +7,11 @@ Environment variables override the file.
 from __future__ import annotations
 
 import os
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
 from dossier.effort import DEFAULT_EFFORT, apply_effort, normalize_effort
-from dossier.paths import data_dir, pubs_url, warehouse_db
+from dossier.paths import TomlConfigError, data_dir, pubs_url, read_toml_dict, warehouse_db
 
 ASK_MODES = ("exact", "auto", "rich")
 DECOMPOSE_MODES = ("off", "auto", "on")
@@ -247,11 +246,7 @@ def _choice(value: str, allowed: tuple[str, ...], default: str) -> str:
 
 
 def _load_toml(path: Path) -> dict:
-    if not path.is_file():
-        return {}
-    with path.open("rb") as handle:
-        data = tomllib.load(handle)
-    return data if isinstance(data, dict) else {}
+    return read_toml_dict(path)
 
 
 def _lexicon(file_cfg: dict) -> tuple[str, ...] | None:

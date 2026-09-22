@@ -34,7 +34,9 @@
   </ul>
   {% endif %}
 </div>
-{% elif job and job.status == 'running' %}
+{% elif job and job.status == 'error' %}
+<div class="err">{{ job.error or 'Ask job failed.' }}</div>
+{% elif job and job.status in ('running', 'queued') %}
 <p class="meta">Waiting for the ask job…</p>
 {% endif %}
 {% endblock %}

@@ -64,7 +64,8 @@ def llm_egress_is_remote(cfg) -> bool:
 
     Off by default. On only for provider ``litellm``, or Ollama with
     ``allow_remote``. A non-loopback Ollama URL without that flag is
-    refused by the client; this still reports it so the CLI can say why.
+    refused by the client and reports False here (doctor says blocked;
+    no egress notice).
     """
     if not cfg.llm_enabled:
         return False
@@ -74,9 +75,9 @@ def llm_egress_is_remote(cfg) -> bool:
         return True
     try:
         validate_ollama_url(cfg.llm_base_url, False)
-        return False
     except LlmConfigError:
-        return True
+        return False
+    return False
 
 
 def egress_status(cfg) -> str:

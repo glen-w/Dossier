@@ -22,6 +22,24 @@ DEFAULT_PUBS_URL = "http://127.0.0.1:8012"
 DEFAULT_MAIL_ROOT = Path.home() / "email"
 
 
+class TomlConfigError(ValueError):
+    """``dossier.toml`` exists but cannot be parsed."""
+
+
+def read_toml_dict(path: Path) -> dict:
+    """Load a TOML object table. Missing file → ``{}``. Bad TOML → ``TomlConfigError``."""
+    if not path.is_file():
+        return {}
+    try:
+        with path.open("rb") as handle:
+            data = tomllib.load(handle)
+    except OSError as exc:
+        raise TomlConfigError(f"cannot read {path}: {exc}") from exc
+    except tomllib.TOMLDecodeError as exc:
+        raise TomlConfigError(f"invalid TOML in {path}: {exc}") from exc
+    return data if isinstance(data, dict) else {}
+
+
 def data_dir() -> Path:
     if raw := os.environ.get("DOSSIER_DATA"):
         return Path(raw).expanduser()
@@ -168,15 +186,7 @@ def _is_documents_root(path: Path) -> bool:
 
 
 def _local_toml() -> dict:
-    path = data_dir() / "dossier.toml"
-    if not path.is_file():
-        return {}
-    try:
-        with path.open("rb") as handle:
-            data = tomllib.load(handle)
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    return read_toml_dict(data_dir() / "dossier.toml")
 
 
 def _toml_section(name: str) -> dict:

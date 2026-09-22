@@ -52,6 +52,17 @@ def test_egress_status_names_the_only_way_text_leaves() -> None:
         llm_allow_remote=False,
     )
     assert "blocked" in egress_status(blocked)
+    assert not llm_egress_is_remote(blocked)
+
+
+def test_blocked_remote_ollama_is_not_egress() -> None:
+    cfg = Config(
+        llm_enabled=True,
+        llm_provider="ollama",
+        llm_base_url="http://example.invalid:11434",
+        llm_allow_remote=False,
+    )
+    assert not llm_egress_is_remote(cfg)
 
 
 def test_ollama_timeout_is_llm_client_error() -> None:

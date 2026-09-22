@@ -8,8 +8,8 @@
   --do-warn: #7a2e24;
   --do-ok: #1c5c3a;
   --do-card: #fff;
-  --do-font: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
-  --do-display: "Fraunces", Georgia, serif;
+  --do-font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --do-display: Georgia, "Times New Roman", serif;
 }
 
 *,
@@ -74,6 +74,17 @@ nav.side a:hover {
 nav.side a.on {
   background: var(--do-sea);
   color: #fff;
+}
+
+nav.side .subnav {
+  margin: 8px 0 12px 8px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+nav.side .subnav a {
+  font-size: 0.9rem;
+  padding: 5px 10px;
 }
 
 main {

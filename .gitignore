@@ -81,6 +81,9 @@ build/
 docs/_build/
 _site/
 
+# Local assessments (honest reviews; may cite personal corpus paths)
+assessments/
+
 # Local editor and OS state
 .cursor/
 .DS_Store

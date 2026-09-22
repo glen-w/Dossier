@@ -24,6 +24,7 @@ from dossier.packs import posting_pack, resolve_pack
 from dossier.prove import DEFAULT_ADAPTERS, run_prove
 from dossier.show import defend_cards, find_span, gap_report, write_packet
 from dossier.paths import (
+    TomlConfigError,
     evidence_db,
     employer_paths,
     git_paths,
@@ -192,7 +193,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
-    _note_egress.done = False
+    from dossier.ops import note_egress
+
+    note_egress.done = False  # type: ignore[attr-defined]
     if args.cmd == "referees":
         return _referees(args)
     if args.cmd == "prove":
@@ -210,7 +213,11 @@ def main(argv: list[str] | None = None) -> int:
             with_llm=args.with_llm,
             include_pubs=args.pubs,
         )
-    cfg = Config.from_env()
+    try:
+        cfg = Config.from_env()
+    except TomlConfigError as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        return 2
     if args.cmd == "doctor":
         return _doctor(cfg)
     if args.cmd == "gui":
@@ -308,39 +315,18 @@ def _extract(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
 
 
 def _note_egress(cfg: Config) -> None:
-    if getattr(_note_egress, "done", False) or not llm_egress_is_remote(cfg):
-        return
-    _note_egress.done = True  # type: ignore[attr-defined]
-    print(f"{_YELLOW}{EGRESS_NOTICE}{_RESET}", file=sys.stderr)
+    from dossier.ops import note_egress
+
+    note_egress(cfg)
 
 
 class _LazyClient:
-    """Open the model on the first completion. Exact answers never get that far."""
+    """CLI alias for :class:`dossier.ops.LazyClient`."""
 
-    provider = "lazy"
+    def __new__(cls, cfg: Config):
+        from dossier.ops import LazyClient
 
-    def __init__(self, cfg: Config) -> None:
-        self.cfg = cfg
-        self._inner: LLMClient | None = None
-
-    def check_config(self, model: str) -> tuple[bool, str]:
-        return True, "ok"
-
-    def complete(self, request):  # noqa: ANN001
-        return self._client().complete(request)
-
-    def complete_json(self, request):  # noqa: ANN001
-        return self._client().complete_json(request)
-
-    def _client(self) -> LLMClient:
-        if self._inner is None:
-            _note_egress(self.cfg)
-            inner = get_client(self.cfg)
-            ok, msg = inner.check_config(self.cfg.llm_model)
-            if not ok:
-                raise LLMClientError(msg)
-            self._inner = inner
-        return self._inner
+        return LazyClient(cfg)
 
 
 def _extract_cards(
@@ -1042,6 +1028,12 @@ def _packet(cfg: Config, corpus: Corpus) -> int:
 
 
 def _doctor(cfg: Config) -> int:
+    from dossier.identity import (
+        configured_slack_user_ids,
+        is_sent_metadata_uri,
+        resolve_speaker_names,
+    )
+
     db = evidence_db(Path(cfg.data_dir))
     corpus = Corpus(db)
     try:
@@ -1077,7 +1069,8 @@ def _doctor(cfg: Config) -> int:
         print(f"tailor: {spanned}")
         if spanned == 0:
             print("tailor: approve and defend before tailor will quote")
-        if collection := pubs_collection():
+        collection = pubs_collection()
+        if collection:
             print(f"pubs_collection: {collection}")
         print(f"employer_paths: {len(employer_paths())}")
         print(f"employer.filter: {'yes' if cfg.employer_filter else 'no'}")
@@ -1088,60 +1081,55 @@ def _doctor(cfg: Config) -> int:
         print(f"git_paths: {len(git_paths())}")
         if user := git_user():
             print(f"git_user: {user}")
+        sent_meta = sum(
+            1 for rec in corpus.records("mbox") if is_sent_metadata_uri(rec.uri)
+        )
+        if sent_meta:
+            print(
+                f"mbox_sent_metadata: {sent_meta} "
+                "(folder closed; subjects/attachments only, no body)"
+            )
+        identity_empty = not configured_slack_user_ids() and not resolve_speaker_names()
         for item in CONTRIBUTIONS:
             default = _default_path(item.name)
             seen = default is not None and item.source.detect(default)
             if item.name == "pubs" and seen:
                 rows = len(item.source.records_for(default))  # type: ignore[attr-defined]
                 print(f"adapter pubs: detected rows={rows}")
+                if collection and rows == 0:
+                    print(
+                        "warn: pubs_collection set but rows=0 "
+                        "(check collection name and zotero_db)"
+                    )
             else:
                 print(f"adapter {item.name}: {'detected' if seen else 'not detected'}")
+            if seen and item.name == "slack" and identity_empty:
+                print(
+                    "warn: slack detected but identity empty "
+                    "(set [identity] slack_user_ids or speaker_names)"
+                )
+            if seen and item.name == "meetings" and not resolve_speaker_names():
+                print(
+                    "warn: meetings detected but speaker_names empty "
+                    "(set [identity] speaker_names)"
+                )
     finally:
         corpus.close()
     return 0
 
 
 def _client_for_mode(cfg: Config, mode: str) -> tuple[LLMClient, int | None]:
-    """A client, and an exit code when rich mode cannot reach a model."""
-    if mode == "exact" or not cfg.llm_enabled:
-        return NullLLMClient(), None
-    if llm_egress_is_remote(cfg):
-        _note_egress(cfg)
-    client = get_client(cfg)
-    ok, msg = client.check_config(cfg.llm_model)
-    if ok:
-        return client, None
-    if mode == "rich":
-        print(msg, file=sys.stderr)
-        return client, 2
-    print(msg, file=sys.stderr)
-    return NullLLMClient(), None
+    from dossier.ops import client_for_mode
+
+    return client_for_mode(cfg, mode)
 
 
 def _detected_targets(
     allowlist: tuple[str, ...],
 ) -> tuple[list[tuple], list[str]]:
-    names = allowlist or tuple(item.name for item in CONTRIBUTIONS)
-    targets: list[tuple] = []
-    skipped: list[str] = []
-    for name in names:
-        item = contribution(name)
-        if item is None:
-            skipped.append(f"skip {name}: unknown adapter")
-            continue
-        paths: list[Path] = []
-        default = _default_path(name)
-        if default is not None and item.source.detect(default):
-            paths.append(default)
-        for extra in _extra_paths(name):
-            if item.source.detect(extra):
-                paths.append(extra)
-        if not paths:
-            skipped.append(f"skip {name}: not detected")
-            continue
-        for path in paths:
-            targets.append((item, path))
-    return targets, skipped
+    from dossier.ops import detected_targets_report
+
+    return detected_targets_report(allowlist)
 
 
 def _index(cfg: Config, corpus: Corpus) -> int:
@@ -1176,21 +1164,9 @@ def _index(cfg: Config, corpus: Corpus) -> int:
 
 
 def _query_embedder(cfg: Config, corpus: Corpus):
-    """Embed the question only when this model already has vectors."""
-    from dossier.embed import OllamaEmbedder
-    from dossier.llm.validate import LlmConfigError, validate_ollama_url
+    from dossier.ops import query_embedder
 
-    if not cfg.ask_embed or not cfg.llm_enabled:
-        return None
-    if corpus.vector_count(cfg.embed_model) < 1:
-        return None
-    try:
-        validate_ollama_url(cfg.llm_base_url, False)
-    except LlmConfigError:
-        if not cfg.llm_allow_remote:
-            return None
-        _note_egress(cfg)
-    return OllamaEmbedder(cfg.llm_base_url, cfg.llm_allow_remote, cfg.embed_model)
+    return query_embedder(cfg, corpus)
 
 
 def _default_path(name: str) -> Path | None:

@@ -15,6 +15,17 @@
   <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Ingest</button>
 </form>
 
+{% if result %}
+<div class="card">
+  <p class="ok">Ingest finished.</p>
+  <p class="meta">records {{ result.records_before }} → {{ result.records_after }}</p>
+</div>
+{% elif job and job.status == 'error' %}
+<div class="err">{{ job.error or 'Ingest failed.' }}</div>
+{% elif job and job.status in ('running', 'queued') %}
+<p class="meta">Waiting for ingest…</p>
+{% endif %}
+
 <table>
   <thead><tr><th>Adapter</th><th>Detected</th><th>Path</th><th>Extras</th></tr></thead>
   <tbody>

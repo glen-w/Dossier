@@ -11,7 +11,7 @@ Waves are ambition, not a calendar. Hard boundaries at the bottom do not move.
 
 ### 0.4 — Locker plus interview
 
-Local SQLite corpus, seven explicit adapters, deterministic then optional-model claim drafts, human `approve`, and `ask` / `brief` / `run` over approved claims, passages, one Lens/Kind hop, and a call budget. Read-only `referees`. `doctor` for data dir, FTS5, provider, budget, adapters.
+Local SQLite corpus, ten explicit adapters, deterministic then optional-model claim drafts, human `approve`, and `ask` / `brief` / `run` over approved claims, passages, one Lens/Kind hop, and a call budget. Read-only `referees`. `doctor` for data dir, FTS5, provider, budget, adapters.
 
 ### 0.5 — Show the carrying sentence
 

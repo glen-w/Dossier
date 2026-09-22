@@ -47,6 +47,7 @@ REQUIRED_LINES = (
     "/email/",
     "/transcripts/",
     "/exports/",
+    "assessments/",
 )
 
 _DENY_NAMES = {

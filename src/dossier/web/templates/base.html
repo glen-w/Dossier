@@ -15,15 +15,21 @@
       {% for key, title in nav %}
       <a href="/{{ key }}" class="{{ 'on' if active == key else '' }}">{{ title }}</a>
       {% endfor %}
+      {% if active == 'settings' or active == 'lists' or active == 'prompts' or active == 'packs' %}
+      <div class="subnav">
+        <a href="/settings" class="{{ 'on' if active == 'settings' else '' }}">Knobs</a>
+        <a href="/settings/lists" class="{{ 'on' if active == 'lists' else '' }}">Lists</a>
+        <a href="/settings/prompts" class="{{ 'on' if active == 'prompts' else '' }}">Prompts</a>
+        <a href="/settings/packs" class="{{ 'on' if active == 'packs' else '' }}">Packs</a>
+      </div>
+      {% endif %}
     </nav>
     <main>
       {% include "partials/job_strip.html" %}
       {% if notice %}
       <div class="notice" role="status">{{ notice }}</div>
       {% endif %}
-      {% if err == 'busy' %}
-      <div class="err">{{ blurbs.locker_busy }}</div>
-      {% elif err %}
+      {% if err %}
       <div class="err">{{ err }}</div>
       {% endif %}
       {% block content %}{% endblock %}

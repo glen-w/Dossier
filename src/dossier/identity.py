@@ -121,3 +121,18 @@ def is_blocked_mail_root(path: Path) -> bool:
     if path.name.lower() != "iddri":
         return False
     return (path / "[Gmail].sbd" / "Sent Mail").exists() or (path / "INBOX").exists()
+
+
+def mbox_folder_from_uri(uri: str) -> str:
+    """Folder segment of an ``mbox://account/folder/…`` URI, or empty."""
+    if not uri.startswith("mbox://"):
+        return ""
+    parts = uri[len("mbox://") :].split("/")
+    if len(parts) < 2:
+        return ""
+    return parts[1]
+
+
+def is_sent_metadata_uri(uri: str) -> bool:
+    """True when the URI points at a hard-closed mail folder (bodies never opened)."""
+    return skip_folder(mbox_folder_from_uri(uri))
