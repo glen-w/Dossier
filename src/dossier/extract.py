@@ -191,9 +191,14 @@ def extract_record(
         chunk_chars=chunk_chars,
         max_chunks=max_chunks,
     )
-    evidence = corpus.evidence_by_uri()
-    if record.uri not in evidence:
-        evidence = {**evidence, record.uri: record.text}
+    evidence = {record.uri: record.text}
+    for prop in proposals:
+        for uri in prop.citations:
+            if uri in evidence:
+                continue
+            found = corpus.get_record(uri)
+            if found is not None:
+                evidence[uri] = found.text
     cards = lock_claims(record, proposals, evidence)
     for card in cards:
         corpus.put_card(card)
@@ -216,7 +221,8 @@ def extract_corpus(
     records = corpus.records(source)
     if limit is not None:
         records = records[:limit]
-    work = [rec for rec in records if not corpus.record_has_open_card(rec.id)]
+    open_ids = corpus.open_card_record_ids()
+    work = [rec for rec in records if rec.id not in open_ids]
     skipped = len(records) - len(work)
     if on_progress is not None:
         on_progress(
@@ -228,6 +234,7 @@ def extract_corpus(
             )
         )
     out: list[ClaimCard] = []
+    llm_on = use_llm
     for index, rec in enumerate(work, start=1):
         drafted = draft_record(rec, corpus)
         if drafted:
@@ -246,7 +253,7 @@ def extract_corpus(
                     )
                 )
             continue
-        if use_llm:
+        if llm_on and _client_has_budget(client):
             if on_progress is not None:
                 on_progress(
                     ExtractProgress(
@@ -268,6 +275,8 @@ def extract_corpus(
                 chunk_chars=chunk_chars,
                 max_chunks=max_chunks,
             )
+            if not _client_has_budget(client):
+                llm_on = False
             out.extend(cards)
             if on_progress is not None:
                 on_progress(
@@ -339,3 +348,10 @@ def _extras_from_item(item: dict[str, Any]) -> dict[str, str]:
 
 def _norm_claim(claim: str) -> str:
     return " ".join(claim.lower().split())
+
+
+def _client_has_budget(client: LLMClient) -> bool:
+    budget = getattr(client, "_budget", None)
+    if budget is None:
+        return True
+    return bool(getattr(budget, "remaining", True))

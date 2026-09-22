@@ -10,7 +10,7 @@ from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
-from dossier.identity import account_dir, skip_folder
+from dossier.identity import account_dir, is_blocked_mail_root, skip_folder
 
 DEFAULT_MAX_BYTES = 200 * 1024 * 1024
 TEXT_CAP = 8000
@@ -85,13 +85,21 @@ def is_mbox_file(path: Path) -> bool:
 
 def iter_mbox_files(root: Path) -> Iterator[tuple[Path, str]]:
     root = root.resolve()
+    if is_blocked_mail_root(root):
+        return
     if root.is_file() and is_mbox_file(root):
         yield root, root.name
         return
     if not root.is_dir():
         return
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        # Never stream the 26G IDDRI Thunderbird tree (or its Sent Mail).
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if not d.startswith(".")
+            and not is_blocked_mail_root(Path(dirpath) / d)
+        ]
         for name in filenames:
             path = Path(dirpath) / name
             if not is_mbox_file(path):

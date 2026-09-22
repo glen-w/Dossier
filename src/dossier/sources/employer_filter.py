@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dossier.llm.budget import CallBudget
-from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError
+from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
 
 # Directory names that are machinery, not work. Matched on one path part.
 SKIP_DIR_NAMES = frozenset(
@@ -142,6 +142,8 @@ Folders:
 
 _BATCH = 40
 _NAMES = 8
+# Folder names only — do not inherit a 256k model default or a long extract timeout.
+_LLM_TIMEOUT_CAP = 60.0
 
 
 @dataclass(frozen=True)
@@ -174,7 +176,7 @@ def select_files(
     client: LLMClient | None = None,
     model: str = "",
     max_calls: int = 4,
-    timeout_seconds: float = 300.0,
+    timeout_seconds: float = 60.0,
     on_dir: OnDir | None = None,
 ) -> FilterStats:
     """Walk ``root``. When ``enabled`` is false, keep the old broad inventory."""
@@ -194,12 +196,14 @@ def select_files(
     if len(parents) < 2:
         stats.llm_note = "skipped (one folder)"
         return stats
+    if on_dir is not None:
+        on_dir("llm folder pass", stats)
     dropped_dirs, note = _llm_drop(
         kept,
         client,
         model=model,
         max_calls=max_calls,
-        timeout_seconds=timeout_seconds,
+        timeout_seconds=min(timeout_seconds, _LLM_TIMEOUT_CAP),
         stats=stats,
     )
     stats.llm_note = note
@@ -380,6 +384,8 @@ def _llm_drop(
                     json_mode=True,
                     timeout_seconds=timeout_seconds,
                     temperature=0.0,
+                    num_ctx=ctx_tokens_for(prompt, max_num_ctx=8192),
+                    max_tokens=512,
                 )
             )
         except LLMClientError:

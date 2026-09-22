@@ -253,6 +253,17 @@ class Corpus:
         ).fetchone()
         return row is not None
 
+    def open_card_record_ids(self) -> set[str]:
+        rows = self._conn.execute(
+            """
+            SELECT DISTINCT record_id FROM cards
+            WHERE record_id IS NOT NULL AND record_id != ''
+              AND status IN (?, ?)
+            """,
+            (STATUS_PENDING, STATUS_APPROVED),
+        ).fetchall()
+        return {str(row["record_id"]) for row in rows}
+
     def search_fts(self, match: str, *, limit: int) -> list[tuple[str, float]] | None:
         """(uri, rank) pairs, best rank first. None when FTS5 cannot run."""
         if not self.fts_ok or not match.strip() or limit < 1:

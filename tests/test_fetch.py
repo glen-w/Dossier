@@ -13,6 +13,28 @@ def test_fetch_mbox_does_not_expose_folder_walker() -> None:
     assert not hasattr(mbox_fetch, "parse_mbox_folder")
 
 
+def test_iter_mbox_files_skips_blocked_iddri_tree(tmp_path: Path) -> None:
+    from dossier.fetch.mbox import build_mbox_index, iter_mbox_files
+
+    mail = tmp_path / "email"
+    gmail = mail / "gmail"
+    gmail.mkdir(parents=True)
+    (gmail / "Teaching").write_text("From: a\nSubject: gmail\n\nok\n", encoding="utf-8")
+    iddri = mail / "iddri"
+    iddri.mkdir()
+    (iddri / "INBOX").write_text("From: a\nSubject: inbox\n\nno\n", encoding="utf-8")
+    deep = iddri / "Teaching"
+    deep.write_text("From: a\nSubject: deep\n\nno\n", encoding="utf-8")
+
+    paths = [p.name for p, _ in iter_mbox_files(mail)]
+    assert "Teaching" in paths
+    assert "INBOX" not in paths
+    assert "deep" not in paths
+    index = build_mbox_index(mail)
+    assert ("gmail", "Teaching") in index
+    assert not any(key[0].lower() == "iddri" for key in index)
+
+
 def test_slack_fetch_includes_thread_root(tmp_path: Path) -> None:
     db = tmp_path / "catalog.duckdb"
     conn = duckdb.connect(str(db))

@@ -46,7 +46,7 @@ class EmployerSource:
                 client=client,
                 model=cfg.llm_model,
                 max_calls=cfg.employer_filter_llm_calls,
-                timeout_seconds=cfg.llm_timeout_seconds,
+                timeout_seconds=min(cfg.llm_timeout_seconds, 60.0),
                 on_dir=on_dir,
             )
             scan.finish(

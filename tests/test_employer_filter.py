@@ -86,6 +86,8 @@ def test_llm_pass_drops_a_named_folder_and_keeps_the_rest(
             assert "CSE" in request.prompt
             assert "raw dumps" in request.prompt
             assert "Minutes" not in request.prompt
+            assert request.num_ctx is not None and request.num_ctx <= 8192
+            assert request.timeout_seconds <= 60.0
             return {"drop": ["raw dumps"]}
 
     monkeypatch.setenv("DOSSIER_EMPLOYER_PATHS", str(folder))

@@ -34,9 +34,7 @@ def draft_record(record: Record, corpus: Corpus) -> list[ClaimCard]:
     proposal = _proposal(record)
     if proposal is None:
         return []
-    evidence = corpus.evidence_by_uri()
-    if record.uri not in evidence:
-        evidence = {**evidence, record.uri: record.text}
+    evidence = _evidence_for(proposal.citations, record, corpus)
     status, reason = adjudicate(proposal.claim, proposal.citations, evidence)
     if status != STATUS_PENDING:
         return []
@@ -52,6 +50,23 @@ def draft_record(record: Record, corpus: Corpus) -> list[ClaimCard]:
     )
     corpus.put_card(card)
     return [card]
+
+
+def _evidence_for(
+    citations: list[str], record: Record, corpus: Corpus
+) -> dict[str, str]:
+    """Citation bodies only — never reload the whole corpus per draft."""
+    evidence: dict[str, str] = {}
+    for uri in citations:
+        if uri == record.uri:
+            evidence[uri] = record.text
+            continue
+        found = corpus.get_record(uri)
+        if found is not None:
+            evidence[uri] = found.text
+    if record.uri not in evidence:
+        evidence[record.uri] = record.text
+    return evidence
 
 
 def _proposal(record: Record) -> ProposedClaim | None:

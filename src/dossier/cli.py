@@ -266,7 +266,14 @@ def _ingest(args: argparse.Namespace, corpus: Corpus) -> int:
 
 
 def _extract(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
-    return _extract_cards(cfg, corpus, source=args.source, limit=args.limit, strict_llm=True)
+    return _extract_cards(
+        cfg,
+        corpus,
+        source=args.source,
+        limit=args.limit,
+        strict_llm=True,
+        budget=CallBudget(cfg.llm_max_calls),
+    )
 
 
 def _note_egress(cfg: Config) -> None:
@@ -312,9 +319,11 @@ def _extract_cards(
     source: str | None,
     limit: int | None,
     strict_llm: bool,
+    budget: CallBudget | None = None,
 ) -> int:
     use_llm = cfg.extract_llm and cfg.llm_enabled
     client: LLMClient = NullLLMClient()
+    spent = budget
     if use_llm:
         if llm_egress_is_remote(cfg):
             _note_egress(cfg)
@@ -328,7 +337,7 @@ def _extract_cards(
                 source=source,
                 limit=limit,
                 use_llm=False,
-                timeout_seconds=cfg.llm_timeout_seconds,
+                timeout_seconds=min(cfg.llm_timeout_seconds, 60.0),
                 chunk_chars=cfg.extract_chunk_chars,
                 max_chunks=cfg.extract_max_chunks,
                 on_progress=_extract_progress(use_llm=False, model=cfg.llm_model),
@@ -336,6 +345,9 @@ def _extract_cards(
             _print_extract(drafted)
             print(msg, file=sys.stderr)
             return 2 if strict_llm else 0
+        if spent is None:
+            spent = CallBudget(cfg.llm_max_calls)
+        client = spent.wrap(client)
     cards = extract_corpus(
         corpus,
         client,
@@ -343,7 +355,7 @@ def _extract_cards(
         source=source,
         limit=limit,
         use_llm=use_llm,
-        timeout_seconds=cfg.llm_timeout_seconds,
+        timeout_seconds=min(cfg.llm_timeout_seconds, 60.0),
         chunk_chars=cfg.extract_chunk_chars,
         max_chunks=cfg.extract_max_chunks,
         on_progress=_extract_progress(use_llm=use_llm, model=cfg.llm_model),
@@ -664,7 +676,7 @@ def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
         stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
         run_ingest_targets(targets, corpus)
     budget = CallBudget(cfg.llm_max_calls)
-    _extract_cards(cfg, corpus, source=None, limit=None, strict_llm=False)
+    _extract_cards(cfg, corpus, source=None, limit=None, strict_llm=False, budget=budget)
     code = _brief(args, cfg, corpus, budget=budget)
     print(
         f"ledger: records={len(corpus.records())} "

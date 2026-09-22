@@ -12,6 +12,10 @@ class CallBudget:
         self.max_calls = max(0, max_calls)
         self.calls = 0
 
+    @property
+    def remaining(self) -> bool:
+        return self.calls < self.max_calls
+
     def wrap(self, inner: LLMClient) -> LLMClient:
         return _BudgetClient(inner, self)
 
