@@ -1,7 +1,60 @@
 import pytest
 
-from dossier.cards import STATUS_PENDING, STATUS_REFUSED, ClaimCard
+from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED, ClaimCard
 from dossier.store import Corpus, Record
+
+
+def _pending(card_id: str, source: str, *, status: str = STATUS_PENDING, lens: str = "") -> ClaimCard:
+    extras = {"lens": lens, "kind": "paper"} if lens else {}
+    return ClaimCard(
+        id=card_id,
+        claim=f"Synthetic claim {card_id}. Not a real job.",
+        citations=["fixture://note-1"],
+        source=source,
+        status=status,
+        extras=extras,
+    )
+
+
+def test_approve_pending_skips_excluded_and_refused(corpus: Corpus) -> None:
+    corpus.put_card(_pending("emp", "employer", lens="delivered"))
+    corpus.put_card(_pending("skill", "employer", lens="skills"))
+    corpus.put_card(_pending("chat", "chatgpt"))
+    corpus.put_card(_pending("git", "git"))
+    corpus.put_card(_pending("nope", "employer", status=STATUS_REFUSED))
+    counts = corpus.pending_counts(exclude=("chatgpt", "git"))
+    assert counts == [("employer", 2)]
+    changed = corpus.approve_pending(exclude=("chatgpt", "git"))
+    assert changed == 2
+    assert corpus.get_card("emp").status == STATUS_APPROVED
+    assert corpus.get_card("chat").status == STATUS_PENDING
+    assert corpus.get_card("git").status == STATUS_PENDING
+    assert corpus.get_card("nope").status == STATUS_REFUSED
+    assert corpus.approve_pending(sources=("employer",), lens="skills") == 0
+    assert corpus.approve_pending(sources=("chatgpt",)) == 1
+
+
+def test_reopen_returns_approved_and_refused_only(corpus: Corpus) -> None:
+    corpus.put_card(_pending("keep", "employer", status=STATUS_APPROVED, lens="delivered"))
+    corpus.put_card(_pending("nope", "employer", status=STATUS_REFUSED))
+    corpus.put_card(_pending("wait", "employer"))
+    corpus.put_card(_pending("other", "git", status=STATUS_APPROVED))
+    assert corpus.reopen("keep").status == STATUS_PENDING
+    assert corpus.reopen_filtered(sources=("employer",)) == 1
+    assert corpus.get_card("nope").status == STATUS_PENDING
+    assert corpus.get_card("wait").status == STATUS_PENDING
+    assert corpus.get_card("other").status == STATUS_APPROVED
+    with pytest.raises(ValueError):
+        corpus.reopen("wait")
+
+
+def test_refuse_pending_card(corpus: Corpus) -> None:
+    corpus.put_card(_pending("chat", "chatgpt"))
+    refused = corpus.refuse("chat")
+    assert refused.status == STATUS_REFUSED
+    with pytest.raises(ValueError):
+        corpus.refuse("chat")
+    assert corpus.refuse_pending(sources=("chatgpt",)) == 0
 
 
 def test_refused_card_cannot_be_approved(corpus) -> None:

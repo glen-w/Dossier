@@ -8,7 +8,7 @@ model = "qwen3.8:latest"
 embed_model = "nomic-embed-text"
 base_url = "http://127.0.0.1:11434"
 allow_remote = false
-max_calls = 6
+max_calls = 0 # 0 = unlimited; set a positive cap to stop early
 timeout = 300 # seconds per Ollama generate call
 # api_base = "https://example.invalid/v1"
 

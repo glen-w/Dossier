@@ -8,7 +8,7 @@ adapters you enable
     → local corpus (data/evidence.db, gitignored)
         → dossier index (passage vectors in that same file)
         → deterministic drafts, then the model for what is left
-            → human approve
+            → human gate (buffet, approve, refuse, reopen, review)
                 → buffet of cards you can paste
                     → defend stores the carrying sentence
                         → data/packets when you write a packet
@@ -34,7 +34,7 @@ One adapter per source. Register it by appending `CONTRIBUTIONS` in `src/dossier
 
 ## After ingest
 
-Drafts, the human approve gate, defend, packet, gaps, and ask are described in [status](status.md). This page does not restate those rules. `dossier index` writes passage vectors into the same SQLite file. It does not open a second store.
+Drafts, the human gate (`buffet`, `approve`, `refuse`, `reopen`, `review`), defend, packet, gaps, and ask are described in [status](status.md). This page does not restate those rules. `dossier index` writes passage vectors into the same SQLite file. It does not open a second store.
 
 ## Wired adapters
 

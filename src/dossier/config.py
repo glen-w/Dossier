@@ -39,7 +39,7 @@ class Config:
     run_pack: str = "career"
     run_posting: str = ""
     lexicon: tuple[str, ...] | None = None
-    llm_max_calls: int = 6
+    llm_max_calls: int = 0
     llm_timeout_seconds: float = 300.0
     ask_cards_first: bool = True
     ask_passages: bool = True
@@ -132,7 +132,7 @@ class Config:
             lexicon=lexicon,
             llm_max_calls=max(
                 0,
-                _env_int("DOSSIER_LLM_MAX_CALLS", _as_int(llm.get("max_calls"), 6)),
+                _env_int("DOSSIER_LLM_MAX_CALLS", _as_int(llm.get("max_calls"), 0)),
             ),
             llm_timeout_seconds=max(
                 30.0,

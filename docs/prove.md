@@ -28,7 +28,9 @@ bash scripts/prove_0_6.sh --pubs
 
 ```text
 DOSSIER_DATA=<path from ledger> uv run dossier buffet --status pending
+DOSSIER_DATA=<path> uv run dossier review
 DOSSIER_DATA=<path> uv run dossier approve <card-id>
+DOSSIER_DATA=<path> uv run dossier approve --all --except chatgpt,git
 DOSSIER_DATA=<path> uv run dossier ask "…"
 ```
 

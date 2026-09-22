@@ -349,6 +349,17 @@ def test_budget_stops_a_sixth_call() -> None:
     assert budget.calls == 1
 
 
+def test_budget_zero_is_unlimited() -> None:
+    budget = CallBudget(0)
+    client = budget.wrap(_Once())
+    req = CompletionRequest(model="x", prompt="p", json_mode=True, num_ctx=1024)
+    for _ in range(3):
+        assert budget.remaining
+        client.complete_json(req)
+    assert budget.calls == 3
+    assert budget.remaining
+
+
 def test_posting_pack_writes_under_tmp(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
     monkeypatch.setenv("DOSSIER_LLM_PROVIDER", "off")

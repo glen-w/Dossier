@@ -19,7 +19,7 @@ Ingest an adapter you have. Records land in `data/evidence.db`. Extract drafts a
 
 Glen’s machine can point `DATA_DUMPS_WAREHOUSE` at an existing DuckDB file. LinkedIn, and the warehouse paths for ChatGPT, Slack, and mail, read that file. They do not build it.
 
-A thin user has no warehouse. Turn on sources you actually have: an employer folder you list, a ChatGPT export, a Slack export, a git repo you list, one exported mbox folder, or a meetings library. Two of those can fill a buffet. Then extract, approve, `defend`, and `tailor`. The same adapters serve both setups. There is no plugin scan. Ollama stays the default. A remote model is opt-in and prints an egress notice.
+A thin user has no warehouse. Turn on sources you actually have: an employer folder you list, a ChatGPT export, a Slack export, a git repo you list, one exported mbox folder, or a meetings library. Two of those can fill a buffet. Then extract, `review` or approve, `defend`, and `tailor`. The same adapters serve both setups. There is no plugin scan. Ollama stays the default. Completions are unlimited unless you set a call cap. A remote model is opt-in and prints an egress notice.
 
 ## Adapters
 
@@ -41,6 +41,7 @@ uv run dossier ingest --adapter employer /path/you/listed
 uv run dossier ingest --adapter git /path/to/repo
 uv run dossier index
 uv run dossier ask "what did I write about coastal governance?"
+uv run dossier review
 uv run dossier defend
 uv run dossier tailor --posting ./posting.txt
 uv run dossier gaps

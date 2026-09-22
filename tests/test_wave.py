@@ -385,6 +385,64 @@ def test_empty_fts_does_not_fall_back_to_overlap() -> None:
     assert hits == []
 
 
+def test_fts_outside_filter_falls_back_to_overlap() -> None:
+    delivered = Record(
+        id="d",
+        source="mbox",
+        uri="mbox://delivered",
+        title="Ocean chapter",
+        text="Lens: delivered\nKind: chapter\nI deliver the ocean chapter for the work report.",
+    )
+    outsider = Record(
+        id="x",
+        source="employer",
+        uri="file://employer/transcript",
+        title="Team notes",
+        text="Lens: skills\nKind: workshop\nLong work notes about deliverables.",
+    )
+    fts = {outsider.uri: -10.0, delivered.uri: -1.0}
+    # Global FTS prefers the outsider; lens keeps only delivered → use overlap.
+    hits = retrieve(
+        [delivered, outsider],
+        "What work did I deliver?",
+        lens="delivered",
+        fts_rank=fts,
+    )
+    assert [hit.uri for hit in hits] == [delivered.uri]
+    # When FTS hits exist only outside the filter, still keep overlap.
+    outside_only = {outsider.uri: -10.0}
+    again = retrieve(
+        [delivered, outsider],
+        "What work did I deliver?",
+        lens="delivered",
+        fts_rank=outside_only,
+    )
+    assert [hit.uri for hit in again] == [delivered.uri]
+
+
+def test_narrow_source_surfaces_without_token_overlap(corpus: Corpus) -> None:
+    role = Record(
+        id="li",
+        source="linkedin",
+        uri="linkedin://positions/0",
+        title="Adjunct Professor at Sciences Po",
+        text="Adjunct Professor at Sciences Po. Paris. Jan 2015",
+        table="linkedin.positions",
+    )
+    # retrieve alone still refuses hollow token overlap
+    assert retrieve([role], "What roles have I held?", source="linkedin") == []
+    corpus.upsert_record(role)
+    hits = ask_hits(
+        corpus,
+        "What roles have I held?",
+        Config(ask_fts=False, ask_passages=False, ask_embed=False, lexicon=()),
+        limit=5,
+        source="linkedin",
+    )
+    assert [hit.uri for hit in hits] == [role.uri]
+    assert hits[0].score == 0
+
+
 def test_ask_hits_uses_empty_fts_result(corpus: Corpus) -> None:
     corpus.upsert_record(_coastal())
     corpus.search_fts = lambda match, limit: []  # type: ignore[method-assign]

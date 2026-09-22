@@ -10,7 +10,7 @@ from pathlib import Path
 
 from dossier.ask import ASK_MODES
 from dossier.brief import run_pack, write_brief
-from dossier.cards import STATUS_APPROVED
+from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED
 from dossier.config import Config
 from dossier.contributions import CONTRIBUTIONS, contribution
 from dossier.extract import ExtractProgress, extract_corpus
@@ -70,7 +70,19 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     p_ok = sub.add_parser("approve", help="Human gate: mark a pending card approved")
-    p_ok.add_argument("card_id")
+    p_ok.add_argument("card_id", nargs="?", default=None)
+    _add_gate_filters(p_ok)
+
+    p_no = sub.add_parser("refuse", help="Human gate: mark a pending card refused")
+    p_no.add_argument("card_id", nargs="?", default=None)
+    _add_gate_filters(p_no)
+
+    p_reopen = sub.add_parser("reopen", help="Send an approved or refused card back to pending")
+    p_reopen.add_argument("card_id", nargs="?", default=None)
+    _add_gate_filters(p_reopen)
+
+    p_review = sub.add_parser("review", help="Loopback page to sift claim cards")
+    p_review.add_argument("--port", type=int, default=8765)
 
     p_ask = sub.add_parser("ask", help="Answer from ingested records, with citations")
     p_ask.add_argument("question")
@@ -203,6 +215,12 @@ def main(argv: list[str] | None = None) -> int:
             return _buffet(args, corpus)
         if args.cmd == "approve":
             return _approve(args, corpus)
+        if args.cmd == "refuse":
+            return _refuse(args, corpus)
+        if args.cmd == "reopen":
+            return _reopen(args, corpus)
+        if args.cmd == "review":
+            return _review(args, corpus)
         if args.cmd == "ask":
             return _ask(args, cfg, corpus)
         if args.cmd == "brief":
@@ -542,16 +560,128 @@ def _env_path(name: str) -> Path | None:
     return Path(raw)
 
 
-def _approve(args: argparse.Namespace, corpus: Corpus) -> int:
+def _add_gate_filters(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Apply to every pending card in the filter",
+    )
+    parser.add_argument(
+        "--source",
+        default="",
+        help="Comma-separated sources to include",
+    )
+    parser.add_argument(
+        "--except",
+        dest="exclude",
+        default="",
+        help="Comma-separated sources to skip",
+    )
+
+
+def _names(raw: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
+def _gate(args: argparse.Namespace, corpus: Corpus, *, action: str) -> int:
+    card_id = getattr(args, "card_id", None)
+    if args.all and card_id:
+        print("pass a card id or --all, not both", file=sys.stderr)
+        return 2
+    if args.all:
+        return _bulk(args, corpus, action=action)
+    if not card_id:
+        print("pass a card id or --all", file=sys.stderr)
+        return 2
     try:
-        card = corpus.approve(args.card_id)
+        if action == "approve":
+            card = corpus.approve(card_id)
+            label = STATUS_APPROVED
+        elif action == "refuse":
+            card = corpus.refuse(card_id)
+            label = STATUS_REFUSED
+        else:
+            card = corpus.reopen(card_id)
+            label = STATUS_PENDING
     except KeyError:
-        print(f"unknown card {args.card_id}", file=sys.stderr)
+        print(f"unknown card {card_id}", file=sys.stderr)
         return 2
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    print(f"{STATUS_APPROVED} {card.id}  {card.claim}")
+    print(f"{label} {card.id}  {card.claim}")
+    return 0
+
+
+def _bulk(args: argparse.Namespace, corpus: Corpus, *, action: str) -> int:
+    sources = _names(args.source)
+    exclude = _names(args.exclude)
+    both = sorted(set(sources) & set(exclude))
+    if both:
+        print(
+            "listed in --source and --except: " + ", ".join(both),
+            file=sys.stderr,
+        )
+    known = corpus.known_sources()
+    missing = [name for name in sources if name not in known]
+    if missing:
+        print("no cards for " + ", ".join(missing), file=sys.stderr)
+    if action == "reopen":
+        counts = corpus.matching_counts(
+            (STATUS_APPROVED, STATUS_REFUSED),
+            sources=sources,
+            exclude=exclude,
+        )
+        noun = "to reopen"
+    else:
+        counts = corpus.pending_counts(sources=sources, exclude=exclude)
+        noun = "pending"
+    if not counts:
+        print("no pending cards" if action != "reopen" else "nothing to reopen")
+        return 0
+    for source, count in counts:
+        print(f"{source}  {count} {noun}")
+    if action == "approve":
+        changed = corpus.approve_pending(sources=sources, exclude=exclude)
+        verb = "approved"
+    elif action == "refuse":
+        changed = corpus.refuse_pending(sources=sources, exclude=exclude)
+        verb = "refused"
+    else:
+        changed = corpus.reopen_filtered(sources=sources, exclude=exclude)
+        verb = "reopened"
+    print(f"{verb} {changed}")
+    return 0
+
+
+def _approve(args: argparse.Namespace, corpus: Corpus) -> int:
+    return _gate(args, corpus, action="approve")
+
+
+def _refuse(args: argparse.Namespace, corpus: Corpus) -> int:
+    return _gate(args, corpus, action="refuse")
+
+
+def _reopen(args: argparse.Namespace, corpus: Corpus) -> int:
+    return _gate(args, corpus, action="reopen")
+
+
+def _review(args: argparse.Namespace, corpus: Corpus) -> int:
+    from dossier.review import serve
+
+    port = args.port
+    if port < 1 or port > 65535:
+        print("port must be 1-65535", file=sys.stderr)
+        return 2
+    print(f"http://127.0.0.1:{port}/")
+    try:
+        serve(corpus, port)
+    except KeyboardInterrupt:
+        print("\nstopped")
+        return 0
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     return 0
 
 
@@ -675,13 +805,16 @@ def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
     if targets:
         stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
         run_ingest_targets(targets, corpus)
-    budget = CallBudget(cfg.llm_max_calls)
-    _extract_cards(cfg, corpus, source=None, limit=None, strict_llm=False, budget=budget)
-    code = _brief(args, cfg, corpus, budget=budget)
+    extract_budget = CallBudget(cfg.llm_max_calls)
+    _extract_cards(
+        cfg, corpus, source=None, limit=None, strict_llm=False, budget=extract_budget
+    )
+    brief_budget = CallBudget(cfg.llm_max_calls)
+    code = _brief(args, cfg, corpus, budget=brief_budget)
     print(
         f"ledger: records={len(corpus.records())} "
         f"adapters_skipped={len(skipped)} "
-        f"model_calls={budget.calls} "
+        f"model_calls={extract_budget.calls + brief_budget.calls} "
         f"egress={'yes' if llm_egress_is_remote(cfg) else 'no'}"
     )
     return code
@@ -800,7 +933,10 @@ def _doctor(cfg: Config) -> int:
         print(f"sqlite: {sqlite3.sqlite_version}")
         print(f"fts5: {'yes' if corpus.fts_ok else 'no'}")
         print(f"provider: {cfg.llm_provider}")
-        print(f"max_calls: {cfg.llm_max_calls}")
+        print(
+            "max_calls: "
+            + ("unlimited" if cfg.llm_max_calls == 0 else str(cfg.llm_max_calls))
+        )
         print(f"ask.mode: {cfg.ask_mode}")
         print(f"ask.cards_first: {cfg.ask_cards_first}")
         print(f"ask.passages: {cfg.ask_passages}")

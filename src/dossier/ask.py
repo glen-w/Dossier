@@ -125,10 +125,17 @@ def retrieve(
     rows = _filter_records(records, source=source, lens=lens, kind=kind)
     scored = _score(rows, used)
     # None means full text is off or unavailable. An empty map means it ran and missed.
+    # A non-empty map scoped outside this filter falls back to overlap.
     if fts_rank is not None:
-        preferred = [hit for hit in scored if hit.uri in fts_rank]
-        preferred.sort(key=lambda hit: (fts_rank[hit.uri], -hit.score, hit.uri))
-        return preferred[:capped]
+        if not fts_rank:
+            return []
+        allowed = {rec.uri for rec in rows}
+        scoped = {uri: rank for uri, rank in fts_rank.items() if uri in allowed}
+        if scoped:
+            preferred = [hit for hit in scored if hit.uri in scoped]
+            preferred.sort(key=lambda hit: (scoped[hit.uri], -hit.score, hit.uri))
+            if preferred:
+                return preferred[:capped]
     scored.sort(key=lambda hit: (-hit.score, hit.uri))
     return scored[:capped]
 
@@ -160,6 +167,8 @@ def collect_hits(
             tokens=used,
             fts_rank=_fts_rank(corpus.search_fts, match_query(used), limit, fts_on),
         )
+        if not lexical:
+            lexical = _source_fallback(records, source, limit)
         return _with_vectors(
             corpus,
             lexical,
@@ -199,6 +208,8 @@ def collect_hits(
             continue
         seen.add(hit.uri)
         unique.append(hit)
+    if not unique:
+        unique = _source_fallback(records, source, limit)
     return _with_vectors(
         corpus,
         unique,
@@ -207,6 +218,23 @@ def collect_hits(
         embed_model=embed_model,
         limit=min(limit, MAX_HITS),
     )
+
+
+def _source_fallback(
+    records: list[Record],
+    source: str | None,
+    limit: int,
+) -> list[Hit]:
+    """When a pack pins a small source (LinkedIn) and tokens miss, still surface it."""
+    if not source or not records:
+        return []
+    capped = min(limit, MAX_HITS)
+    if len(records) > max(capped * 4, 16):
+        return []
+    return [
+        Hit(uri=rec.uri, title=rec.title, text=rec.text, score=0)
+        for rec in records[:capped]
+    ]
 
 
 def approved_answer(corpus: Corpus, question: str) -> Answer | None:

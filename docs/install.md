@@ -46,8 +46,9 @@ The pubs search server, when you run one, is its own compose project. This repo 
 
 ## Model
 
-The default model is Ollama at `http://127.0.0.1:11434`. Set
-`DOSSIER_LLM_PROVIDER=off` to skip model calls. `dossier ask --mode exact`
+The default model is Ollama at `http://127.0.0.1:11434`. Completions are
+unlimited unless `DOSSIER_LLM_MAX_CALLS` (or `[llm] max_calls`) is a positive
+cap. Set `DOSSIER_LLM_PROVIDER=off` to skip model calls. `dossier ask --mode exact`
 still quotes from the corpus. An OpenAI-compatible API is opt-in
 (`DOSSIER_LLM_PROVIDER=litellm`, plus `dossier[llm]`). If a completion can
 leave the machine, the CLI prints an egress notice before it runs.

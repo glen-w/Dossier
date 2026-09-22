@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dossier.cards import STATUS_APPROVED, STATUS_PENDING, ClaimCard
+from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED, ClaimCard
 
 
 def _now() -> str:
@@ -33,6 +33,7 @@ class Corpus:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self.db_path)
         self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA busy_timeout = 5000")
         self.fts_ok = False
         self.passages_fts_ok = False
         self._init()
@@ -69,6 +70,7 @@ class Corpus:
                 created_at TEXT NOT NULL,
                 extras TEXT
             );
+            CREATE INDEX IF NOT EXISTS cards_status_source ON cards (status, source);
             """
         )
         cols = {
@@ -239,6 +241,204 @@ class Corpus:
         )
         self.put_card(approved)
         return approved
+
+    def refuse(self, card_id: str) -> ClaimCard:
+        card = self.get_card(card_id)
+        if card is None:
+            raise KeyError(card_id)
+        if card.status != STATUS_PENDING:
+            raise ValueError(f"card {card_id} is {card.status}, not pending")
+        refused = ClaimCard(
+            id=card.id,
+            claim=card.claim,
+            citations=list(card.citations),
+            source=card.source,
+            status=STATUS_REFUSED,
+            reason="refused",
+            record_id=card.record_id,
+            extras=dict(card.extras),
+        )
+        self.put_card(refused)
+        return refused
+
+    def reopen(self, card_id: str) -> ClaimCard:
+        card = self.get_card(card_id)
+        if card is None:
+            raise KeyError(card_id)
+        if card.status not in (STATUS_APPROVED, STATUS_REFUSED):
+            raise ValueError(f"card {card_id} is {card.status}, not approved or refused")
+        pending = ClaimCard(
+            id=card.id,
+            claim=card.claim,
+            citations=list(card.citations),
+            source=card.source,
+            status=STATUS_PENDING,
+            reason="",
+            record_id=card.record_id,
+            extras=dict(card.extras),
+        )
+        self.put_card(pending)
+        return pending
+
+    def known_sources(self) -> set[str]:
+        rows = self._conn.execute("SELECT DISTINCT source FROM cards").fetchall()
+        return {str(row["source"]) for row in rows}
+
+    def pending_counts(
+        self,
+        *,
+        sources: tuple[str, ...] = (),
+        exclude: tuple[str, ...] = (),
+    ) -> list[tuple[str, int]]:
+        return self.matching_counts(
+            (STATUS_PENDING,),
+            sources=sources,
+            exclude=exclude,
+        )
+
+    def matching_counts(
+        self,
+        statuses: tuple[str, ...],
+        *,
+        sources: tuple[str, ...] = (),
+        exclude: tuple[str, ...] = (),
+    ) -> list[tuple[str, int]]:
+        where, params = _card_filter(
+            statuses=statuses,
+            sources=sources,
+            exclude=exclude,
+            lens=None,
+            kind=None,
+            ids=(),
+        )
+        rows = self._conn.execute(
+            f"SELECT source, COUNT(*) AS n FROM cards WHERE {where} "
+            "GROUP BY source ORDER BY n DESC, source",
+            params,
+        ).fetchall()
+        return [(str(row["source"]), int(row["n"])) for row in rows]
+
+    def approve_pending(
+        self,
+        *,
+        sources: tuple[str, ...] = (),
+        exclude: tuple[str, ...] = (),
+        lens: str | None = None,
+        kind: str | None = None,
+        ids: tuple[str, ...] = (),
+    ) -> int:
+        return self._set_pending(
+            STATUS_APPROVED,
+            reason="",
+            sources=sources,
+            exclude=exclude,
+            lens=lens,
+            kind=kind,
+            ids=ids,
+        )
+
+    def refuse_pending(
+        self,
+        *,
+        sources: tuple[str, ...] = (),
+        exclude: tuple[str, ...] = (),
+        lens: str | None = None,
+        kind: str | None = None,
+        ids: tuple[str, ...] = (),
+    ) -> int:
+        return self._set_pending(
+            STATUS_REFUSED,
+            reason="refused",
+            sources=sources,
+            exclude=exclude,
+            lens=lens,
+            kind=kind,
+            ids=ids,
+        )
+
+    def reopen_filtered(
+        self,
+        *,
+        sources: tuple[str, ...] = (),
+        exclude: tuple[str, ...] = (),
+        lens: str | None = None,
+        kind: str | None = None,
+        ids: tuple[str, ...] = (),
+    ) -> int:
+        """Send approved and refused cards back to pending. Pending cards stay."""
+        return self._move(
+            (STATUS_APPROVED, STATUS_REFUSED),
+            STATUS_PENDING,
+            reason="",
+            sources=sources,
+            exclude=exclude,
+            lens=lens,
+            kind=kind,
+            ids=ids,
+        )
+
+    def _set_pending(
+        self,
+        status: str,
+        *,
+        reason: str,
+        sources: tuple[str, ...],
+        exclude: tuple[str, ...],
+        lens: str | None,
+        kind: str | None,
+        ids: tuple[str, ...],
+    ) -> int:
+        return self._move(
+            (STATUS_PENDING,),
+            status,
+            reason=reason,
+            sources=sources,
+            exclude=exclude,
+            lens=lens,
+            kind=kind,
+            ids=ids,
+        )
+
+    def _move(
+        self,
+        from_statuses: tuple[str, ...],
+        status: str,
+        *,
+        reason: str,
+        sources: tuple[str, ...],
+        exclude: tuple[str, ...],
+        lens: str | None,
+        kind: str | None,
+        ids: tuple[str, ...],
+    ) -> int:
+        if len(ids) > 400:
+            changed = 0
+            for start in range(0, len(ids), 400):
+                changed += self._move(
+                    from_statuses,
+                    status,
+                    reason=reason,
+                    sources=sources,
+                    exclude=exclude,
+                    lens=lens,
+                    kind=kind,
+                    ids=ids[start : start + 400],
+                )
+            return changed
+        where, params = _card_filter(
+            statuses=from_statuses,
+            sources=sources,
+            exclude=exclude,
+            lens=lens,
+            kind=kind,
+            ids=ids,
+        )
+        cur = self._conn.execute(
+            f"UPDATE cards SET status = ?, reason = ? WHERE {where}",
+            [status, reason, *params],
+        )
+        self._conn.commit()
+        return max(0, cur.rowcount)
 
     def record_has_open_card(self, record_id: str) -> bool:
         if not record_id:
@@ -695,6 +895,57 @@ class Corpus:
                 self._conn.execute("SELECT last_insert_rowid()").fetchone()[0],
             ),
         )
+
+
+def _card_filter(
+    *,
+    statuses: tuple[str, ...],
+    sources: tuple[str, ...],
+    exclude: tuple[str, ...],
+    lens: str | None,
+    kind: str | None,
+    ids: tuple[str, ...],
+) -> tuple[str, list]:
+    if len(statuses) == 1:
+        clauses = ["status = ?"]
+        params: list = [statuses[0]]
+    else:
+        marks = ",".join("?" * len(statuses))
+        clauses = [f"status IN ({marks})"]
+        params = list(statuses)
+    if ids:
+        marks = ",".join("?" * len(ids))
+        clauses.append(f"id IN ({marks})")
+        params.extend(ids)
+        return " AND ".join(clauses), params
+    if sources:
+        marks = ",".join("?" * len(sources))
+        clauses.append(f"source IN ({marks})")
+        params.extend(sources)
+    if exclude:
+        marks = ",".join("?" * len(exclude))
+        clauses.append(f"source NOT IN ({marks})")
+        params.extend(exclude)
+    facet, facet_params = _facet("lens", lens)
+    if facet:
+        clauses.append(facet)
+        params.extend(facet_params)
+    facet, facet_params = _facet("kind", kind)
+    if facet:
+        clauses.append(facet)
+        params.extend(facet_params)
+    return " AND ".join(clauses), params
+
+
+def _facet(key: str, value: str | None) -> tuple[str, list]:
+    if key not in ("lens", "kind"):
+        raise ValueError(f"unknown facet {key}")
+    if value is None:
+        return "", []
+    column = f"lower(trim(COALESCE(json_extract(extras, '$.{key}'), '')))"
+    if value == "(none)" or not value.strip():
+        return f"{column} = ''", []
+    return f"{column} = ?", [value.strip().lower()]
 
 
 def _card_from_row(row: sqlite3.Row) -> ClaimCard:

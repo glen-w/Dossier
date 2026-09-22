@@ -1,4 +1,4 @@
-"""Cap model completions for one process. A spent budget does not open a socket."""
+"""Cap model completions for one process. ``max_calls=0`` means unlimited."""
 
 from __future__ import annotations
 
@@ -8,13 +8,15 @@ from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError
 
 
 class CallBudget:
+    """Track completions. A spent positive budget does not open a socket."""
+
     def __init__(self, max_calls: int) -> None:
         self.max_calls = max(0, max_calls)
         self.calls = 0
 
     @property
     def remaining(self) -> bool:
-        return self.calls < self.max_calls
+        return self.max_calls == 0 or self.calls < self.max_calls
 
     def wrap(self, inner: LLMClient) -> LLMClient:
         return _BudgetClient(inner, self)
@@ -38,6 +40,6 @@ class _BudgetClient:
         return self._inner.complete_json(request)
 
     def _take(self) -> None:
-        if self._budget.calls >= self._budget.max_calls:
+        if self._budget.max_calls and self._budget.calls >= self._budget.max_calls:
             raise LLMClientError("model call budget spent")
         self._budget.calls += 1

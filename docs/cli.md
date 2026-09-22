@@ -15,6 +15,10 @@ uv run dossier extract --limit 20
 uv run dossier extract
 uv run dossier buffet --status pending
 uv run dossier approve <card-id>
+uv run dossier approve --all --except chatgpt,git
+uv run dossier refuse --all --source chatgpt
+uv run dossier reopen <card-id>
+uv run dossier review
 uv run dossier span "synthetic paper on coastal governance"
 uv run dossier defend
 uv run dossier gaps
@@ -47,6 +51,19 @@ Split the pipeline when you want control:
 - `uv run dossier brief` — answer the question pack without re-ingesting or
   re-extracting.
 
+`dossier approve --all` and `dossier refuse --all` change every pending card
+that matches `--source` and skips `--except`. `dossier reopen` sends approved
+or refused cards back to pending, one id or `--all` with the same filters.
+A card id and `--all` cannot be combined. A name in both `--source` and
+`--except` is skipped. A `--source` with no cards is reported and not treated
+as a match.
+
+`dossier review` serves one page on `127.0.0.1:8765` (override with `--port`).
+Sources open into lens and kind groups. Approve or refuse applies to pending
+cards in that group, that source, or one card. Reopen walks a card back to
+pending. Source and group actions ask before they run. A claim search and the
+first cited record's opening text sit on each card.
+
 `dossier tailor` writes CV or letter markdown under `data/drafts/` from
 approved cards that already have a span. `--arrange` is letter-only.
 
@@ -70,7 +87,7 @@ variables win over that file.
 | --- | --- |
 | `DOSSIER_LLM_MODEL` | Ollama tag (default `qwen3.8:latest`) |
 | `DOSSIER_ASK_MODE` | `exact`, `auto` (default), or `rich` |
-| `DOSSIER_ASK_FTS` | Full text on title, text, and passages (`true` by default). Whole-word overlap when this Python has no FTS5 |
+| `DOSSIER_ASK_FTS` | Full text on title, text, and passages (`true` by default). Whole-word overlap when this Python has no FTS5, and when full-text hits fall outside the current source or lens filter |
 | `DOSSIER_ASK_CARDS_FIRST` | Prefer an approved claim that carries the question (`true` by default) |
 | `DOSSIER_ASK_PASSAGES` | Search passage rows and cite the parent record (`true` by default) |
 | `DOSSIER_ASK_HOPS` | After a miss, hop on Lens/Kind (default `1`) |
@@ -90,7 +107,7 @@ variables win over that file.
 | `DOSSIER_GIT_PATHS` | Comma-separated git repos. No home-directory scan |
 | `DOSSIER_GIT_USER` | Author name or email fragment. Empty keeps every author |
 | `DOSSIER_MBOX_MAX_FILES` | Max mbox files opened in one exported folder (default 40) |
-| `DOSSIER_LLM_MAX_CALLS` | Cap completions per process (default `6`) |
+| `DOSSIER_LLM_MAX_CALLS` | Cap completions per process (`0` = unlimited, the default) |
 | `DOSSIER_EXTRACT_LLM` | Ask the model after drafts (`true` by default) |
 | `DOSSIER_RUN_PACK` | Question pack for `brief` and `run` (default `career`) |
 | `DOSSIER_RUN_POSTING` | Local posting path for the posting pack |

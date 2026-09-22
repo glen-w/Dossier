@@ -47,6 +47,90 @@ def test_cli_ingest_buffet_approve(tmp_path: Path, monkeypatch) -> None:
     assert main(["buffet", "--status", "approved"]) == 0
 
 
+def test_cli_approve_all_skips_excluded_sources(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
+    corpus = Corpus(tmp_path / "evidence.db")
+    for card_id, source in (("keep", "employer"), ("chat", "chatgpt"), ("git", "git")):
+        corpus.put_card(
+            ClaimCard(
+                id=card_id,
+                claim=f"Synthetic claim {card_id}. Not a real job.",
+                citations=["fixture://note-1"],
+                source=source,
+                status=STATUS_PENDING,
+            )
+        )
+    corpus.put_card(
+        ClaimCard(
+            id="already",
+            claim="Synthetic refused claim. Not a real job.",
+            citations=["fixture://note-1"],
+            source="employer",
+            status="refused",
+            reason="no citations",
+        )
+    )
+    corpus.close()
+    assert main(["approve"]) == 2
+    assert main(["approve", "--all", "--except", "chatgpt,git"]) == 0
+    out = capsys.readouterr().out
+    assert "employer  1 pending" in out
+    assert "approved 1" in out
+    corpus = Corpus(tmp_path / "evidence.db")
+    assert corpus.get_card("keep").status == STATUS_APPROVED
+    assert corpus.get_card("chat").status == STATUS_PENDING
+    assert corpus.get_card("git").status == STATUS_PENDING
+    assert corpus.get_card("already").status == "refused"
+    corpus.close()
+    assert main(["refuse", "chat"]) == 0
+    corpus = Corpus(tmp_path / "evidence.db")
+    assert corpus.get_card("chat").status == "refused"
+    corpus.close()
+    assert main(["reopen", "--all", "--source", "missing,employer"]) == 0
+    again = capsys.readouterr()
+    assert "no cards for missing" in again.err
+    assert "reopened 2" in again.out
+    corpus = Corpus(tmp_path / "evidence.db")
+    assert corpus.get_card("keep").status == STATUS_PENDING
+    assert corpus.get_card("already").status == STATUS_PENDING
+    assert corpus.get_card("chat").status == "refused"
+    corpus.close()
+
+
+def test_cli_bulk_gate_rejects_a_mixed_id_and_an_overlap(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
+    corpus = Corpus(tmp_path / "evidence.db")
+    for card_id, source in (("emp", "employer"), ("chat", "chatgpt")):
+        corpus.put_card(
+            ClaimCard(
+                id=card_id,
+                claim=f"Synthetic claim {card_id}. Not a real job.",
+                citations=["fixture://note-1"],
+                source=source,
+                status=STATUS_PENDING,
+            )
+        )
+    corpus.close()
+    assert main(["approve", "emp", "--all"]) == 2
+    assert "not both" in capsys.readouterr().err
+    assert main(["refuse", "--all", "--source", "employer", "--except", "employer"]) == 0
+    overlap = capsys.readouterr()
+    assert "listed in --source and --except: employer" in overlap.err
+    assert "no pending cards" in overlap.out
+    assert main(["refuse", "--all", "--except", "chatgpt"]) == 0
+    refused = capsys.readouterr().out
+    assert "employer  1 pending" in refused
+    assert "refused 1" in refused
+    corpus = Corpus(tmp_path / "evidence.db")
+    assert corpus.get_card("emp").status == "refused"
+    assert corpus.get_card("chat").status == STATUS_PENDING
+    corpus.close()
+    assert main(["review", "--port", "0"]) == 2
+    assert "port must be" in capsys.readouterr().err
+
+
 def test_cli_extract_prints_egress_and_needs_llm(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
     monkeypatch.setenv("DOSSIER_LLM_PROVIDER", "litellm")
