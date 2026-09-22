@@ -12,6 +12,8 @@ Suggested layout, when you choose to run one:
 - Loopback port `8012` (the `pubs` adapter’s default `DOSSIER_PUBS_URL`)
 - A thin `POST /search` endpoint that wraps LanceDB retrieval (upstream zotero-rag is Chainlit + CLI today)
 
+That compose project is the pubs server only. The locker stays a host CLI. See [install](install.md).
+
 Confirm the collection name in Zotero before any ingest. A large library and a publications folder are different scopes.
 
 ```text

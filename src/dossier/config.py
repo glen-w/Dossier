@@ -51,6 +51,9 @@ class Config:
     ask_pubs: bool = False
     cv_name: str = ""
     referee_pubs: bool = True
+    employer_filter: bool = True
+    employer_filter_llm: bool = True
+    employer_filter_llm_calls: int = 4
 
     @classmethod
     def from_env(cls) -> Config:
@@ -61,6 +64,7 @@ class Config:
         extract = file_cfg.get("extract") if isinstance(file_cfg.get("extract"), dict) else {}
         run = file_cfg.get("run") if isinstance(file_cfg.get("run"), dict) else {}
         tailor = file_cfg.get("tailor") if isinstance(file_cfg.get("tailor"), dict) else {}
+        employer = file_cfg.get("employer") if isinstance(file_cfg.get("employer"), dict) else {}
 
         provider = _env_str(
             "DOSSIER_LLM_PROVIDER",
@@ -165,6 +169,21 @@ class Config:
             ask_pubs=_env_bool("DOSSIER_ASK_PUBS", bool(ask.get("pubs", False))),
             cv_name=_env_str("DOSSIER_CV_NAME", str(tailor.get("name") or "")).strip(),
             referee_pubs=_env_bool("DOSSIER_REFEREE_PUBS", True),
+            employer_filter=_env_bool(
+                "DOSSIER_EMPLOYER_FILTER",
+                bool(employer.get("filter", True)),
+            ),
+            employer_filter_llm=_env_bool(
+                "DOSSIER_EMPLOYER_FILTER_LLM",
+                bool(employer.get("filter_llm", True)),
+            ),
+            employer_filter_llm_calls=max(
+                0,
+                _env_int(
+                    "DOSSIER_EMPLOYER_FILTER_LLM_CALLS",
+                    _as_int(employer.get("filter_llm_calls"), 4),
+                ),
+            ),
         )
 
 

@@ -56,4 +56,5 @@ These are not delayed features; they are refuse lines.
 - No cloud LLM default; egress notice when a completion can leave the machine
 - No 26G IDDRI mbox stream; no Sent Mail as a folder walker; no re-embed of hoops/ocean
 - No plugin directory or entry-point scan
+- No Docker image for the locker. It installs with `uv` on the host. A pubs compose project, if any, stays separate and gated
 - Dumps, warehouse, LanceDB, `evidence.db`, `.env`, mbox, and PDFs stay off git

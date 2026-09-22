@@ -444,15 +444,9 @@ class Corpus:
                 )
 
     def _delete_passage_fts(self, uri: str) -> None:
-        rows = self._conn.execute(
-            "SELECT rowid, record_uri FROM passages_fts"
-        ).fetchall()
-        for row in rows:
-            if str(row["record_uri"]) == uri:
-                self._conn.execute(
-                    "DELETE FROM passages_fts WHERE rowid = ?",
-                    (row["rowid"],),
-                )
+        # record_uri is UNINDEXED, so FTS5 allows this filter.
+        # A full-table fetch here scans every passage on every upsert.
+        self._conn.execute("DELETE FROM passages_fts WHERE record_uri = ?", (uri,))
 
     def _ensure_vectors(self) -> None:
         self._conn.execute(

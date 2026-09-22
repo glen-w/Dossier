@@ -12,6 +12,7 @@ Authority: What stays off git and off the network. The refuse list is defined in
 - No 26G IDDRI mbox stream; no Sent Mail as a folder walker; no re-embed of
   hoops or ocean Zotero libraries.
 - No plugin directory or entry-point scan.
+- No Docker image for the locker. It installs on the host with `uv`.
 - Meeting transcripts stay in the TranscriptX library. Ingest copies your
   turns into `evidence.db` only. Do not commit that library.
 

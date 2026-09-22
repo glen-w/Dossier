@@ -20,6 +20,8 @@ adapters you enable
 
 Ask reads records already in the corpus, then the passage vectors in that same file when full text is thin. The order — approved card, quote, hops, one completion — and when a neighbor is quoted live in [status](status.md).
 
+The locker is a host process: `uv run dossier` on the machine that holds the folders, the SQLite file, and Ollama on loopback. There is no image. See [install](install.md).
+
 ## Source protocol
 
 One adapter per source. Register it by appending `CONTRIBUTIONS` in `src/dossier/contributions.py`. Adapters are not discovered from a plugins folder.

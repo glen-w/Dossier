@@ -16,7 +16,7 @@ plugin directory and no entry-point scan. Turn on only the sources you have.
 | `slack` | Slack export zip or folder, or Glen-touched rows in warehouse `slack.*`. Quotas apply. |
 | `mbox` | Seeks Thunderbird Gloda metadata; fetches **one** allowlisted mbox body under a size cap. An exported folder stops after a file cap. Never streams IDDRI or Sent Mail. |
 | `meetings` | Seeks a TranscriptX library for meetings where you are a named speaker, then stores your turns. |
-| `employer` | Text in every folder you list. Not a walk of Documents. |
+| `employer` | Text in every folder you list, after a cache and duplicate filter. Not a walk of Documents. |
 | `git` | Subject, date, and file names from repos you list, or one repo you pass to `ingest`. Optional author filter. No patches. |
 
 LinkedIn still expects the warehouse schema. ChatGPT and Slack use that warehouse when you point them at it, and an export zip when you point them at one.

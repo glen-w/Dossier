@@ -77,6 +77,22 @@ def test_employer_allowlist_loads_text_and_skips_pdf(
     assert "coastal governance briefing" in cards[0].claim
 
 
+def test_employer_load_reports_each_file(
+    tmp_path: Path, corpus: Corpus, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = tmp_path / "REN21"
+    folder.mkdir()
+    (folder / "note.md").write_text("Drafted the status report.\n", encoding="utf-8")
+    (folder / "scan.pdf").write_bytes(b"%PDF-fake")
+    monkeypatch.setenv("DOSSIER_EMPLOYER_PATHS", str(folder))
+    EmployerSource().load(folder, corpus)
+    err = capsys.readouterr().err
+    assert "employer REN21" in err
+    assert "stored=1" in err
+    assert "inventory=1" in err
+    assert "note.md" in err
+
+
 def test_employer_paths_load_from_toml(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

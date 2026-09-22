@@ -27,7 +27,7 @@ The list is `src/dossier/contributions.py`. Names and limits: [Adapters](docs/ad
 
 ## Install
 
-Python 3.11+ and [uv](https://docs.astral.sh/uv/). The default model is Ollama on loopback. `DOSSIER_LLM_PROVIDER=off` skips model calls. A remote completion prints an egress notice. Interpreter and FTS5 notes: [Install](docs/install.md).
+Python 3.11+ and [uv](https://docs.astral.sh/uv/) on the machine that holds the folders. There is no container image. The default model is Ollama on loopback. `DOSSIER_LLM_PROVIDER=off` skips model calls. A remote completion prints an egress notice. Interpreter and FTS5 notes: [Install](docs/install.md).
 
 ```text
 uv sync --extra dev

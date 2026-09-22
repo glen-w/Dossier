@@ -3,7 +3,7 @@
 Type: GUIDE
 Authority: How to install and which interpreter has FTS5. Command behavior lives in [status](status.md).
 
-Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/) on the machine that holds the folders. There is no container image. See [Where it runs](#where-it-runs).
 
 ```text
 uv sync --extra dev
@@ -35,6 +35,14 @@ uv run dossier doctor
 
 Do not vendor SQLite into this repo. `dossier prove` exits non-zero when
 FTS5 is missing unless you pass `--allow-overlap`.
+
+## Where it runs
+
+`uv sync` on the host. The corpus is `data/evidence.db` on that machine. Adapters read paths you list there: an employer folder, a git repo, an export, an mbox, or `DATA_DUMPS_WAREHOUSE`. The default model is Ollama at `http://127.0.0.1:11434`.
+
+A container would need a bind mount for each of those paths and a second route to loopback Ollama. The 1.0 install is this page. FTS5 is the interpreter note above (`UV_PYTHON`), not an image pin. The refuse line is in [roadmap](roadmap.md).
+
+The pubs search server, when you run one, is its own compose project. This repo does not start it. See [Publications index](zotero-rag-pubs.md).
 
 ## Model
 

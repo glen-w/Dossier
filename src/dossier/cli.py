@@ -14,6 +14,7 @@ from dossier.cards import STATUS_APPROVED
 from dossier.config import Config
 from dossier.contributions import CONTRIBUTIONS, contribution
 from dossier.extract import ExtractProgress, extract_corpus
+from dossier.ingest_run import run_ingest_targets
 from dossier.interview import conduct
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
@@ -259,14 +260,8 @@ def _ingest(args: argparse.Namespace, corpus: Corpus) -> int:
         if not targets:
             print("nothing to ingest (no default source detected)", file=sys.stderr)
             return 1
-    n_before = len(corpus.records())
     stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
-    for item, path in targets:
-        print(f"ingest {item.name} from {path}")
-        item.source.load(path, corpus)
-    n_after = len(corpus.records())
-    print(f"records: {n_after} (+{n_after - n_before})")
-    ok(f"ingest done · {n_after} records (+{n_after - n_before})")
+    run_ingest_targets(targets, corpus)
     return 0
 
 
@@ -376,6 +371,7 @@ def _extract_progress(*, use_llm: bool, model: str):
                 note("nothing new to extract")
                 return
             bar = Progress(ev.total, label="extract")
+            bar.__enter__()
             return
         if ev.phase == "llm":
             if bar is not None:
@@ -398,6 +394,8 @@ def _extract_progress(*, use_llm: bool, model: str):
             bar.tick(drafted=drafted, llm=llm_n, cards=cards_n)
         if ev.phase == "done" and bar is not None:
             bar.finish(drafted=drafted, llm=llm_n, cards=cards_n)
+            bar.__exit__(None, None, None)
+            bar = None
             bits = [f"{cards_n} cards"]
             if drafted:
                 bits.append(f"{drafted} drafted")
@@ -610,33 +608,34 @@ def _brief(
     if code is not None:
         return code
     stage("brief", f"{len(questions)} questions · mode={mode}")
-    bar = Progress(len(questions), label="brief")
     cited = 0
     refused = 0
 
-    def on_progress(done: int, total: int, item, result) -> None:  # noqa: ANN001
-        nonlocal cited, refused
-        bar.set_total(total)
-        if result.refused:
-            refused += 1
-        else:
-            cited += 1
-        bar.tick(
-            cited=cited,
-            refused=refused,
-        )
-        bar.status(trunc(item.question, 40))
+    with Progress(len(questions), label="brief") as bar:
 
-    items = run_pack(
-        corpus,
-        questions,
-        cfg,
-        spent.wrap(client),
-        mode=mode,
-        on_progress=on_progress,
-        embedder=_query_embedder(cfg, corpus),
-    )
-    bar.finish(cited=cited, refused=refused)
+        def on_progress(done: int, total: int, item, result) -> None:  # noqa: ANN001
+            nonlocal cited, refused
+            bar.set_total(total)
+            if result.refused:
+                refused += 1
+            else:
+                cited += 1
+            bar.tick(
+                cited=cited,
+                refused=refused,
+            )
+            bar.status(trunc(item.question, 40))
+
+        items = run_pack(
+            corpus,
+            questions,
+            cfg,
+            spent.wrap(client),
+            mode=mode,
+            on_progress=on_progress,
+            embedder=_query_embedder(cfg, corpus),
+        )
+        bar.finish(cited=cited, refused=refused)
     path = write_brief(items, Path(cfg.data_dir) / "briefs")
     print(path)
     ok(f"brief · {cited} cited · {refused} refused")
@@ -661,16 +660,9 @@ def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
         print(line)
     if not targets and not corpus.records():
         print("nothing to ingest (no default source detected)")
-    n_before = len(corpus.records())
     if targets:
         stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
-    for item, path in targets:
-        print(f"ingest {item.name} from {path}")
-        item.source.load(path, corpus)
-    n_after = len(corpus.records())
-    if targets:
-        print(f"records: {n_after} (+{n_after - n_before})")
-        ok(f"ingest done · {n_after} records (+{n_after - n_before})")
+        run_ingest_targets(targets, corpus)
     budget = CallBudget(cfg.llm_max_calls)
     _extract_cards(cfg, corpus, source=None, limit=None, strict_llm=False)
     code = _brief(args, cfg, corpus, budget=budget)
@@ -818,6 +810,11 @@ def _doctor(cfg: Config) -> int:
         if collection := pubs_collection():
             print(f"pubs_collection: {collection}")
         print(f"employer_paths: {len(employer_paths())}")
+        print(f"employer.filter: {'yes' if cfg.employer_filter else 'no'}")
+        print(
+            f"employer.filter_llm: {'yes' if cfg.employer_filter_llm and cfg.llm_enabled else 'no'}"
+            f" ({cfg.employer_filter_llm_calls})"
+        )
         print(f"git_paths: {len(git_paths())}")
         if user := git_user():
             print(f"git_user: {user}")

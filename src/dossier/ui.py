@@ -2,6 +2,9 @@
 
 No third-party deps. Respects NO_COLOR / FORCE_COLOR and non-TTY streams.
 Progress bars write to stderr so stdout stays a clean log of results.
+
+On a TTY, :class:`Progress` pins one line at the bottom (like Rich Progress in
+paperful): scrollable logs print above, the bar redraws on the last row.
 """
 
 from __future__ import annotations
@@ -21,6 +24,9 @@ _YELLOW = "\033[33m"
 _MAGENTA = "\033[35m"
 _BLUE = "\033[34m"
 
+_ACTIVE: "BottomBar | None" = None
+_ACTIVE_STACK: list[BottomBar] = []
+
 
 def colour_enabled(stream: TextIO | None = None) -> bool:
     if os.environ.get("NO_COLOR"):
@@ -37,6 +43,15 @@ def paint(text: str, *codes: str, stream: TextIO | None = None) -> str:
     return f"{''.join(codes)}{text}{_RESET}"
 
 
+def _log_line(text: str, *, stream: TextIO | None = None, flush: bool = True) -> None:
+    out = stream if stream is not None else sys.stderr
+    if _ACTIVE is not None and _ACTIVE.owns(out):
+        _ACTIVE.clear_for_log()
+    print(text, file=out, flush=flush)
+    if _ACTIVE is not None and _ACTIVE.owns(out):
+        _ACTIVE.redraw()
+
+
 def stage(title: str, detail: str = "", *, stream: TextIO | None = None) -> None:
     """Print a phase banner, e.g. ◆ extract  llm=on · 180 to draft."""
     out = stream if stream is not None else sys.stderr
@@ -45,22 +60,28 @@ def stage(title: str, detail: str = "", *, stream: TextIO | None = None) -> None
     line = f"{mark} {name}"
     if detail:
         line = f"{line}  {paint(detail, _DIM, stream=out)}"
-    print(line, file=out, flush=True)
+    _log_line(line, stream=out)
 
 
 def note(text: str, *, stream: TextIO | None = None) -> None:
     out = stream if stream is not None else sys.stderr
-    print(paint(text, _DIM, stream=out), file=out, flush=True)
+    _log_line(paint(text, _DIM, stream=out), stream=out)
 
 
 def ok(text: str, *, stream: TextIO | None = None) -> None:
     out = stream if stream is not None else sys.stderr
-    print(f"{paint('✓', _GREEN, _BOLD, stream=out)} {text}", file=out, flush=True)
+    _log_line(
+        f"{paint('✓', _GREEN, _BOLD, stream=out)} {text}",
+        stream=out,
+    )
 
 
 def warn(text: str, *, stream: TextIO | None = None) -> None:
     out = stream if stream is not None else sys.stderr
-    print(f"{paint('!', _YELLOW, _BOLD, stream=out)} {text}", file=out, flush=True)
+    _log_line(
+        f"{paint('!', _YELLOW, _BOLD, stream=out)} {text}",
+        stream=out,
+    )
 
 
 def trunc(text: str, width: int = 36) -> str:
@@ -70,6 +91,72 @@ def trunc(text: str, width: int = 36) -> str:
     if width <= 1:
         return "…"
     return raw[: width - 1] + "…"
+
+
+class BottomBar:
+    """One pinned footer line. Only one instance is active per process."""
+
+    def __init__(self, stream: TextIO | None = None, *, width: int = 24) -> None:
+        self.stream = stream if stream is not None else sys.stderr
+        self.width = width
+        self._tty = hasattr(self.stream, "isatty") and bool(self.stream.isatty())
+        self._colour = colour_enabled(self.stream)
+        self._last_plain = ""
+        self._active = False
+
+    def owns(self, stream: TextIO) -> bool:
+        return stream is self.stream
+
+    def __enter__(self) -> BottomBar:
+        global _ACTIVE
+        if self._tty:
+            if _ACTIVE is not None:
+                _ACTIVE.clear_for_log()
+                _ACTIVE_STACK.append(_ACTIVE)
+            _ACTIVE = self
+            self._active = True
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        global _ACTIVE
+        if self._active:
+            self.clear_for_log()
+            if _ACTIVE_STACK:
+                _ACTIVE = _ACTIVE_STACK.pop()
+                _ACTIVE.redraw()
+            else:
+                _ACTIVE = None
+            self._active = False
+
+    def clear_for_log(self) -> None:
+        if not self._tty or not self._last_plain:
+            return
+        self.stream.write("\r\033[K")
+        self.stream.flush()
+        self._last_plain = ""
+
+    def write(self, line: str, *, final: bool = False) -> None:
+        if self._tty:
+            pad = max(0, len(self._last_plain) - len(_plain(line)))
+            self.stream.write("\r" + line + (" " * pad))
+            if final:
+                self.stream.write("\n")
+            self.stream.flush()
+            self._last_plain = "" if final else _plain(line)
+            return
+        print(line, file=self.stream, flush=True)
+
+    def redraw(self) -> None:
+        if self._tty and self._last_plain:
+            self.write(self._rendered_line, final=False)
+
+    @property
+    def _rendered_line(self) -> str:
+        return getattr(self, "_line_cache", "")
+
+    def set_line(self, line: str, *, final: bool = False) -> None:
+        self._line_cache = line
+        self.write(line, final=final)
 
 
 @dataclass
@@ -88,7 +175,20 @@ class Progress:
         self._out = self.stream if self.stream is not None else sys.stderr
         self._tty = hasattr(self._out, "isatty") and bool(self._out.isatty())
         self._colour = colour_enabled(self._out)
+        self._bar: BottomBar | None = None
         self._last_plain = ""
+
+    def __enter__(self) -> Progress:
+        if self._tty:
+            self._bar = BottomBar(self._out, width=self.width)
+            self._bar.__enter__()
+            self._render()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        if self._bar is not None:
+            self._bar.__exit__(*exc)
+            self._bar = None
 
     def status(self, text: str) -> None:
         self._status = text
@@ -112,9 +212,29 @@ class Progress:
         self._render(final=True)
 
     def _render(self, *, final: bool = False) -> None:
+        line = self._format_line()
+        if self._bar is not None:
+            self._bar.set_line(line, final=final)
+            self._last_plain = _plain(line)
+            return
+        if self._tty:
+            pad = max(0, len(self._last_plain) - len(_plain(line)))
+            self._out.write("\r" + line + (" " * pad))
+            if final:
+                self._out.write("\n")
+            self._out.flush()
+            self._last_plain = _plain(line) if not final else ""
+            return
+        step = max(1, self.total // 10) if self.total else 50
+        if final or self.done == 1 or self.done % step == 0:
+            print(line, file=self._out, flush=True)
+
+    def _format_line(self) -> str:
         total = max(self.total, 1) if self.total > 0 else max(self.done, 1)
         done = self.done if self.total > 0 else self.done
-        frac = 1.0 if self.total == 0 and final else min(1.0, done / total)
+        frac = 1.0 if self.total == 0 and self.done > 0 else min(1.0, done / total)
+        if self.total > 0 and self.done >= self.total:
+            frac = 1.0
         filled = int(round(self.width * frac))
         empty = max(0, self.width - filled)
         if self._colour:
@@ -132,19 +252,7 @@ class Progress:
         line = f"{label}[{bar}]  {counts}"
         if suffix:
             line = f"{line}  {suffix}"
-        line = f"{line}{status}"
-        if self._tty:
-            pad = max(0, len(self._last_plain) - len(_plain(line)))
-            self._out.write("\r" + line + (" " * pad))
-            if final:
-                self._out.write("\n")
-            self._out.flush()
-            self._last_plain = _plain(line)
-            return
-        # Non-TTY: print sparingly (every ~10% or on finish).
-        step = max(1, self.total // 10) if self.total else 1
-        if final or self.done == 1 or (self.total and self.done % step == 0):
-            print(line, file=self._out, flush=True)
+        return f"{line}{status}"
 
 
 def _plain(text: str) -> str:

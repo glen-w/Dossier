@@ -82,6 +82,9 @@ variables win over that file.
 | `DOSSIER_CV_NAME` | Name printed on a tailored CV or letter. Empty omits it |
 | `DOSSIER_REFEREE_PUBS` | Treat a name on an ingested pubs record as a coauthor (`true` by default) |
 | `DOSSIER_EMPLOYER_PATHS` | Comma-separated employer folders. `~/Documents` itself is ignored |
+| `DOSSIER_EMPLOYER_FILTER` | Skip caches, junk types, and older copies (`true` by default) |
+| `DOSSIER_EMPLOYER_FILTER_LLM` | Ask the model which remaining folders to drop (`true` by default; no call when the provider is off) |
+| `DOSSIER_EMPLOYER_FILTER_LLM_CALLS` | Cap for that folder pass (default `4`). Does not spend `DOSSIER_LLM_MAX_CALLS` |
 | `DOSSIER_CHATGPT_EXPORT` | ChatGPT export zip or folder, used before the warehouse |
 | `DOSSIER_SLACK_EXPORT` | Slack export zip or folder, used before the warehouse |
 | `DOSSIER_GIT_PATHS` | Comma-separated git repos. No home-directory scan |

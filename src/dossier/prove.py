@@ -148,19 +148,27 @@ def _run_prove_body(
             return 2
 
         from dossier.cli import _detected_targets
+        from dossier.ingest_run import run_ingest_targets
+        from dossier.ui import stage
 
         targets, skipped = _detected_targets(tuple(names))
         ledger.adapters_skipped = list(skipped)
         for line in skipped:
             print(line)
 
-        n_before = len(corpus.records())
-        for item, path in targets:
-            print(f"ingest {item.name} from {path}")
-            item.source.load(path, corpus)
-            if item.name not in ledger.adapters_ingested:
-                ledger.adapters_ingested.append(item.name)
-        n_after = len(corpus.records())
+        if targets:
+            stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
+
+        def _ingested(name: str) -> None:
+            if name not in ledger.adapters_ingested:
+                ledger.adapters_ingested.append(name)
+
+        n_before, n_after = run_ingest_targets(
+            targets,
+            corpus,
+            emit_summary=False,
+            on_source_done=_ingested,
+        )
         if targets:
             print(f"records: {n_after} (+{n_after - n_before})")
 

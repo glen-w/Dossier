@@ -29,6 +29,9 @@ pubs = false # one /search per ask; hits are not written into the corpus
 
 [employer]
 # paths = ["/absolute/path/to/one/employer/folder"]
+filter = true # skip caches, junk types, and older copies of the same file
+filter_llm = true # when the provider is on, one pass over folder names
+filter_llm_calls = 4 # own cap; does not spend DOSSIER_LLM_MAX_CALLS
 
 [git]
 # user = "your-git-author"
