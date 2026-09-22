@@ -1,5 +1,8 @@
 <h1 align="center">
-  <img src="docs/logo.png" alt="Dossier" width="280">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo.png">
+    <img src="docs/logo-on-light.png" alt="Dossier" width="280">
+  </picture>
 </h1>
 
 <p align="center">

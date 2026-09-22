@@ -45,7 +45,6 @@ nav.side {
 
 nav.side .mark {
   display: block;
-  background: var(--do-paper);
   border-radius: 10px;
   padding: 6px 8px 2px;
   margin: 0 0 16px;

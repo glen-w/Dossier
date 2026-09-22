@@ -69,4 +69,8 @@ html_static_path = ["_static", "../website/chrome"]
 html_css_files = ["site_chrome.css"]
 html_js_files = ["site_nav.js"]
 html_favicon = "favicon.png"
-html_logo = "logo.png"
+# Light sidebar keeps the ink wordmark. Dark sidebar uses the light wordmark.
+html_theme_options = {
+    "light_logo": "logo-on-light.png",
+    "dark_logo": "logo.png",
+}
