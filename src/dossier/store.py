@@ -96,6 +96,17 @@ class Corpus:
         self._ensure_vectors()
 
     def upsert_record(self, record: Record) -> None:
+        prior = self._conn.execute(
+            "SELECT title, text, table_name FROM records WHERE uri = ?",
+            (record.uri,),
+        ).fetchone()
+        if (
+            prior is not None
+            and prior["title"] == record.title
+            and prior["text"] == record.text
+            and (prior["table_name"] or "") == (record.table or "")
+        ):
+            return
         self._conn.execute(
             """
             INSERT INTO records (id, source, uri, title, text, table_name, ingested_at)
@@ -308,6 +319,7 @@ class Corpus:
             # Title and text only. An older index also stored source and a searchable URI.
             if "source" in sql or "unindexed" not in sql:
                 self._conn.execute("DROP TABLE records_fts")
+                self._conn.execute("DROP TABLE IF EXISTS records_fts_map")
                 self._conn.commit()
         try:
             self._conn.execute(
@@ -324,18 +336,54 @@ class Corpus:
             self.fts_ok = False
             return
         self.fts_ok = True
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS records_fts_map (
+                uri TEXT PRIMARY KEY,
+                fts_rowid INTEGER NOT NULL
+            )
+            """
+        )
+        map_cols = {
+            r[1] for r in self._conn.execute("PRAGMA table_info(records_fts_map)").fetchall()
+        }
+        if "fts_rowid" not in map_cols:
+            self._conn.execute("DROP TABLE records_fts_map")
+            self._conn.execute(
+                """
+                CREATE TABLE records_fts_map (
+                    uri TEXT PRIMARY KEY,
+                    fts_rowid INTEGER NOT NULL
+                )
+                """
+            )
         n_fts = self._conn.execute("SELECT count(*) FROM records_fts").fetchone()[0]
         n_rec = self._conn.execute("SELECT count(*) FROM records").fetchone()[0]
-        if n_fts == n_rec:
+        if n_fts != n_rec:
+            self._conn.execute("DELETE FROM records_fts")
+            self._conn.execute("DELETE FROM records_fts_map")
+            rows = self._conn.execute(
+                "SELECT uri, title, text FROM records"
+            ).fetchall()
+            for row in rows:
+                self._conn.execute(
+                    "INSERT INTO records_fts (uri, title, text) VALUES (?, ?, ?)",
+                    (row["uri"], row["title"], row["text"]),
+                )
+                self._conn.execute(
+                    "INSERT INTO records_fts_map (uri, fts_rowid) VALUES (?, ?)",
+                    (row["uri"], self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]),
+                )
+            self._conn.commit()
             return
-        self._conn.execute("DELETE FROM records_fts")
-        rows = self._conn.execute(
-            "SELECT uri, title, text FROM records"
-        ).fetchall()
-        for row in rows:
+        n_map = self._conn.execute("SELECT count(*) FROM records_fts_map").fetchone()[0]
+        if n_map == n_fts:
+            return
+        self._conn.execute("DELETE FROM records_fts_map")
+        for row in self._conn.execute("SELECT rowid, uri FROM records_fts"):
             self._conn.execute(
-                "INSERT INTO records_fts (uri, title, text) VALUES (?, ?, ?)",
-                (row["uri"], row["title"], row["text"]),
+                "INSERT INTO records_fts_map (uri, fts_rowid) VALUES (?, ?)",
+                (row["uri"], row["rowid"]),
             )
         self._conn.commit()
 
@@ -396,6 +444,47 @@ class Corpus:
                 self.passages_fts_ok = True
             except sqlite3.OperationalError:
                 self.passages_fts_ok = False
+        if self.passages_fts_ok:
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS passages_fts_map (
+                    record_uri TEXT NOT NULL,
+                    ordinal INTEGER NOT NULL,
+                    fts_rowid INTEGER NOT NULL,
+                    PRIMARY KEY (record_uri, ordinal)
+                )
+                """
+            )
+            pmap_cols = {
+                r[1]
+                for r in self._conn.execute("PRAGMA table_info(passages_fts_map)").fetchall()
+            }
+            if "fts_rowid" not in pmap_cols:
+                self._conn.execute("DROP TABLE passages_fts_map")
+                self._conn.execute(
+                    """
+                    CREATE TABLE passages_fts_map (
+                        record_uri TEXT NOT NULL,
+                        ordinal INTEGER NOT NULL,
+                        fts_rowid INTEGER NOT NULL,
+                        PRIMARY KEY (record_uri, ordinal)
+                    )
+                    """
+                )
+            n_pfts = self._conn.execute("SELECT count(*) FROM passages_fts").fetchone()[0]
+            n_pmap = self._conn.execute("SELECT count(*) FROM passages_fts_map").fetchone()[0]
+            if n_pmap != n_pfts:
+                self._conn.execute("DELETE FROM passages_fts_map")
+                for row in self._conn.execute(
+                    "SELECT rowid, record_uri, ordinal FROM passages_fts"
+                ):
+                    self._conn.execute(
+                        """
+                        INSERT INTO passages_fts_map (record_uri, ordinal, fts_rowid)
+                        VALUES (?, ?, ?)
+                        """,
+                        (row["record_uri"], row["ordinal"], row["rowid"]),
+                    )
         self._conn.commit()
         missing = self._conn.execute(
             """
@@ -442,11 +531,33 @@ class Corpus:
                     """,
                     (record.uri, ordinal, chunk),
                 )
+                self._conn.execute(
+                    """
+                    INSERT INTO passages_fts_map (record_uri, ordinal, fts_rowid)
+                    VALUES (?, ?, ?)
+                    """,
+                    (
+                        record.uri,
+                        ordinal,
+                        self._conn.execute("SELECT last_insert_rowid()").fetchone()[0],
+                    ),
+                )
 
     def _delete_passage_fts(self, uri: str) -> None:
-        # record_uri is UNINDEXED, so FTS5 allows this filter.
-        # A full-table fetch here scans every passage on every upsert.
-        self._conn.execute("DELETE FROM passages_fts WHERE record_uri = ?", (uri,))
+        # record_uri is UNINDEXED; delete by mapped rowids instead of scanning FTS.
+        rows = self._conn.execute(
+            "SELECT fts_rowid FROM passages_fts_map WHERE record_uri = ?",
+            (uri,),
+        ).fetchall()
+        for row in rows:
+            self._conn.execute(
+                "DELETE FROM passages_fts WHERE rowid = ?",
+                (row["fts_rowid"],),
+            )
+        self._conn.execute(
+            "DELETE FROM passages_fts_map WHERE record_uri = ?",
+            (uri,),
+        )
 
     def _ensure_vectors(self) -> None:
         self._conn.execute(
@@ -548,10 +659,30 @@ class Corpus:
     def _index_record(self, record: Record) -> None:
         if not getattr(self, "fts_ok", False):
             return
-        self._conn.execute("DELETE FROM records_fts WHERE uri = ?", (record.uri,))
+        # uri is UNINDEXED; delete by mapped rowid instead of scanning FTS.
+        mapped = self._conn.execute(
+            "SELECT fts_rowid FROM records_fts_map WHERE uri = ?",
+            (record.uri,),
+        ).fetchone()
+        if mapped is not None:
+            self._conn.execute(
+                "DELETE FROM records_fts WHERE rowid = ?",
+                (mapped["fts_rowid"],),
+            )
+            self._conn.execute(
+                "DELETE FROM records_fts_map WHERE uri = ?",
+                (record.uri,),
+            )
         self._conn.execute(
             "INSERT INTO records_fts (uri, title, text) VALUES (?, ?, ?)",
             (record.uri, record.title, record.text),
+        )
+        self._conn.execute(
+            "INSERT INTO records_fts_map (uri, fts_rowid) VALUES (?, ?)",
+            (
+                record.uri,
+                self._conn.execute("SELECT last_insert_rowid()").fetchone()[0],
+            ),
         )
 
 

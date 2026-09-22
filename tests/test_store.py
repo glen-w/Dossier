@@ -58,6 +58,61 @@ def test_upsert_replaces_text_for_the_same_uri(corpus) -> None:
     assert recs[0].text.startswith("second text")
 
 
+def test_upsert_skips_unchanged_record(corpus) -> None:
+    record = Record(
+        id="r1",
+        source="pubs",
+        uri="zotero://fixture/1",
+        title="One",
+        text="coastal governance token",
+    )
+    corpus.upsert_record(record)
+    first = corpus.get_record(record.uri)
+    assert first is not None
+    corpus.upsert_record(record)
+    again = corpus.get_record(record.uri)
+    assert again is not None
+    assert again.text == first.text
+
+
+def test_upsert_fts_map_keeps_search(corpus) -> None:
+    corpus.upsert_record(
+        Record(
+            id="a",
+            source="pubs",
+            uri="zotero://fixture/a",
+            title="Alpha",
+            text="obsoletexyz kelp token",
+        )
+    )
+    corpus.upsert_record(
+        Record(
+            id="b",
+            source="pubs",
+            uri="zotero://fixture/b",
+            title="Beta",
+            text="ships at sea token",
+        )
+    )
+    corpus.upsert_record(
+        Record(
+            id="a",
+            source="pubs",
+            uri="zotero://fixture/a",
+            title="Alpha",
+            text="revised kelp forest token",
+        )
+    )
+    hits = corpus.search_fts("ships", limit=5)
+    assert hits is not None
+    assert hits[0][0] == "zotero://fixture/b"
+    revised = corpus.search_fts("revised", limit=5)
+    assert revised is not None
+    assert revised[0][0] == "zotero://fixture/a"
+    gone = corpus.search_fts("obsoletexyz", limit=5)
+    assert gone == []
+
+
 def test_upsert_rebuilds_passages(corpus) -> None:
     corpus.upsert_record(
         Record(
