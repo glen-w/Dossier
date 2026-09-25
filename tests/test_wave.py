@@ -52,7 +52,7 @@ def _coastal(uri: str = "zotero://fixture/1") -> Record:
         source="pubs",
         uri=uri,
         title="Synthetic coastal paper",
-        text="Glen wrote a synthetic paper on coastal governance.",
+        text="Quinn wrote a synthetic paper on coastal governance.",
     )
 
 
@@ -95,7 +95,7 @@ def test_overlap_breaks_equal_fts_ranks() -> None:
         source="pubs",
         uri="zotero://high",
         title="Coastal governance paper",
-        text="Glen wrote a synthetic paper on coastal governance.",
+        text="Quinn wrote a synthetic paper on coastal governance.",
     )
     same = {"zotero://low": -1.0, "zotero://high": -1.0}
     hits = retrieve(
@@ -129,7 +129,7 @@ def test_auto_falls_through_to_one_completion_on_a_tie() -> None:
             source="pubs",
             uri="zotero://fixture/b",
             title="Another coastal paper",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         ),
     ]
     hits = retrieve(records, "coastal governance paper")
@@ -531,7 +531,7 @@ def test_retrieve_caps_at_eight_hits() -> None:
             source="pubs",
             uri=f"zotero://fixture/{i}",
             title="Synthetic coastal paper",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         )
         for i in range(12)
     ]
@@ -586,7 +586,7 @@ def test_auto_calls_once_when_no_sentence_carries_the_question() -> None:
         uri="zotero://fixture/split",
         title="Notes",
         text=(
-            "Glen drafted the notes.\n"
+            "Quinn drafted the notes.\n"
             "The workshop met in March.\n"
             "A separate paper covered fish.\n"
             "Editing happened the next week.\n"

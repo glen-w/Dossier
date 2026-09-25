@@ -50,8 +50,8 @@ def test_extract_record_chunks_large_text(corpus) -> None:
         source="pubs",
         uri="zotero://fixture/chunk",
         title="Long",
-        text=("Glen wrote chapter one on coastal governance.\n\n" * 80)
-        + "Glen drafted a second brief on ocean policy.",
+        text=("Quinn wrote chapter one on coastal governance.\n\n" * 80)
+        + "Quinn drafted a second brief on ocean policy.",
     )
     corpus.upsert_record(record)
     client = FakeLLM(
@@ -84,7 +84,7 @@ def test_extract_record_stores_pending(corpus) -> None:
         source="pubs",
         uri="zotero://fixture/1",
         title="Synthetic",
-        text="Glen wrote a synthetic paper on coastal governance.",
+        text="Quinn wrote a synthetic paper on coastal governance.",
     )
     corpus.upsert_record(record)
     client = FakeLLM(

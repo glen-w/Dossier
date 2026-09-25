@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import os
+import re
+
 import httpx
 
 from dossier.referees.rank import Person
+
+_FIELD = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 _QUERY = """
 query RefereePeople($after: String) {
@@ -17,7 +22,6 @@ query RefereePeople($after: String) {
         keywords
         bio
         enrichmentStatus
-        coAuthorWithGlen
         lastContactAt
         company { name }
         noteTargets(first: 8) {
@@ -33,6 +37,22 @@ query RefereePeople($after: String) {
 """
 
 _MAX_PAGES = 40
+
+
+def coauthor_field() -> str:
+    """Optional Twenty boolean. Set locally; the name is not built in."""
+    name = os.environ.get("DOSSIER_TWENTY_COAUTHOR_FIELD", "").strip()
+    if name and _FIELD.fullmatch(name):
+        return name
+    return ""
+
+
+def referee_query() -> str:
+    field = coauthor_field()
+    if not field:
+        return _QUERY
+    needle = "        enrichmentStatus\n"
+    return _QUERY.replace(needle, f"{needle}        {field}\n", 1)
 
 
 def fetch_people(url: str, key: str, *, client: httpx.Client | None = None) -> list[Person]:
@@ -82,7 +102,7 @@ def _post(
         response = client.post(
             endpoint,
             headers=headers,
-            json={"query": _QUERY, "variables": {"after": after}},
+            json={"query": referee_query(), "variables": {"after": after}},
         )
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
@@ -105,7 +125,8 @@ def _person_from_node(node: dict) -> Person:
         if part and str(part).strip()
     )
     company = node.get("company") or {}
-    coauthor = node.get("coAuthorWithGlen") or 0
+    field = coauthor_field()
+    coauthor = node.get("coauthor") or (node.get(field) if field else 0) or 0
     return Person(
         name=full,
         company=str(company.get("name") or ""),
@@ -114,7 +135,7 @@ def _person_from_node(node: dict) -> Person:
         bio=str(node.get("bio") or ""),
         note=_notes(node),
         enrichment_status=str(node.get("enrichmentStatus") or ""),
-        co_author_with_glen=int(coauthor),
+        coauthor=int(coauthor),
         last_contact_at=node.get("lastContactAt") or None,
         timeline_count=_timeline_count(node),
     )

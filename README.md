@@ -18,11 +18,11 @@ Exports, mail, and PDFs stay on your machine. They are not part of this git tree
 
 Ingest an adapter you have. Records land in `data/evidence.db`. Extract drafts a card when the text already carries the sentence, then may ask a local model for the rest. Approve is the human gate. `dossier ask` quotes a cited span, or refuses. `dossier index` can add a passage-vector neighbor when full text misses. What the commands do is in [Status](docs/status.md). The pipeline shape is in [Architecture](docs/architecture.md).
 
-## Glen and a thin user
+## Warehouse and a thin install
 
-Glen’s machine can point `DATA_DUMPS_WAREHOUSE` at an existing DuckDB file. LinkedIn, and the warehouse paths for ChatGPT, Slack, and mail, read that file. They do not build it.
+Point `DATA_DUMPS_WAREHOUSE` at an existing DuckDB file when you already have one. LinkedIn, and the warehouse paths for ChatGPT, Slack, and mail, read that file. They do not build it.
 
-A thin user has no warehouse. Turn on sources you actually have: an employer folder you list, a ChatGPT export, a Slack export, a git repo you list, one exported mbox folder, or a meetings library. Two of those can fill a buffet. Then extract, `review` or approve, `defend`, and `tailor`. The same adapters serve both setups. There is no plugin scan. Ollama stays the default. Completions are unlimited unless you set a call cap. A remote model is opt-in and prints an egress notice.
+A thin install has no warehouse. Turn on sources you actually have: an employer folder you list, a ChatGPT export, a Slack export, a git repo you list, one exported mbox folder, or a meetings library. Two of those can fill a buffet. Then extract, `review` or approve, `defend`, and `tailor`. The same adapters serve both setups. There is no plugin scan. Ollama stays the default. Completions are unlimited unless you set a call cap. A remote model is opt-in and prints an egress notice.
 
 ## Adapters
 
@@ -73,4 +73,4 @@ Records stay on this machine. The only way text leaves is a remote LLM, and that
 - [Publications index](docs/zotero-rag-pubs.md) — named Zotero collection
 - Product page and Sphinx guide: `uv sync --extra docs && make pages-site` → `_site/`
 
-MIT. Copyright 2026 Glen.
+MIT. Copyright 2026 Dossier contributors.

@@ -25,11 +25,11 @@ Closed set. Folder and channel names feed the seeker; cards are filed under lens
 - **skills** — evidenced in context (not a LinkedIn dump). Kept only if the hit shows the skill in use
 - **contributions** — role (drafted, edited, coordinated, reviewed, taught, convened, data/tables, outreach)
 
-IDDRI mail is research/teaching. REN21 Slack is GSR/GFR production. Quotas exist so the buffet is not only one of those.
+Quotas exist so the buffet is not only one workplace, one channel, or one year.
 
 ## Slack
 
-Glen: read `slack.*` in the data_dumps warehouse. Thin user: a Slack export zip or folder (`users.json` plus channel JSON), via `DOSSIER_SLACK_EXPORT` or the path you pass. Quotas apply to both. The export is not copied into git.
+Warehouse: read `slack.*` in the DuckDB file. Thin install: a Slack export zip or folder (`users.json` plus channel JSON), via `DOSSIER_SLACK_EXPORT` or the path you pass. Quotas apply to both. The export is not copied into git.
 
 Identity: `DOSSIER_SLACK_USER_IDS` (ids or a display name), or `[identity] slack_user_ids` in gitignored `$DOSSIER_DATA/dossier.toml`. Nothing is built in. Warehouse hunts stay on those rows: file posts, long messages, hot threads, file-conversations, files that mention you or sit in a thread you replied to, samples from GSR/research/events channels. The export path keeps messages from those ids. When ids are unset, speaker names from that same file can match a Slack display name. When Slack detects and both ids and speaker names are empty, ingest is a silent no-op and `dossier doctor` prints a warn.
 
@@ -37,15 +37,15 @@ Identity: `DOSSIER_SLACK_USER_IDS` (ids or a display name), or `[identity] slack
 
 Seek `thunderbird.messages` (Gloda: subject, folder, attachments, direction). Bodies are not in the warehouse.
 
-- Exclude newsletters, receipts, google alerts, affiliate mail, bounce folders, `la vie de l'iddri`, and out of office, plus Gloda `signals` of newsletter, receipt, subscription, and signup
+- Exclude newsletters, receipts, google alerts, affiliate mail, bounce folders, and out of office, plus Gloda `signals` of newsletter, receipt, subscription, and signup
 - Keep admin, budget, and finance folders. A reimbursement or a budget note there is evidence. One message tagged as a receipt still drops
 - Those lists are on without a config file. Each source has a section in gitignored `dossier.toml`: `[mail]`, `[names]`, `[slack]`, `[meetings]`, `[employer]`, and `exclude` on `[git]`, `[chatgpt]`, `[linkedin]`, `[transcripts]`, `[pubs]`, and `[applications]`. A list adds phrases. The matching `_off` key turns a built-in phrase off. The workbench Phrase lists page writes those keys. Environment variables `DOSSIER_<SECTION>_<KEY>` override the file. Sent, Inbox, and All Mail stay closed. `.git` stays skipped
 - Prefer activity folders (Teaching, webinars, workshops, BBNJ, IKI, PROG, Review, …)
 - Rank sent+document in those folders; delivery-ish subjects; starred/replied
 - Sent+document outside activity folders is metadata only
-- **Never** stream `~/email/iddri` or `Sent Mail`. Wrap rollup `parse_message` for **one** allowlisted mbox under `DOSSIER_MBOX_MAX_BYTES` (default 200MB). If the only copy is Sent Mail, keep subject + attachment names. Those closed-folder hits can still appear as `mbox://…` citations (metadata only); `dossier doctor` counts them as `mbox_sent_metadata`.
+- **Never** stream a blocked mail tree or `Sent Mail`. Wrap rollup `parse_message` for **one** allowlisted mbox under `DOSSIER_MBOX_MAX_BYTES` (default 200MB). If the only copy is Sent Mail, keep subject + attachment names. Those closed-folder hits can still appear as `mbox://…` citations (metadata only); `dossier doctor` counts them as `mbox_sent_metadata`.
 
-Glen: `uv run dossier ingest --adapter mbox` reads the warehouse and fetches from `DOSSIER_MAIL_ROOT` (default `~/email`). Thin user: one exported folder, same heuristics, no Gloda.
+Warehouse: `uv run dossier ingest --adapter mbox` reads the warehouse and fetches from `DOSSIER_MAIL_ROOT` (default `~/email`). Thin install: one exported folder, same heuristics, no Gloda.
 
 ## Meetings
 

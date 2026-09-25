@@ -4,7 +4,7 @@ version = "0.9.0"
 description = "Local-first work-evidence locker and RAG"
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "Glen" }]
+authors = [{ name = "Dossier contributors" }]
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.27",

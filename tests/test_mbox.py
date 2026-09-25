@@ -9,7 +9,7 @@ Subject: Please find the draft briefing
 Date: Mon, 21 Sep 2026 12:00:00 +0000
 Message-ID: <fixture-1@example.test>
 
-Glen drafted a coastal governance briefing for the synthetic pack.
+Quinn drafted a coastal governance briefing for the synthetic pack.
 """
 
 
@@ -99,12 +99,12 @@ def test_gloda_warehouse_skips_noise_and_does_not_open_sent_mail(
         INSERT INTO thunderbird.messages VALUES
         (10, 1, '<teach-1@example.test>',
          'Lecture slides for the ocean governance course',
-         'lecture-slides.pdf', TRUE, 'sent', 'Glen Wright', 2024, FALSE, FALSE),
+         'lecture-slides.pdf', TRUE, 'sent', 'Quinn Hale', 2024, FALSE, FALSE),
         (12, 2, '<news-1@example.test>',
-         'IDDRI newsletter', 'digest.pdf', TRUE, 'sent', 'Glen Wright', 2024, FALSE, FALSE),
+         'IDDRI newsletter', 'digest.pdf', TRUE, 'sent', 'Quinn Hale', 2024, FALSE, FALSE),
         (13, 3, '<sent-1@example.test>',
          'BBNJ fisheries brief attached', 'bbnj-brief.pdf', TRUE, 'sent',
-         'Glen Wright', 2024, FALSE, FALSE)
+         'Quinn Hale', 2024, FALSE, FALSE)
         """
     )
     conn.close()
@@ -189,18 +189,18 @@ def test_admin_budget_stays_and_newsletter_folders_do_not(
         """
         INSERT INTO thunderbird.messages VALUES
         (1, 1, '<budget@example.test>',
-         'IKI rethink budget', 'iki-budget.xlsx', TRUE, 'sent', 'Glen Wright', 2020, FALSE, FALSE),
+         'IKI rethink budget', 'iki-budget.xlsx', TRUE, 'sent', 'Quinn Hale', 2020, FALSE, FALSE),
         (2, 1, '<receipt@example.test>',
-         'ANU Invoice', 'anu-invoice.pdf', TRUE, 'sent', 'Glen Wright', 2017, FALSE, FALSE),
+         'ANU Invoice', 'anu-invoice.pdf', TRUE, 'sent', 'Quinn Hale', 2017, FALSE, FALSE),
         (3, 2, '<news@example.test>',
-         'IDDRI newsletter', 'digest.pdf', TRUE, 'sent', 'Glen Wright', 2020, FALSE, FALSE),
+         'IDDRI newsletter', 'digest.pdf', TRUE, 'sent', 'Quinn Hale', 2020, FALSE, FALSE),
         (4, 3, '<alert@example.test>',
          'Google Alert - marine renewable energy', 'alert.pdf', TRUE, 'sent',
-         'Glen Wright', 2020, FALSE, FALSE),
+         'Quinn Hale', 2020, FALSE, FALSE),
         (5, 4, '<finance@example.test>',
-         'Ocean banking note', 'ocean-banking.pdf', TRUE, 'sent', 'Glen Wright', 2021, FALSE, FALSE),
+         'Ocean banking note', 'ocean-banking.pdf', TRUE, 'sent', 'Quinn Hale', 2021, FALSE, FALSE),
         (6, 5, '<trash@example.test>',
-         'Old draft attached', 'old-draft.pdf', TRUE, 'sent', 'Glen Wright', 2019, FALSE, FALSE)
+         'Old draft attached', 'old-draft.pdf', TRUE, 'sent', 'Quinn Hale', 2019, FALSE, FALSE)
         """
     )
     conn.execute(

@@ -38,7 +38,7 @@ def _records() -> list[Record]:
             source="pubs",
             uri="zotero://fixture/1",
             title="Synthetic coastal paper",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         ),
         Record(
             id="r2",

@@ -15,11 +15,11 @@ THREAD_REPLIES = 8
 
 
 def fetch_slack_body(
-    conn: duckdb.DuckDBPyConnection, hit: Hit, glen_ids: Sequence[str] | None = None
+    conn: duckdb.DuckDBPyConnection, hit: Hit, user_ids: Sequence[str] | None = None
 ) -> str:
     if not hit.channel_id or not hit.ts:
         return hit.preview
-    ids = tuple(glen_ids or configured_slack_user_ids())
+    ids = tuple(user_ids or configured_slack_user_ids())
     row = conn.execute(
         """
         SELECT coalesce(text, ''), coalesce(thread_ts, ts),
@@ -46,10 +46,10 @@ def _thread_context(
     conn: duckdb.DuckDBPyConnection,
     channel_id: str,
     thread_ts: str,
-    glen_ids: Sequence[str],
+    user_ids: Sequence[str],
     skip_ts: str,
 ) -> list[str]:
-    ph = ",".join("?" for _ in glen_ids)
+    ph = ",".join("?" for _ in user_ids)
     root = conn.execute(
         """
         SELECT coalesce(user_name, ''), coalesce(text, ''), ts
@@ -62,7 +62,7 @@ def _thread_context(
     if root and str(root[2]) != skip_ts:
         who, body, _ = root
         lines.append(f"Thread root {who}: {body}".strip())
-    if glen_ids:
+    if user_ids:
         replies = conn.execute(
             f"""
             SELECT coalesce(user_name, ''), coalesce(text, '')
@@ -72,7 +72,7 @@ def _thread_context(
             ORDER BY ts
             LIMIT ?
             """,
-            [channel_id, thread_ts, skip_ts, *list(glen_ids), THREAD_REPLIES],
+            [channel_id, thread_ts, skip_ts, *list(user_ids), THREAD_REPLIES],
         ).fetchall()
         for who, body in replies:
             lines.append(f"{who}: {body}".strip())

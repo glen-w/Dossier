@@ -37,7 +37,7 @@ def test_evidence_must_carry_the_claim() -> None:
 
 
 def test_matching_evidence_is_pending() -> None:
-    text = "Glen led the Oceana BBNJ working group in 2023."
+    text = "Quinn led the Oceana BBNJ working group in 2023."
     status, reason = adjudicate(
         "Led the Oceana BBNJ working group",
         ["doc://1"],
@@ -53,7 +53,7 @@ def test_lock_claims_writes_refused_and_pending() -> None:
         source="chatgpt",
         uri="chatgpt://c/m",
         title="Synthetic",
-        text="Glen drafted a coastal governance briefing for Oceana.",
+        text="Quinn drafted a coastal governance briefing for Oceana.",
     )
     cards = lock_claims(
         record,
@@ -76,7 +76,7 @@ def test_lock_claims_drops_near_duplicate_wording() -> None:
         source="slack",
         uri="slack://C/1",
         title="Synthetic",
-        text="Glen drafted a coastal governance briefing for Oceana.",
+        text="Quinn drafted a coastal governance briefing for Oceana.",
     )
     cards = lock_claims(
         record,

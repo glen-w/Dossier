@@ -50,8 +50,8 @@ def test_slack_fetch_includes_thread_root(tmp_path: Path) -> None:
     conn.execute(
         """
         INSERT INTO slack.messages VALUES
-        ('C1', '1.0', 'UTESTSLACK', 'Glen', 'Root: ocean chapter plan', '1.0', TRUE, FALSE),
-        ('C1', '1.1', 'UTESTSLACK', 'Glen', 'Reply with the draft notes', '1.0', FALSE, TRUE)
+        ('C1', '1.0', 'UTESTSLACK', 'Quinn', 'Root: ocean chapter plan', '1.0', TRUE, FALSE),
+        ('C1', '1.1', 'UTESTSLACK', 'Quinn', 'Reply with the draft notes', '1.0', FALSE, TRUE)
         """
     )
     hit = Hit(
@@ -65,7 +65,7 @@ def test_slack_fetch_includes_thread_root(tmp_path: Path) -> None:
         lenses=("delivered",),
         primary_lens="delivered",
         artifacts=(),
-        people=("Glen",),
+        people=("Quinn",),
         skills=(),
         score=20,
         hunts=("t",),

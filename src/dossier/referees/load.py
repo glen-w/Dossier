@@ -46,7 +46,7 @@ def _names(value: object) -> frozenset[str]:
 def _person(row: object) -> Person:
     if not isinstance(row, dict):
         raise ValueError("each person must be an object")
-    coauthor = _first(row, "coAuthorWithGlen", "co_author_with_glen", default=0)
+    coauthor = _first(row, "coauthor", "co_author", default=0)
     timeline = _first(row, "timelineCount", "timeline_count", default=0)
     last = _first(row, "lastContactAt", "last_contact_at", default=None)
     return Person(
@@ -59,7 +59,7 @@ def _person(row: object) -> Person:
         enrichment_status=str(
             _first(row, "enrichmentStatus", "enrichment_status", default="") or ""
         ),
-        co_author_with_glen=int(coauthor or 0),
+        coauthor=int(coauthor or 0),
         last_contact_at=str(last) if last else None,
         timeline_count=int(timeline or 0),
     )

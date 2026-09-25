@@ -22,7 +22,7 @@ Subject: Please find the draft briefing
 Date: Mon, 21 Sep 2026 12:00:00 +0000
 Message-ID: <fixture-{n}@example.test>
 
-Glen drafted a coastal governance briefing for the synthetic pack.
+Quinn drafted a coastal governance briefing for the synthetic pack.
 """
 
 _EXPORT = [
@@ -121,8 +121,8 @@ def test_chatgpt_export_folder(tmp_path: Path, corpus: Corpus) -> None:
 def test_slack_export_matches_a_display_name(
     tmp_path: Path, corpus: Corpus, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("DOSSIER_SLACK_USER_IDS", "Glen Wright")
-    users = [{"id": "UTEST", "real_name": "Glen Wright", "profile": {"display_name": "glen"}}]
+    monkeypatch.setenv("DOSSIER_SLACK_USER_IDS", "Quinn Hale")
+    users = [{"id": "UTEST", "real_name": "Quinn Hale", "profile": {"display_name": "quinn"}}]
     messages = [
         {
             "type": "message",
@@ -173,7 +173,7 @@ def test_slack_export_keeps_named_user(
     tmp_path: Path, corpus: Corpus, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("DOSSIER_SLACK_USER_IDS", "UTEST")
-    users = [{"id": "UTEST", "real_name": "Glen Wright", "profile": {"display_name": "glen"}}]
+    users = [{"id": "UTEST", "real_name": "Quinn Hale", "profile": {"display_name": "quinn"}}]
     messages = [
         {
             "type": "message",
@@ -242,7 +242,7 @@ def test_git_log_stores_subject_not_a_patch(
 def test_git_user_keeps_matching_author_only(
     tmp_path: Path, corpus: Corpus, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("DOSSIER_GIT_USER", "glen-w")
+    monkeypatch.setenv("DOSSIER_GIT_USER", "quinn-h")
     repo = tmp_path / "sample"
     repo.mkdir()
     subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
@@ -269,9 +269,9 @@ def test_git_user_keeps_matching_author_only(
         [
             "git",
             "-c",
-            "user.email=glen-w@example.com",
+            "user.email=quinn-h@example.com",
             "-c",
-            "user.name=Glen",
+            "user.name=Quinn",
             "commit",
             "-m",
             "Drafted the coastal governance briefing for Oceana.",
@@ -300,7 +300,7 @@ def test_local_toml_names_git_author_and_pubs_collection(
         "\n".join(
             [
                 "[git]",
-                'user = "glen-w"',
+                'user = "quinn-h"',
                 f'paths = ["{repo}"]',
                 "",
                 "[pubs]",
@@ -311,7 +311,7 @@ def test_local_toml_names_git_author_and_pubs_collection(
         ),
         encoding="utf-8",
     )
-    assert git_user() == "glen-w"
+    assert git_user() == "quinn-h"
     assert git_paths() == (repo,)
     assert pubs_collection() == "my pubs"
     assert pubs_seed() == "my pubs"

@@ -48,9 +48,9 @@ class SlackSource:
         conn = connect_readonly(path)
         try:
             hits = apply_quotas(merge_hits(hunt_slack(conn)))
-            glen_ids = resolve_slack_user_ids(conn)
+            user_ids = resolve_slack_user_ids(conn)
             for hit in hits:
-                body = fetch_slack_body(conn, hit, glen_ids)
+                body = fetch_slack_body(conn, hit, user_ids)
                 corpus.upsert_record(record_from_hit(hit, body))
         finally:
             conn.close()

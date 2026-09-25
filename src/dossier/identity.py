@@ -117,7 +117,7 @@ def account_dir(mail_root: Path, account_key: str) -> Path:
 
 
 def is_blocked_mail_root(path: Path) -> bool:
-    """True for the full IDDRI Thunderbird tree — do not walk/parse it."""
+    """True for a full Thunderbird tree that must not be walked or parsed."""
     if path.name.lower() != "iddri":
         return False
     return (path / "[Gmail].sbd" / "Sent Mail").exists() or (path / "INBOX").exists()

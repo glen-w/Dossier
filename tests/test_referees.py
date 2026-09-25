@@ -109,7 +109,7 @@ def test_graphql_payload_maps_notes_and_skips_writes() -> None:
                             "keywords": "governance",
                             "bio": "",
                             "enrichmentStatus": "REVIEWED",
-                            "coAuthorWithGlen": 1,
+                            "coauthor": 1,
                             "lastContactAt": "2026-08-01T00:00:00Z",
                             "company": {"name": "Coastal Lab"},
                             "noteTargets": {
@@ -129,7 +129,7 @@ def test_graphql_payload_maps_notes_and_skips_writes() -> None:
     assert person.company == "Coastal Lab"
     assert person.note == "Sofia line."
     assert person.timeline_count == 1
-    assert person.co_author_with_glen == 1
+    assert person.coauthor == 1
     query = _QUERY.lower()
     for forbidden in ("tasktargets", "messageparticipants", "pointofcontactforopportunities"):
         assert forbidden not in query
@@ -250,7 +250,7 @@ def _node(first: str, last: str) -> dict:
         "keywords": "",
         "bio": "",
         "enrichmentStatus": "REVIEWED",
-        "coAuthorWithGlen": 0,
+        "coauthor": 0,
         "lastContactAt": None,
         "company": {"name": "Coastal Lab"},
         "noteTargets": {"edges": []},

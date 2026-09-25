@@ -25,7 +25,7 @@ Also off git: dumps, DuckDB, LanceDB, `.env`, mbox, PDFs, office exports, and lo
 
 - No Twenty writes (Tasks, Opportunities, Notes, last-contacted).
 - No auto-attach of a referee name to an application.
-- No 26G IDDRI mbox stream; no Sent Mail as a folder walker; no re-embed of hoops or ocean Zotero libraries.
+- No walk of a blocked mail tree; no Sent Mail as a folder walker; no re-embed of a Zotero library you did not name.
 - No plugin directory or entry-point scan.
 - No Docker image for the locker. It installs on the host with `uv`.
 - Meeting transcripts stay in the TranscriptX library. Ingest copies your turns into `evidence.db` only.

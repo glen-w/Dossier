@@ -24,7 +24,7 @@ def test_cli_ingest_buffet_approve(tmp_path: Path, monkeypatch) -> None:
     apps = tmp_path / "job applications"
     apps.mkdir()
     (apps / "cover.md").write_text(
-        "Cover letter. Glen led the Oceana BBNJ working group.\n",
+        "Cover letter. Quinn led the Oceana BBNJ working group.\n",
         encoding="utf-8",
     )
     assert main(["ingest", "--adapter", "applications", str(apps)]) == 0
@@ -150,7 +150,7 @@ def test_cli_extract_prints_egress_and_needs_llm(tmp_path: Path, monkeypatch, ca
             source="pubs",
             uri="zotero://fixture/1",
             title="Synthetic",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         )
     )
     corpus.close()
@@ -199,7 +199,7 @@ def test_cli_ask_prints_egress_before_model(tmp_path: Path, monkeypatch, capsys)
             source="pubs",
             uri="zotero://fixture/1",
             title="Synthetic coastal paper",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         )
     )
     corpus.close()
@@ -228,12 +228,12 @@ def test_cli_ingest_slack_synthetic_warehouse(tmp_path: Path, monkeypatch) -> No
         )
         """
     )
-    long_text = "Glen drafted a coastal governance briefing. " * 12
+    long_text = "Quinn drafted a coastal governance briefing. " * 12
     conn.execute("INSERT INTO slack.channels VALUES ('C1', 'policy', 'channel')")
     conn.execute(
         """
         INSERT INTO slack.messages VALUES
-        ('C1', '1.0', 'policy', 'UTESTSLACK', 'Glen', ?, 2023, ?, 0, 0, 0,
+        ('C1', '1.0', 'policy', 'UTESTSLACK', 'Quinn', ?, 2023, ?, 0, 0, 0,
          FALSE, FALSE, FALSE, NULL)
         """,
         [long_text, len(long_text)],

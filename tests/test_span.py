@@ -13,10 +13,10 @@ def _record(uri: str, text: str, title: str = "Note") -> Record:
 def test_span_returns_the_sentence_that_carries_the_claim() -> None:
     text = (
         "Ships sailed east that year. "
-        "Glen wrote a synthetic paper on coastal governance."
+        "Quinn wrote a synthetic paper on coastal governance."
     )
     span = carrying_span("synthetic paper on coastal governance", text)
-    assert span == "Glen wrote a synthetic paper on coastal governance."
+    assert span == "Quinn wrote a synthetic paper on coastal governance."
 
 
 def test_split_tokens_pass_the_record_and_fail_the_sentence() -> None:
@@ -35,7 +35,7 @@ def test_find_span_picks_the_shorter_sentence(corpus: Corpus) -> None:
     corpus.upsert_record(
         _record(
             "slack://long",
-            "Glen wrote a very long synthetic paper on coastal governance and reefs.",
+            "Quinn wrote a very long synthetic paper on coastal governance and reefs.",
             title="Long",
         )
     )
@@ -51,7 +51,7 @@ def test_find_span_picks_the_shorter_sentence(corpus: Corpus) -> None:
 def test_defend_stores_span_and_keeps_approved(corpus: Corpus) -> None:
     rec = _record(
         "slack://1",
-        "Glen wrote a synthetic paper on coastal governance. Ships sailed.",
+        "Quinn wrote a synthetic paper on coastal governance. Ships sailed.",
     )
     corpus.upsert_record(rec)
     card = ClaimCard(
@@ -201,7 +201,7 @@ def test_span_uri_ignores_other_records(corpus: Corpus) -> None:
     corpus.upsert_record(
         _record(
             "slack://other",
-            "Glen wrote a synthetic paper on coastal governance.",
+            "Quinn wrote a synthetic paper on coastal governance.",
             title="Other",
         )
     )
@@ -214,7 +214,7 @@ def test_defend_keeps_the_first_carrying_citation_and_other_extras(corpus: Corpu
     weak = _record("slack://weak", "Ships sailed east that year.")
     strong = _record(
         "slack://strong",
-        "Glen wrote a synthetic paper on coastal governance.",
+        "Quinn wrote a synthetic paper on coastal governance.",
     )
     corpus.upsert_record(weak)
     corpus.upsert_record(strong)
@@ -242,7 +242,7 @@ def test_defend_keeps_the_first_carrying_citation_and_other_extras(corpus: Corpu
 
 
 def test_defend_leaves_refused_cards_alone(corpus: Corpus) -> None:
-    rec = _record("slack://1", "Glen wrote a synthetic paper on coastal governance.")
+    rec = _record("slack://1", "Quinn wrote a synthetic paper on coastal governance.")
     corpus.upsert_record(rec)
     card = ClaimCard(
         id="refused-1",
@@ -267,7 +267,7 @@ def test_cli_defend_prints_unspanned_and_span_filters(tmp_path: Path, monkeypatc
     monkeypatch.setenv("DOSSIER_LLM_PROVIDER", "off")
     corpus = Corpus(tmp_path / "evidence.db")
     corpus.upsert_record(
-        _record("slack://1", "Glen wrote a synthetic paper on coastal governance.")
+        _record("slack://1", "Quinn wrote a synthetic paper on coastal governance.")
     )
     corpus.put_card(
         ClaimCard(

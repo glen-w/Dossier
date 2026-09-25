@@ -54,6 +54,8 @@ pubs = false # one /search per ask; hits are not written into the corpus
 # folder holds each account. This block stays in the gitignored copy.
 # slack_user_ids = ["U00000000"]
 # speaker_names = ["Your Name"]
+# Optional Twenty boolean on People. The field name stays in the environment,
+# not in this repo: DOSSIER_TWENTY_COAUTHOR_FIELD. Leave it unset to skip.
 
 # [identity.mail_accounts]
 # "you@example.com" = "mail-folder"

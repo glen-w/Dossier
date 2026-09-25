@@ -622,7 +622,7 @@ def test_sources_shows_ingest_summary_after_job(client, monkeypatch) -> None:
     test_client, root = client
     apps = root / "job applications"
     apps.mkdir()
-    (apps / "note.md").write_text("Glen led a coastal workshop.\n", encoding="utf-8")
+    (apps / "note.md").write_text("Quinn led a coastal workshop.\n", encoding="utf-8")
     monkeypatch.setenv("DOSSIER_APPLICATIONS", str(apps))
     resp = test_client.post(
         "/sources/ingest",

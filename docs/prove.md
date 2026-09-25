@@ -11,7 +11,7 @@ smokes a few `ask --mode exact` questions. It writes `ledger.json` and
 ## Default behaviour
 
 - Temporary `DOSSIER_DATA` (or `--data`)
-- Adapters: `linkedin,chatgpt,applications` (no `mbox` by default — IDDRI risk)
+- Adapters: `linkedin,chatgpt,applications` (no `mbox` by default — a full mail tree stays closed)
 - Seeker caps lowered (`DOSSIER_SEEKER_OVERALL=80`)
 - Model off (`DOSSIER_LLM_PROVIDER=off`) unless `--with-llm`
 - Refuses when FTS5 is missing unless `--allow-overlap`

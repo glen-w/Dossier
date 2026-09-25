@@ -1,4 +1,4 @@
-"""Slack warehouse hunts. Glen-touched rows only — not the full workspace."""
+"""Slack warehouse hunts. Rows for the configured user — not the full workspace."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def hunt_slack(conn: duckdb.DuckDBPyConnection) -> list[Hit]:
     if not ids:
         return []
     hits: list[Hit] = []
-    hits.extend(_hunt_glen_files(conn, ids))
+    hits.extend(_hunt_user_files(conn, ids))
     hits.extend(_hunt_hot_threads(conn, ids))
     hits.extend(_hunt_long_messages(conn, ids))
     hits.extend(_hunt_file_conversations(conn, ids))
@@ -135,7 +135,7 @@ def _hit(
     )
 
 
-def _hunt_glen_files(conn: duckdb.DuckDBPyConnection, ids: Sequence[str]) -> list[Hit]:
+def _hunt_user_files(conn: duckdb.DuckDBPyConnection, ids: Sequence[str]) -> list[Hit]:
     ph, params = _in_clause(ids)
     has_files = has_table(conn, "slack.files")
     if has_files:
@@ -181,7 +181,7 @@ def _hunt_glen_files(conn: duckdb.DuckDBPyConnection, ids: Sequence[str]) -> lis
                 artifacts=artifacts,
                 people=tuple(p for p in (str(row[3] or ""),) if p),
                 score=score,
-                hunt="glen_file",
+                hunt="user_file",
                 authored=True,
                 coordinated=False,
             )

@@ -26,7 +26,7 @@ class Person:
     bio: str = ""
     note: str = ""
     enrichment_status: str = ""
-    co_author_with_glen: int = 0
+    coauthor: int = 0
     last_contact_at: str | None = None
     timeline_count: int = 0
 
@@ -65,10 +65,10 @@ def note_pubs_coauthors(people: list[Person], blobs: list[str]) -> list[Person]:
     out: list[Person] = []
     for person in people:
         name = person.name.casefold().strip()
-        if person.co_author_with_glen > 0 or not name or name not in haystack:
+        if person.coauthor > 0 or not name or name not in haystack:
             out.append(person)
             continue
-        out.append(replace(person, co_author_with_glen=1))
+        out.append(replace(person, coauthor=1))
     return out
 
 
@@ -158,7 +158,7 @@ def _score(
     if _named(person.name, policy.this_quarter):
         points += 1
         why.append("this quarter")
-    if person.co_author_with_glen > 0:
+    if person.coauthor > 0:
         points += 1
         why.append("coauthor")
     warning = SPEND_WARNING if _named(person.name, policy.scarce) else ""

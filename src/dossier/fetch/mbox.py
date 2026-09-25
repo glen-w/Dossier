@@ -1,4 +1,4 @@
-"""One-message mbox fetch. Never parse Sent Mail or the IDDRI tree as a stream."""
+"""One-message mbox fetch. Never parse Sent Mail or a blocked mail tree as a stream."""
 
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ def iter_mbox_files(root: Path) -> Iterator[tuple[Path, str]]:
     if not root.is_dir():
         return
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        # Never stream the 26G IDDRI Thunderbird tree (or its Sent Mail).
+        # Never stream a blocked Thunderbird tree (or its Sent Mail).
         dirnames[:] = [
             d
             for d in dirnames

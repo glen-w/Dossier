@@ -272,7 +272,7 @@ def _sent_docs_elsewhere(conn: duckdb.DuckDBPyConnection, has_signals: bool) -> 
 
 
 def hunt_mbox_folder(root: Path, *, max_bytes: int, max_files: int | None = None) -> list[Hit]:
-    """Thin-user path: score headers in a small exported folder. Never IDDRI."""
+    """Thin-install path: score headers in a small exported folder. Never a blocked tree."""
     from dossier.fetch.mbox import iter_mbox_files, mbox_max_files, mbox_openable, parse_headers
 
     file_cap = mbox_max_files() if max_files is None else max_files

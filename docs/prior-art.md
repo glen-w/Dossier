@@ -15,9 +15,9 @@ Take the rule that fits. Leave the product that does not.
 
 **RenderCV / JSON Resume.** A way to render a CV later, from cards you have already approved. No renderer in this repo.
 
-**data_dumps** ([glen-w/data_dumps](https://github.com/glen-w/data_dumps)). ZIP exports to DuckDB. LinkedIn, ChatGPT, and Slack message text can already live there. Thunderbird tables are metadata only. Dossier reads that warehouse. It does not ship those loaders.
+**data_dumps.** ZIP exports to DuckDB. LinkedIn, ChatGPT, and Slack message text can already live there. Thunderbird tables are metadata only. Dossier reads that warehouse when you point `DATA_DUMPS_WAREHOUSE` at it. It does not ship those loaders.
 
-**rollup** (house). `parse.py` walks a whole mbox for newsletter digests. Dossier wraps `parse_message` for **one** allowlisted message after a Gloda seek. It does not call `parse_mbox_folder` on Sent Mail or IDDRI.
+**rollup.** `parse.py` walks a whole mbox for newsletter digests. Dossier wraps `parse_message` for **one** allowlisted message after a Gloda seek. It does not call `parse_mbox_folder` on Sent Mail or a blocked mail tree.
 
 **zotero-rag** ([anapaulagomes/zotero-rag](https://github.com/anapaulagomes/zotero-rag)). RAG over one Zotero collection, with its own embeddings. Dossier reads bibliography fields from the named collection and does not embed that library. See [publications index](zotero-rag-pubs.md).
 

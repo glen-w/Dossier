@@ -61,7 +61,7 @@ def test_search_escapes_wildcards_and_shows_a_snippet(corpus: Corpus) -> None:
             source="employer",
             uri="fixture://a",
             title="Oceana note",
-            text="Glen drafted a coastal governance briefing for the synthetic pack.",
+            text="Quinn drafted a coastal governance briefing for the synthetic pack.",
         )
     )
     corpus.put_card(
@@ -71,14 +71,14 @@ def test_search_escapes_wildcards_and_shows_a_snippet(corpus: Corpus) -> None:
             citations=["fixture://a"],
             source="employer",
             status=STATUS_PENDING,
-            extras={"lens": "delivered", "kind": "paper", "span": "Glen drafted a coastal briefing."},
+            extras={"lens": "delivered", "kind": "paper", "span": "Quinn drafted a coastal briefing."},
         )
     )
     corpus.put_card(_card("b", "employer", "delivered"))
     exact = list_cards(corpus, source="employer", q="100%")
     assert exact["total"] == 1
     assert exact["cards"][0]["id"] == "a"
-    assert exact["cards"][0]["span"].startswith("Glen drafted")
+    assert exact["cards"][0]["span"].startswith("Quinn drafted")
     assert "Oceana note" in exact["cards"][0]["snippet"]
     assert "coastal governance" in exact["cards"][0]["snippet"]
     assert list_cards(corpus, source="employer", q="%")["total"] == 1

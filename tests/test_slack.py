@@ -41,11 +41,11 @@ def _warehouse(path: Path) -> Path:
         """
     )
     conn.execute("INSERT INTO slack.channels VALUES ('C1', 'policy', 'channel')")
-    long_text = "Glen drafted a coastal governance briefing. " * 12
+    long_text = "Quinn drafted a coastal governance briefing. " * 12
     conn.execute(
         """
         INSERT INTO slack.messages VALUES
-        ('C1', '1.0', 'policy', 'UTESTSLACK', 'Glen', ?, 2023, ?, 0, 0, 0,
+        ('C1', '1.0', 'policy', 'UTESTSLACK', 'Quinn', ?, 2023, ?, 0, 0, 0,
          FALSE, FALSE, FALSE, NULL),
         ('C1', '2.0', 'policy', 'UOTHER', 'Other', ?, 2023, ?, 0, 0, 0,
          FALSE, FALSE, FALSE, NULL)
@@ -71,7 +71,7 @@ def test_slack_keeps_a_long_message_from_the_known_user(
     assert "milk" not in recs[0].text
 
 
-def test_slack_keeps_glen_file_and_skips_unrelated(
+def test_slack_keeps_user_file_and_skips_unrelated(
     tmp_path: Path, corpus: Corpus, monkeypatch
 ) -> None:
     monkeypatch.setenv("DOSSIER_SLACK_USER_IDS", "UTESTSLACK")
@@ -102,7 +102,7 @@ def test_slack_keeps_glen_file_and_skips_unrelated(
     conn.execute(
         """
         INSERT INTO slack.messages VALUES
-        ('COCEAN', '1.0', 'gsr_section_ocean', 'UTESTSLACK', 'Glen',
+        ('COCEAN', '1.0', 'gsr_section_ocean', 'UTESTSLACK', 'Quinn',
          'Draft of the GSR ocean chapter attached.', 2024, 40, 1, 1, 2,
          FALSE, TRUE, FALSE, '1.0'),
         ('COCEAN', '9.0', 'gsr_section_ocean', 'UOTHER', 'Other',

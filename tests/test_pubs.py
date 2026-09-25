@@ -16,7 +16,7 @@ def test_pubs_fixture_load(tmp_path: Path, corpus: Corpus) -> None:
         {"records": [
           {"uri": "zotero://my-pubs/fixture-1",
            "title": "Synthetic coastal paper",
-           "text": "Glen wrote a synthetic paper on coastal governance."}
+           "text": "Quinn wrote a synthetic paper on coastal governance."}
         ]}
         """,
         encoding="utf-8",
@@ -44,7 +44,7 @@ def test_stub_retriever_loads(corpus: Corpus, monkeypatch) -> None:
         source="pubs",
         uri="zotero://stub/1",
         title="Stub",
-        text="Glen published a stub paper on synthetic reefs.",
+        text="Quinn published a stub paper on synthetic reefs.",
         table="pubs.records",
     )
     src = PubsSource(retriever=StubPubsRetriever([rec]))
@@ -83,7 +83,7 @@ def test_named_collection_loads_without_a_server(
     assert set(recs) == {"zotero://CHILDKEY1", "zotero://ABCD1234"}
     assert recs["zotero://CHILDKEY1"].title == "Child chapter"
     coastal = recs["zotero://ABCD1234"]
-    assert "Wright, Glen (2019)" in coastal.text
+    assert "Hale, Quinn (2019)" in coastal.text
     assert "synthetic abstract on coastal governance" in coastal.text
     assert "https://doi.org/10.1000/coast" in coastal.text
     assert all("Ocean library" not in rec.text for rec in recs.values())
@@ -203,7 +203,7 @@ def _zotero_fixture(tmp_path: Path) -> Path:
         INSERT INTO itemData VALUES (15, 1, 101);
         INSERT INTO itemDataValues VALUES (100, 'Attachment pdf');
         INSERT INTO itemData VALUES (13, 1, 100);
-        INSERT INTO creators VALUES (1, 'Glen', 'Wright');
+        INSERT INTO creators VALUES (1, 'Quinn', 'Hale');
         INSERT INTO itemCreators VALUES (10, 1, 1, 0);
         """
     )

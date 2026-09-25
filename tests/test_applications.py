@@ -8,7 +8,7 @@ def test_applications_loads_text_and_skips_pdf_body(tmp_path: Path, corpus: Corp
     root = tmp_path / "job applications" / "Oceana"
     root.mkdir(parents=True)
     (root / "cover.md").write_text(
-        "Glen led the Oceana BBNJ working group and wrote this pack.\n",
+        "Quinn led the Oceana BBNJ working group and wrote this pack.\n",
         encoding="utf-8",
     )
     (root / "cv.pdf").write_bytes(b"%PDF-fake")

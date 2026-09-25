@@ -22,7 +22,7 @@ def _release() -> str:
 
 
 project = "Dossier"
-author = "Glen"
+author = "Dossier contributors"
 copyright = f"{date.today().year}, {author}"
 
 release = _release()

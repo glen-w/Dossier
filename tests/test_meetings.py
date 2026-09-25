@@ -11,7 +11,7 @@ from dossier.store import Corpus
 
 @pytest.fixture(autouse=True)
 def _default_speaker(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DOSSIER_SPEAKER_NAMES", "Glen Wright,Glen")
+    monkeypatch.setenv("DOSSIER_SPEAKER_NAMES", "Quinn Hale,Quinn")
 
 
 def _write(
@@ -52,7 +52,7 @@ def _library(root: Path) -> None:
     _write(
         root,
         "250610_ocean_webinar",
-        {"SPEAKER_00": "Glen Wright", "SPEAKER_01": "Ada Lovelace"},
+        {"SPEAKER_00": "Quinn Hale", "SPEAKER_01": "Ada Lovelace"},
         [
             ("SPEAKER_00", "I drafted the ocean webinar briefing for the working group."),
             ("SPEAKER_01", "The parking meters on the street need a coin."),
@@ -68,37 +68,37 @@ def _library(root: Path) -> None:
         root,
         "250612_placeholder",
         {"SPEAKER_00": "SPEAKER_00"},
-        [("SPEAKER_00", "Glen drafted a briefing but this speaker was never named.")],
+        [("SPEAKER_00", "Quinn drafted a briefing but this speaker was never named.")],
     )
     _write(
         root,
         "250613_ignored",
-        {"SPEAKER_00": "Glen Wright", "SPEAKER_01": "Ada Lovelace"},
+        {"SPEAKER_00": "Quinn Hale", "SPEAKER_01": "Ada Lovelace"},
         [("SPEAKER_00", "I drafted the ignored briefing.")],
         ignored=("SPEAKER_00",),
     )
     _write(
         root,
         "250614_monologue",
-        {"SPEAKER_00": "Glen"},
+        {"SPEAKER_00": "Quinn"},
         [("SPEAKER_00", "Thinking about lunch tomorrow and nothing else.")],
     )
     _write(
         root,
         "250615_workshop",
-        {"SPEAKER_00": "Glen Wright"},
+        {"SPEAKER_00": "Quinn Hale"},
         [("SPEAKER_00", "I taught the workshop session on coastal governance.")],
     )
     _write(
         root,
         "250610_ocean_webinar__inbox",
-        {"SPEAKER_00": "Glen Wright", "SPEAKER_01": "Ada Lovelace"},
+        {"SPEAKER_00": "Quinn Hale", "SPEAKER_01": "Ada Lovelace"},
         [("SPEAKER_00", "Inbox duplicate of the ocean webinar. Should not be stored.")],
     )
     _write(
         root,
         "250610_ocean_webinar (conflicted copy 2026-08-23 232516)",
-        {"SPEAKER_00": "Glen Wright", "SPEAKER_01": "Ada Lovelace"},
+        {"SPEAKER_00": "Quinn Hale", "SPEAKER_01": "Ada Lovelace"},
         [("SPEAKER_00", "Conflicted copy of the ocean webinar. Should not be stored.")],
     )
     maps = root / "metadata" / "speaker_maps"
@@ -114,7 +114,7 @@ def test_library_layout_skips_imports(tmp_path: Path, monkeypatch: pytest.Monkey
     _write(
         root,
         "250610_ocean_webinar",
-        {"SPEAKER_00": "Glen Wright", "SPEAKER_01": "Ada Lovelace"},
+        {"SPEAKER_00": "Quinn Hale", "SPEAKER_01": "Ada Lovelace"},
         [("SPEAKER_00", "I drafted the briefing."), ("SPEAKER_01", "Noted.")],
     )
     hidden = root / "imports"
@@ -190,7 +190,7 @@ def test_colocated_export_folder(tmp_path: Path, corpus: Corpus) -> None:
     _write(
         root,
         "250520-team-meeting",
-        {"SPEAKER_00": "Glen", "SPEAKER_01": "Ada"},
+        {"SPEAKER_00": "Quinn", "SPEAKER_01": "Ada"},
         [("SPEAKER_00", "I chaired the team meeting and drafted the note.")],
         library=False,
     )
@@ -209,17 +209,17 @@ def test_display_name_segments_and_near_miss_names(tmp_path: Path, corpus: Corpu
     _write(
         root,
         "250701_ocean_webinar",
-        {"SPEAKER_00": "Glen Wright", "SPEAKER_01": "Ada"},
+        {"SPEAKER_00": "Quinn Hale", "SPEAKER_01": "Ada"},
         [
-            ("Glen Wright", "I drafted the ocean webinar briefing."),
+            ("Quinn Hale", "I drafted the ocean webinar briefing."),
             ("Ada", "The parking meters on the street need a coin."),
         ],
     )
     _write(
         root,
         "250702_notes",
-        {"SPEAKER_00": "Glen Wright"},
-        [("Glen Wright", "Thinking about lunch tomorrow and nothing else.")],
+        {"SPEAKER_00": "Quinn Hale"},
+        [("Quinn Hale", "Thinking about lunch tomorrow and nothing else.")],
     )
     _write(
         root,
@@ -230,7 +230,7 @@ def test_display_name_segments_and_near_miss_names(tmp_path: Path, corpus: Corpu
     _write(
         root,
         "250704_numeric",
-        {"0": "Glen Wright", "1": "Ada"},
+        {"0": "Quinn Hale", "1": "Ada"},
         [
             ("0", "I edited the numeric-id briefing."),
             ("1", "Unrelated parking note from Ada."),
@@ -253,21 +253,21 @@ def test_year_org_and_silent_named_speaker(tmp_path: Path, corpus: Corpus) -> No
     _write(
         root,
         "REN21-team-call",
-        {"SPEAKER_00": "Glen", "SPEAKER_01": "Ada"},
+        {"SPEAKER_00": "Quinn", "SPEAKER_01": "Ada"},
         [("SPEAKER_00", "I convened the REN21 team call.")],
         imported_at="2024-03-01T00:00:00Z",
     )
     _write(
         root,
         "20260619120000_checkin",
-        {"SPEAKER_00": "Glen Wright", "SPEAKER_01": "Ada"},
+        {"SPEAKER_00": "Quinn Hale", "SPEAKER_01": "Ada"},
         [("SPEAKER_00", "I drafted the June check-in note.")],
     )
     _write(
         root,
         "250801_quiet",
-        {"SPEAKER_00": "Glen Wright", "SPEAKER_01": "Ada"},
-        [("SPEAKER_01", "Ada spoke. Glen was named and said nothing.")],
+        {"SPEAKER_00": "Quinn Hale", "SPEAKER_01": "Ada"},
+        [("SPEAKER_01", "Ada spoke. Quinn was named and said nothing.")],
     )
     MeetingsSource().load(root, corpus)
     recs = {rec.uri: rec.text for rec in corpus.records("meetings")}
@@ -285,13 +285,13 @@ def test_caps_quotas_and_escapes(
     _write(
         root,
         "250901_ocean_webinar",
-        {"SPEAKER_00": "Glen", "SPEAKER_01": "Ada"},
+        {"SPEAKER_00": "Quinn", "SPEAKER_01": "Ada"},
         [("SPEAKER_00", long), ("SPEAKER_01", "parking")],
     )
     _write(
         root,
         "250902_ocean_webinar",
-        {"SPEAKER_00": "Glen", "SPEAKER_01": "Ada"},
+        {"SPEAKER_00": "Quinn", "SPEAKER_01": "Ada"},
         [("SPEAKER_00", "I drafted the second ocean webinar briefing.")],
     )
     monkeypatch.setenv("DOSSIER_SEEKER_PER_STRATUM", "1")
@@ -325,7 +325,7 @@ def test_caps_quotas_and_escapes(
     (maps / "250903_leak.speaker_map.json").write_text(
         json.dumps(
             {
-                "speaker_map": {"SPEAKER_00": "Glen", "SPEAKER_01": "Ada"},
+                "speaker_map": {"SPEAKER_00": "Quinn", "SPEAKER_01": "Ada"},
                 "ignored_speakers": [],
             }
         ),
@@ -341,7 +341,7 @@ def test_caps_quotas_and_escapes(
     _write(
         fat,
         "250904_ocean_webinar",
-        {"SPEAKER_00": "Glen", "SPEAKER_01": "Ada"},
+        {"SPEAKER_00": "Quinn", "SPEAKER_01": "Ada"},
         [("SPEAKER_00", "I drafted a briefing that is longer than the byte cap.")],
     )
     before = {rec.uri for rec in corpus.records("meetings")}
@@ -354,7 +354,7 @@ def test_single_file_and_inbox_only_copy(tmp_path: Path, corpus: Corpus) -> None
     _write(
         root,
         "250520-team-meeting",
-        {"SPEAKER_00": "Glen", "SPEAKER_01": "Ada"},
+        {"SPEAKER_00": "Quinn", "SPEAKER_01": "Ada"},
         [("SPEAKER_00", "I chaired this exported team meeting.")],
         library=False,
     )
@@ -366,7 +366,7 @@ def test_single_file_and_inbox_only_copy(tmp_path: Path, corpus: Corpus) -> None
     _write(
         inbox,
         "250521_team__inbox",
-        {"SPEAKER_00": "Glen", "SPEAKER_01": "Ada"},
+        {"SPEAKER_00": "Quinn", "SPEAKER_01": "Ada"},
         [("SPEAKER_00", "I drafted the inbox-only team note.")],
     )
     src.load(inbox, corpus)

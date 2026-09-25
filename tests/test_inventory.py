@@ -202,7 +202,7 @@ def test_year_spread_keeps_early_and_late_reports(corpus: Corpus) -> None:
             Record(
                 id=name,
                 source="mbox",
-                uri=f"mbox://glen@example/{name}",
+                uri=f"mbox://quinn@example/{name}",
                 title=name,
                 text=(
                     f"Lens: delivered\nKind: report\nYear: {year}\n"
@@ -291,7 +291,7 @@ def test_budget_form_stays_and_newsletter_folder_does_not(corpus: Corpus) -> Non
         Record(
             id="frais",
             source="mbox",
-            uri="mbox://glen@example.test/IKI/frais-1",
+            uri="mbox://quinn@example.test/IKI/frais-1",
             title="Form frais for IKI/SHS",
             text=(
                 "Lens: delivered\nKind: report\nYear: 2019\nOrg: IDDRI\n"
@@ -303,7 +303,7 @@ def test_budget_form_stays_and_newsletter_folder_does_not(corpus: Corpus) -> Non
         Record(
             id="news",
             source="mbox",
-            uri="mbox://glen@example.test/Newsletters/news-1",
+            uri="mbox://quinn@example.test/Newsletters/news-1",
             title="IDDRI newsletter",
             text=(
                 "Lens: delivered\nKind: report\nYear: 2019\nOrg: IDDRI\n"
@@ -384,7 +384,7 @@ def test_specific_question_still_uses_an_approved_card(corpus: Corpus) -> None:
             source="pubs",
             uri="zotero://fixture/1",
             title="Note",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         )
     )
     corpus.put_card(

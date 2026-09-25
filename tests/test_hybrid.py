@@ -189,7 +189,7 @@ def test_pubs_hits_quote_without_writing_the_corpus(corpus: Corpus) -> None:
             Hit(
                 uri="zotero://stub/1",
                 title="Stub",
-                text="Glen wrote a synthetic paper on coastal governance.",
+                text="Quinn wrote a synthetic paper on coastal governance.",
                 score=1,
             )
         ],

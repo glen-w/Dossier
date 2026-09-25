@@ -3,7 +3,7 @@
 Type: PRODUCT
 Authority: What shipped, what is next, and the refuse lines. Current behavior lives in [status](status.md).
 
-Versioned waves from the locker you have today through a product someone else can try. Behaviour detail lives in [status](status.md). Pipeline shape lives in [architecture](architecture.md). Life facts and commitment stay in Untangle (`projects/dossier.md`).
+Versioned waves from the locker you have today through a product someone else can try. Behaviour detail lives in [status](status.md). Pipeline shape lives in [architecture](architecture.md). Life facts stay out of this repo.
 
 Waves are ambition, not a calendar. Hard boundaries at the bottom do not move.
 
@@ -19,14 +19,14 @@ Local SQLite corpus, ten explicit adapters, deterministic then optional-model cl
 
 Tested on synthetic fixtures.
 
-### 0.6 — Prove it on Glen’s machine
+### 0.6 — Prove it on a real locker
 
 - `dossier prove` — disposable real-corpus pass, ledger, never approves
 - `doctor` prints python / sqlite / FTS5; install guide documents a known-good interpreter
 - Own-pubs HTTP `POST /search` maps hits into records when no Zotero collection is configured
 - Product page + Sphinx guide (`make pages-site`)
 
-Still open for the full done-when: warehouse `make prove` spot-check by Glen. The named Zotero collection is ingested with the other adapters.
+Still open for the full done-when: a warehouse `make prove` spot-check on a real locker. The named Zotero collection is ingested with the other adapters.
 
 ### 0.8 — Thin corpus and hybrid ask
 
@@ -40,9 +40,9 @@ Employer allowlist, ChatGPT export, Slack export, and git history, plus the meet
 
 ### 0.9 → 1.0 — User testing
 
-Find what breaks when it is not Glen’s laptop and not synthetic fixtures. Match lists evidence for each requirement in a pasted job spec (`dossier match` and the workbench Match page). Tailor stays off that page. There is still no PDF.
+Find what breaks on a machine that is not the one that grew this locker, and not synthetic fixtures. Match lists evidence for each requirement in a pasted job spec (`dossier match` and the workbench Match page). Tailor stays off that page. There is still no PDF.
 
-- Second person (or Glen running as a thin user) installs from the README, enables only adapters they have, and completes ingest → extract → approve → ask → packet (and optional brief, tailor, or referees).
+- Someone else installs from the README, enables only adapters they have, and completes ingest → extract → approve → ask → packet (and optional brief, tailor, or referees). A thin install (no warehouse) is the same path.
 - Acceptance checklist: refusals that should refuse, citations that resolve, egress notice when cloud is opted in, Twenty read-only when used, no dumps or evidence DB in git.
 - Docs and `doctor` messages fixed for every footgun found; features deferred, not patched in as drive-bys.
 - Career inventory covers years across the locker (seeker year floor, employer career folders at read time), not only the three newest files per kind.
@@ -61,7 +61,7 @@ These are not delayed features; they are refuse lines.
 - No Twenty writes (Tasks, Opportunities, Notes, last-contacted)
 - No auto-attach of a referee name to an application
 - No cloud LLM default. Text leaves the machine only when the provider is `litellm` or `DOSSIER_LLM_ALLOW_REMOTE` is set. The CLI prints an egress notice first. `dossier doctor` reports `egress: no` or `egress: yes`
-- No 26G IDDRI mbox stream; no Sent Mail as a folder walker; no re-embed of hoops/ocean
+- No walk of a blocked mail tree; no Sent Mail as a folder walker; no re-embed of a Zotero library you did not name
 - No plugin directory or entry-point scan
-- No Docker image for the locker. It installs with `uv` on the host. Publications are the named Zotero collection, read in-process. No compose server, and no re-embed of hoops or ocean
+- No Docker image for the locker. It installs with `uv` on the host. Publications are the named Zotero collection, read in-process. No compose server, and no re-embed of a Zotero library you did not name
 - Dumps, warehouse, LanceDB, `evidence.db`, `.env`, mbox, and PDFs stay off git. Before every push, `python3 scripts/release/check_gitignore.py` must pass

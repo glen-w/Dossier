@@ -67,7 +67,7 @@ def test_approved_card_beats_a_weaker_record(corpus: Corpus) -> None:
             source="pubs",
             uri="zotero://fixture/1",
             title="Note",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         )
     )
     corpus.put_card(
@@ -99,7 +99,7 @@ def test_pending_card_is_ignored(corpus: Corpus) -> None:
             source="pubs",
             uri="zotero://fixture/1",
             title="Note",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         )
     )
     corpus.put_card(
@@ -127,7 +127,7 @@ def test_pending_card_is_ignored(corpus: Corpus) -> None:
 def test_passage_cites_the_parent_uri(corpus: Corpus) -> None:
     long = (
         "Intro paragraph about shipping schedules.\n\n"
-        "Glen drafted the GSR ocean chapter on coastal governance.\n\n"
+        "Quinn drafted the GSR ocean chapter on coastal governance.\n\n"
         "Closing notes about catering."
     )
     corpus.upsert_record(
@@ -172,7 +172,7 @@ def test_hop_finds_a_kind_the_first_query_missed(corpus: Corpus) -> None:
             title="GSR",
             text=(
                 "Lens: delivered\nKind: chapter\n"
-                "Glen drafted the ocean chapter for the workshop methods."
+                "Quinn drafted the ocean chapter for the workshop methods."
             ),
         )
     )
@@ -205,7 +205,7 @@ def test_planner_spends_one_call_then_quotes(corpus: Corpus) -> None:
             source="pubs",
             uri="zotero://a",
             title="Workshop",
-            text="Glen convened a workshop on coastal methods.",
+            text="Quinn convened a workshop on coastal methods.",
         )
     )
     corpus.upsert_record(
@@ -214,7 +214,7 @@ def test_planner_spends_one_call_then_quotes(corpus: Corpus) -> None:
             source="pubs",
             uri="zotero://b",
             title="Paper",
-            text="Glen wrote a paper on coastal governance.",
+            text="Quinn wrote a paper on coastal governance.",
         )
     )
 
@@ -283,7 +283,7 @@ def test_compound_question_stitches_without_a_model(corpus: Corpus) -> None:
             source="pubs",
             uri="zotero://a",
             title="Workshop",
-            text="Glen convened a workshop on coastal methods.",
+            text="Quinn convened a workshop on coastal methods.",
         )
     )
     corpus.upsert_record(
@@ -292,7 +292,7 @@ def test_compound_question_stitches_without_a_model(corpus: Corpus) -> None:
             source="pubs",
             uri="zotero://b",
             title="Paper",
-            text="Glen wrote a paper on coastal governance.",
+            text="Quinn wrote a paper on coastal governance.",
         )
     )
     question = "workshop methods; coastal governance paper"
@@ -318,7 +318,7 @@ def test_partial_miss_spends_one_call(corpus: Corpus) -> None:
             source="pubs",
             uri="zotero://fixture/1",
             title="Paper",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         )
     )
     client = _Once()
@@ -506,7 +506,7 @@ def test_budget_wraps_conduct_rich(corpus: Corpus) -> None:
             source="pubs",
             uri="zotero://fixture/1",
             title="Paper",
-            text="Glen wrote a synthetic paper on coastal governance.",
+            text="Quinn wrote a synthetic paper on coastal governance.",
         )
     )
     budget = CallBudget(1)

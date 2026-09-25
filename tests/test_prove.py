@@ -21,7 +21,7 @@ def test_http_retriever_maps_search_hits(monkeypatch) -> None:
                     {
                         "uri": "zotero://pubs/1",
                         "title": "Coastal paper",
-                        "text": "Glen wrote on coastal governance.",
+                        "text": "Quinn wrote on coastal governance.",
                     },
                     {
                         "uri": "zotero://pubs/2",
@@ -87,7 +87,7 @@ def test_pubs_load_from_http_search(tmp_path: Path, corpus: Corpus, monkeypatch)
                         {
                             "uri": "zotero://pubs/live",
                             "title": "Live",
-                            "text": "Glen published a live paper on ocean rights.",
+                            "text": "Quinn published a live paper on ocean rights.",
                         }
                     ]
                 },
@@ -114,7 +114,7 @@ def test_prove_on_applications_fixture(tmp_path: Path, monkeypatch) -> None:
     apps = tmp_path / "job applications"
     apps.mkdir()
     (apps / "cover.md").write_text(
-        "Cover letter. Glen led the Oceana BBNJ working group on coastal governance.\n",
+        "Cover letter. Quinn led the Oceana BBNJ working group on coastal governance.\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("DOSSIER_APPLICATIONS", str(apps))
@@ -147,7 +147,7 @@ def test_prove_refuses_without_fts5(tmp_path: Path, monkeypatch, capsys) -> None
     data = tmp_path / "prove-no-fts"
     apps = tmp_path / "job applications"
     apps.mkdir()
-    (apps / "cover.md").write_text("Glen led a synthetic coastal project.\n", encoding="utf-8")
+    (apps / "cover.md").write_text("Quinn led a synthetic coastal project.\n", encoding="utf-8")
     monkeypatch.setenv("DOSSIER_APPLICATIONS", str(apps))
     monkeypatch.setenv("DATA_DUMPS_WAREHOUSE", str(tmp_path / "missing.duckdb"))
 
@@ -182,7 +182,7 @@ def test_prove_restores_env(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DOSSIER_DATA", str(tmp_path / "prior-data"))
     apps = tmp_path / "job applications"
     apps.mkdir()
-    (apps / "cover.md").write_text("Glen led a synthetic coastal project.\n", encoding="utf-8")
+    (apps / "cover.md").write_text("Quinn led a synthetic coastal project.\n", encoding="utf-8")
     monkeypatch.setenv("DOSSIER_APPLICATIONS", str(apps))
     monkeypatch.setenv("DATA_DUMPS_WAREHOUSE", str(tmp_path / "missing.duckdb"))
 
@@ -209,7 +209,7 @@ def test_doctor_prints_python_and_sqlite(tmp_path: Path, monkeypatch, capsys) ->
 def test_cli_prove_empty_data_uses_temp(tmp_path: Path, monkeypatch) -> None:
     apps = tmp_path / "job applications"
     apps.mkdir()
-    (apps / "cover.md").write_text("Glen led a synthetic coastal project.\n", encoding="utf-8")
+    (apps / "cover.md").write_text("Quinn led a synthetic coastal project.\n", encoding="utf-8")
     monkeypatch.setenv("DOSSIER_APPLICATIONS", str(apps))
     monkeypatch.setenv("DATA_DUMPS_WAREHOUSE", str(tmp_path / "missing.duckdb"))
     monkeypatch.chdir(tmp_path)
