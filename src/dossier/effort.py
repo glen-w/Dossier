@@ -78,6 +78,24 @@ def _effort_field(cfg: "Config", name: str, key: str) -> str:
     return str(getattr(cfg, field, "") or "").strip()
 
 
+def effort_model_tags(cfg: "Config") -> tuple[str, ...]:
+    """Tags this effort will call. Light drafts and quotes, so the list is empty."""
+    if not getattr(cfg, "llm_enabled", True) or normalize_effort(cfg.effort) == "light":
+        return ()
+    answer = str(getattr(cfg, "llm_model", "") or "").strip()
+    fast = str(getattr(cfg, "fast_model", "") or "").strip()
+    if normalize_effort(cfg.effort) == "high":
+        tags = [answer] if answer else []
+        if fast and fast not in tags:
+            tags.append(fast)
+        return tuple(tags)
+    tags = []
+    for tag in (fast, answer):
+        if tag and tag not in tags:
+            tags.append(tag)
+    return tuple(tags)
+
+
 def effort_blurb(name: str) -> str:
     name = normalize_effort(name)
     if name == "light":

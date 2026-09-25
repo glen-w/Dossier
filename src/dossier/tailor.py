@@ -13,7 +13,13 @@ from dossier.cards import (
     header_values,
 )
 from dossier.lenses import infer_skills, kinds_mentioned
-from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
+from dossier.llm.client import (
+    FAST_MAX_TOKENS,
+    CompletionRequest,
+    LLMClient,
+    LLMClientError,
+    ctx_tokens_for,
+)
 from dossier.prompts import ARRANGE_BODY, active_prompt, render
 from dossier.store import Corpus
 
@@ -131,6 +137,7 @@ def arrange_letter(
                 json_mode=True,
                 num_ctx=ctx_tokens_for(prompt, max_num_ctx=max_num_ctx),
                 timeout_seconds=timeout_seconds,
+                max_tokens=FAST_MAX_TOKENS,
                 think=False,
             )
         )

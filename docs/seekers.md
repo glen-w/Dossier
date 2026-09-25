@@ -61,4 +61,4 @@ Default 20 hits per (source, lens, kind, year), 1000 overall. After one hit per 
 
 ## Extract
 
-`dossier extract --source slack` (or `mbox`, or `meetings`) sends only those snippets to the fast model (`[llm] fast`, default `qwen2.5:3b`, thinking off). Ask still uses the answer model. By default both tags are Ollama on loopback, so the snippets stay on this machine. A missing fast tag falls back to the answer model. A remote LLM is off unless you set provider `litellm` or `DOSSIER_LLM_ALLOW_REMOTE`; the CLI then prints an egress notice before the prompt is sent.
+`dossier extract --source slack` (or `mbox`, or `meetings`) sends only those snippets to the fast model (`[llm] fast`, default `qwen2.5:3b`, thinking off, 512-token reply cap). Ask still uses the answer model. By default both tags are Ollama on loopback, so the snippets stay on this machine. A missing fast tag falls back to the answer model. A remote LLM is off unless you set provider `litellm` or `DOSSIER_LLM_ALLOW_REMOTE`; the CLI then prints an egress notice before the prompt is sent.

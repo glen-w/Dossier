@@ -77,6 +77,7 @@ def test_extract_record_chunks_large_text(corpus) -> None:
     )
     assert len(client.prompts) == 3
     assert all(request.think is False for request in client.requests)
+    assert all(request.max_tokens == 512 for request in client.requests)
     assert all(len(p) < 2000 for p in client.prompts)
     assert cards[0].status == STATUS_PENDING
 

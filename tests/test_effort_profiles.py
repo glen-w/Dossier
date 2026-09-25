@@ -142,6 +142,63 @@ def test_neither_tag_installed_keeps_the_fast_name() -> None:
     assert "qwen2.5:3b" in note
 
 
+def test_doctor_names_installed_tags(tmp_path: Path, monkeypatch, capsys) -> None:
+    from dossier.cli import main
+
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
+    (tmp_path / "dossier.toml").write_text(
+        "\n".join(
+            [
+                'effort = "balanced"',
+                "[llm]",
+                'model = "qwen3.8:latest"',
+                'fast = "qwen2.5:3b"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    class _Tags:
+        def check_config(self, model: str) -> tuple[bool, str]:
+            if model == "qwen3.8:latest":
+                return True, "ok"
+            return False, f"missing {model}"
+
+    monkeypatch.setattr("dossier.cli.get_client", lambda cfg: _Tags())
+    assert main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert "qwen2.5:3b missing" in out
+    assert "qwen3.8:latest installed" in out
+    assert "not installed; using qwen3.8:latest" in out
+
+
+def test_doctor_light_does_not_open_a_model(tmp_path: Path, monkeypatch, capsys) -> None:
+    from dossier.cli import main
+
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
+    monkeypatch.setenv("DOSSIER_EFFORT", "light")
+
+    def _boom(cfg: object) -> object:
+        raise AssertionError("light should not open a model")
+
+    monkeypatch.setattr("dossier.cli.get_client", _boom)
+    assert main(["doctor"]) == 0
+    assert "models: none" in capsys.readouterr().out
+
+
+def test_effort_model_tags_follow_the_preset() -> None:
+    from dossier.effort import effort_model_tags
+
+    base = Config(llm_model="qwen3.8:latest", fast_model="qwen2.5:3b", llm_enabled=True)
+    assert effort_model_tags(apply_effort(base, "light")) == ()
+    assert effort_model_tags(apply_effort(base, "balanced")) == (
+        "qwen2.5:3b",
+        "qwen3.8:latest",
+    )
+    assert effort_model_tags(apply_effort(base, "high")) == ("qwen3.8:latest",)
+
+
 def test_balanced_fast_override_does_not_change_answer() -> None:
     cfg = Config(
         llm_model="qwen3.8:latest",

@@ -1049,9 +1049,19 @@ def _doctor(cfg: Config) -> int:
         print(f"effort: {cfg.effort}")
         print(f"model: {cfg.llm_model}")
         print(f"fast: {cfg.fast_model}")
-        if cfg.llm_enabled and cfg.fast_model != cfg.llm_model:
-            fast_client = get_client(cfg)
-            _chosen, fast_note = select_fast_model(cfg, fast_client)
+        from dossier.effort import effort_model_tags
+
+        tags = effort_model_tags(cfg)
+        if not tags:
+            print("models: none")
+        else:
+            tag_client = get_client(cfg)
+            bits = []
+            for tag in tags:
+                ok_tag, _msg = tag_client.check_config(tag)
+                bits.append(f"{tag} {'installed' if ok_tag else 'missing'}")
+            print("models: " + ", ".join(bits))
+            _chosen, fast_note = select_fast_model(cfg, tag_client)
             if fast_note:
                 print(fast_note)
         print(f"llm.timeout: {cfg.llm_timeout_seconds}")

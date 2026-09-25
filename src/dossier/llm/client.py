@@ -20,6 +20,30 @@ class LLMClientError(Exception):
     """Configuration or transport error for an LLM client."""
 
 
+# Short JSON replies: extract, folder filter, ask planner, letter arrange.
+FAST_MAX_TOKENS = 512
+
+# Tags that park the answer in a thinking trace and leave JSON response empty.
+_THINKING_MARKERS = ("qwen3", "deepseek-r1", "gpt-oss")
+
+
+def is_thinking_model(name: str | None) -> bool:
+    """True when this Ollama tag is a family that thinks before it answers."""
+    if not isinstance(name, str):
+        return False
+    lowered = name.strip().lower()
+    return bool(lowered) and any(marker in lowered for marker in _THINKING_MARKERS)
+
+
+def json_think(request: CompletionRequest) -> bool | None:
+    """Keep an explicit think flag. Otherwise disable it for JSON on a thinking tag."""
+    if request.think is not None:
+        return request.think
+    if request.json_mode and is_thinking_model(request.model):
+        return False
+    return None
+
+
 @dataclass(frozen=True)
 class CompletionRequest:
     model: str
@@ -102,8 +126,9 @@ class OllamaClient:
             "stream": False,
             "options": options,
         }
-        if request.think is not None:
-            payload["think"] = request.think
+        think = json_think(request)
+        if think is not None:
+            payload["think"] = think
         try:
             with httpx.Client(timeout=request.timeout_seconds) as client:
                 resp = client.post(f"{self._api_root()}/api/generate", json=payload)

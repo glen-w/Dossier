@@ -16,7 +16,13 @@ from pathlib import Path
 
 from dossier.lists import employer_dirs, employer_files, employer_suffixes, excluded
 from dossier.llm.budget import CallBudget
-from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
+from dossier.llm.client import (
+    FAST_MAX_TOKENS,
+    CompletionRequest,
+    LLMClient,
+    LLMClientError,
+    ctx_tokens_for,
+)
 
 _HEX_NAME = re.compile(r"^[0-9a-f]{16,}$")
 _COPY_PREFIX = re.compile(r"(?i)^copy of ")
@@ -282,7 +288,7 @@ def _llm_drop(
                     timeout_seconds=timeout_seconds,
                     temperature=0.0,
                     num_ctx=ctx_tokens_for(prompt, max_num_ctx=8192),
-                    max_tokens=512,
+                    max_tokens=FAST_MAX_TOKENS,
                     think=False,
                 )
             )

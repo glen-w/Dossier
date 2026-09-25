@@ -65,6 +65,19 @@ def test_blocked_remote_ollama_is_not_egress() -> None:
     assert not llm_egress_is_remote(cfg)
 
 
+def test_json_on_a_thinking_tag_disables_think() -> None:
+    from dossier.llm.client import json_think
+
+    plain = CompletionRequest(model="qwen2.5:3b", prompt="hi", json_mode=True)
+    assert json_think(plain) is None
+    thinking = CompletionRequest(model="qwen3.8:latest", prompt="hi", json_mode=True)
+    assert json_think(thinking) is False
+    explicit = CompletionRequest(
+        model="qwen3.8:latest", prompt="hi", json_mode=True, think=True
+    )
+    assert json_think(explicit) is True
+
+
 def test_ollama_think_flag_is_sent_only_when_set() -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434", allow_remote=False)
     captured: dict = {}
@@ -84,6 +97,10 @@ def test_ollama_think_flag_is_sent_only_when_set() -> None:
     with patch("dossier.llm.client.httpx.Client") as mock_cls:
         mock_cls.return_value.__enter__.return_value.post.side_effect = _post
         client.complete(CompletionRequest(model="toy", prompt="hi", think=False))
+        assert captured["payload"]["think"] is False
+        client.complete(
+            CompletionRequest(model="qwen3.8:latest", prompt="hi", json_mode=True)
+        )
         assert captured["payload"]["think"] is False
         client.complete(CompletionRequest(model="toy", prompt="hi"))
         assert "think" not in captured["payload"]

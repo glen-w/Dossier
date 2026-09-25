@@ -52,11 +52,14 @@ Split the pipeline when you want control:
   open card; useful while tuning the fast model.
 
 Extract, the employer folder filter, the ask planner, and letter arrange use
-`[llm] fast` (default `qwen2.5:3b`) and send `think: false`. Ask and brief
-use `[llm] model` (default `qwen3.8:latest`). If the fast tag is not
+`[llm] fast` (default `qwen2.5:3b`), send `think: false`, and stop after 512
+tokens. Ask and brief use `[llm] model` (default `qwen3.8:latest`). A JSON
+call on a thinking tag (`qwen3`, `deepseek-r1`, `gpt-oss`) also sends
+`think: false` unless you set the flag yourself. If the fast tag is not
 installed, that role uses the answer model and says so. `effort = high`
 points both roles at the answer model unless `[efforts.high] fast` is set.
-`dossier doctor` prints `model:` and `fast:`.
+`dossier doctor` prints `model:`, `fast:`, and whether the tags this effort
+will call are installed (`models: none` on light).
 - `uv run dossier brief` — answer the question pack without re-ingesting or
   re-extracting.
 
@@ -117,7 +120,7 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | Variable | Use |
 | --- | --- |
 | `DOSSIER_LLM_MODEL` | Answer model for ask and brief (default `qwen3.8:latest`) |
-| `DOSSIER_LLM_FAST` | Fast model for extract, the employer folder filter, the ask planner, and letter arrange (default `qwen2.5:3b`). A missing tag falls back to the answer model. Extract calls send `think: false` |
+| `DOSSIER_LLM_FAST` | Fast model for extract, the employer folder filter, the ask planner, and letter arrange (default `qwen2.5:3b`). Those calls send `think: false` and stop after 512 tokens. A missing tag falls back to the answer model |
 | `DOSSIER_ASK_MODE` | `exact`, `auto` (default), or `rich` |
 | `DOSSIER_ASK_FTS` | Full text on title, text, and passages (`true` by default). Whole-word overlap when this Python has no FTS5, and when full-text hits fall outside the current source or lens filter |
 | `DOSSIER_ASK_CARDS_FIRST` | Prefer an approved claim that carries the question (`true` by default) |

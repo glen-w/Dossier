@@ -10,7 +10,13 @@ from typing import Any
 
 from dossier.cards import ClaimCard, ProposedClaim, adjudicate, card_id
 from dossier.drafts import draft_record
-from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
+from dossier.llm.client import (
+    FAST_MAX_TOKENS,
+    CompletionRequest,
+    LLMClient,
+    LLMClientError,
+    ctx_tokens_for,
+)
 from dossier.prompts import EXTRACT_BODY, SEEKER_TAIL, active_prompt, render
 from dossier.store import Corpus, Record
 
@@ -149,6 +155,7 @@ def propose_with_llm(
             json_mode=True,
             num_ctx=ctx_tokens_for(prompt, max_num_ctx=max_num_ctx),
             timeout_seconds=timeout_seconds,
+            max_tokens=FAST_MAX_TOKENS,
             think=False,
         )
         try:
