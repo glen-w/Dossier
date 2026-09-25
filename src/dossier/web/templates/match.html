@@ -5,7 +5,7 @@
 
 <form method="post" action="/match/run">
   <label class="field">Job spec
-    <textarea class="match-spec" name="spec" required placeholder="Paste the job spec. Bullets become requirements."></textarea>
+    <textarea class="match-spec" name="spec" required placeholder="Paste the job spec. Bullets become requirements.">{{ spec_text }}</textarea>
   </label>
   {% include "partials/request_scope.html" %}
   <div class="row" style="margin-top:10px">
@@ -13,27 +13,42 @@
   </div>
 </form>
 
+<div id="job-result">
 {% if result %}
 <p class="meta">{{ result.path }}</p>
+<p class="meta">{{ result.met }} with a quote · {{ result.gaps }} gaps</p>
+<p><a href="/tailor?from={{ job_id }}">Tailor a CV or letter from spanned cards</a></p>
 {% if result.scope %}<p class="meta">{{ result.scope }}</p>{% endif %}
-{% for req in result.requirements %}
-<div class="card">
-  <h3>{{ loop.index }}. {{ req.text }}</h3>
-  {% if req.unsplit %}<p class="meta">unsplit</p>{% endif %}
-  {% if req.broad %}<p class="meta">broad</p>{% endif %}
-  {% if req.gap %}<p class="meta">gap: {{ req.gap }}</p>{% endif %}
-  {% for hit in req.evidence %}
-  <div class="snippet">
-    <p class="meta">{{ hit.rank }}. {{ hit.route }} · {{ hit.source }} · {{ hit.title }}{% if hit.year %} · {{ hit.year }}{% endif %}</p>
-    <p>{{ hit.quote }}</p>
-    <p class="meta">{{ hit.uri }}{% if hit.card_id %} · card {{ hit.card_id }} {{ hit.card_status }}{% endif %}</p>
+<div class="board">
+  <nav class="rail" aria-label="Requirements">
+    {% for req in result.requirements %}
+    <a href="#req-{{ loop.index }}" class="rail-item {{ 'gap' if req.gap else ('broad' if req.broad else ('unsplit' if req.unsplit else 'met')) }}">{{ loop.index }}. {{ req.text }}</a>
+    {% endfor %}
+  </nav>
+  <div>
+  {% for req in result.requirements %}
+  <div class="card" id="req-{{ loop.index }}">
+    <h3>{{ loop.index }}. {{ req.text }}</h3>
+    {% if req.unsplit %}<p class="meta">unsplit</p>{% endif %}
+    {% if req.broad %}<p class="meta">broad</p>{% endif %}
+    {% if req.gap %}<p class="meta">gap: {{ req.gap }}</p>{% endif %}
+    {% if req.next %}<p><a href="{{ req.next_href }}">{{ req.next }}</a></p>{% endif %}
+    {% for hit in req.evidence %}
+    <div class="snippet">
+      <p class="meta">{{ hit.rank }}. {{ hit.route }} · {{ hit.source }} · {{ hit.title }}{% if hit.year %} · {{ hit.year }}{% endif %}</p>
+      <p id="quote-{{ loop.index }}-{{ hit.rank }}">{{ hit.quote }}</p>
+      <p><button type="button" data-copy="quote-{{ loop.index }}-{{ hit.rank }}">Copy</button></p>
+      <p class="meta">{{ hit.uri }}{% if hit.card_id %} · <a href="/review?q={{ hit.card_id }}&status={{ hit.card_status }}">card {{ hit.card_id }}</a> {{ hit.card_status }}{% endif %}</p>
+    </div>
+    {% endfor %}
   </div>
   {% endfor %}
+  </div>
 </div>
-{% endfor %}
 {% elif job and job.status == 'error' %}
 <div class="err">{{ job.error or 'Match job failed.' }}</div>
 {% elif job and job.status in ('running', 'queued') %}
 <p class="meta">Waiting for the match job…</p>
 {% endif %}
+</div>
 {% endblock %}

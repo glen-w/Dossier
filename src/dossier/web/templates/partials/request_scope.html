@@ -2,6 +2,7 @@
   <legend>This request</legend>
   <p class="meta">Starts from Settings. Changes here stay on this request.</p>
   <input type="hidden" name="scope_form" value="1">
+  {% include "partials/check_actions.html" %}
   <div class="checks">
     {% for name in scope_names %}
     <label>

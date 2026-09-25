@@ -5,19 +5,15 @@ Docs authority: docs/vocab.md. Keep these strings aligned with that page.
 
 from __future__ import annotations
 
-# Primary nav (wave 1).
-NAV = (
-    ("locker", "Locker"),
-    ("sources", "Sources"),
-    ("extract", "Extract"),
-    ("review", "Review"),
-    ("ask", "Ask"),
-    ("match", "Match"),
-    ("index", "Index"),
-    ("brief", "Brief"),
-    ("run", "Run"),
-    ("settings", "Settings"),
+# Primary nav. Rooms are layout groups; every key is still its own URL.
+NAV_ROOMS = (
+    ("Prepare", ("locker", "sources", "extract", "index")),
+    ("Decide", ("review", "gaps")),
+    ("Use", ("ask", "match", "tailor", "packet", "brief", "run")),
+    ("Settings", ("settings",)),
 )
+
+NAV = tuple((key, key.replace("_", " ").title()) for _room, keys in NAV_ROOMS for key in keys)
 
 LABELS = {
     "locker": "Locker",
@@ -59,6 +55,9 @@ BLURBS = {
     "review": "Human gate: approve, refuse, or reopen cards.",
     "ask": "One cited answer from the locker, or a refusal.",
     "match": "Ordered evidence for each requirement in a pasted job spec.",
+    "tailor": "CV or letter markdown from spanned approved cards.",
+    "packet": "Markdown of spanned approved cards.",
+    "gaps": "Empty lenses, unspanned cards, and records still waiting on extract.",
     "settings": "Common knobs. Phrase lists and the rest of the file stay in the gitignored dossier.toml.",
     "effort": "How hard the model should try: light, balanced, or high. Balanced matches today's defaults. Light and high also change context and timeout.",
     "profile": "A named overlay of tunable knobs. Not identity.",

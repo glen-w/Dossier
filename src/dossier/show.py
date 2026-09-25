@@ -76,6 +76,24 @@ def find_span(
     return best
 
 
+def store_span(corpus: Corpus, card: ClaimCard) -> bool:
+    """Store the carrying sentence. Status stays put. False when none exists."""
+    if card.status not in _OPEN:
+        return False
+    sentence, span_uri = _first_span(corpus, card)
+    extras = dict(card.extras)
+    if sentence:
+        extras["span"] = sentence
+        extras["span_uri"] = span_uri
+        corpus.put_card(replace(card, extras=extras))
+        return True
+    extras.pop("span", None)
+    extras.pop("span_uri", None)
+    if extras != dict(card.extras):
+        corpus.put_card(replace(card, extras=extras))
+    return False
+
+
 def defend_cards(corpus: Corpus) -> tuple[list[ClaimCard], list[ClaimCard]]:
     """Store span extras on pending and approved cards. Status stays put."""
     spanned: list[ClaimCard] = []
@@ -83,19 +101,13 @@ def defend_cards(corpus: Corpus) -> tuple[list[ClaimCard], list[ClaimCard]]:
     for card in corpus.cards():
         if card.status not in _OPEN:
             continue
-        sentence, span_uri = _first_span(corpus, card)
-        extras = dict(card.extras)
-        if sentence:
-            extras["span"] = sentence
-            extras["span_uri"] = span_uri
-            updated = replace(card, extras=extras)
-            corpus.put_card(updated)
-            spanned.append(updated)
+        if store_span(corpus, card):
+            updated = corpus.get_card(card.id)
+            spanned.append(updated if updated is not None else card)
             continue
+        extras = dict(card.extras)
         extras.pop("span", None)
         extras.pop("span_uri", None)
-        if extras != dict(card.extras):
-            corpus.put_card(replace(card, extras=extras))
         unspanned.append(replace(card, extras=extras))
     return spanned, unspanned
 

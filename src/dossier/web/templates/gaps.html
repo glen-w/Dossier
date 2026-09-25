@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('gaps') }}</h1>
+<p class="lede">{{ blurbs.gaps }} This page does not ingest or extract.</p>
+{% if report.empty_lenses %}
+<p class="meta">Empty lenses: {{ report.empty_lenses | join(', ') }}</p>
+{% endif %}
+{% for hint in report.hints %}
+<p class="meta">{{ hint[0] }}: {{ hint[1] }}</p>
+{% endfor %}
+{% if report.unspanned_approved %}
+<div class="card">
+  <h3>Approved, no span</h3>
+  <ul>
+  {% for card in report.unspanned_approved %}
+    <li><a href="/review?view=queue&status=approved&q={{ card.id }}">{{ card.claim }}</a></li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% if report.extract_targets %}
+<div class="card">
+  <h3>Records with no open card</h3>
+  <ul>
+  {% for uri in report.extract_targets %}
+    <li class="meta">{{ uri }}</li>
+  {% endfor %}
+  </ul>
+  <p><a href="/extract">Extract</a></p>
+</div>
+{% endif %}
+{% if report.singles %}
+<div class="card">
+  <h3>Only spanned card for a lens and kind</h3>
+  <ul>
+  {% for line in report.singles %}
+    <li><a href="/review?view=queue&status=approved&q={{ line.card.id }}">{{ line.lens }} / {{ line.kind }} — {{ line.card.claim }}</a></li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

@@ -5,7 +5,7 @@
 
 <form method="post" action="/ask/run">
   <label class="field">Question
-    <textarea name="question" required placeholder="What did I deliver on coastal governance?"></textarea>
+    <textarea name="question" required placeholder="What did I deliver on coastal governance?">{{ question_text }}</textarea>
   </label>
   {% include "partials/request_scope.html" %}
   <div class="row" style="margin-top:10px">
@@ -21,14 +21,17 @@
   </div>
 </form>
 
+<div id="job-result">
 {% if result %}
-<div class="card">
+<div class="card citation">
   <h3>{{ result.question }}</h3>
   <p class="meta">mode {{ result.mode }}{% if result.scope %} · {{ result.scope }}{% endif %}</p>
   {% if result.refused %}
   <p class="err">Refused{% if result.reason %}: {{ result.reason }}{% endif %}</p>
+  {% if result.next %}<p><a href="{{ result.next_href }}">{{ result.next }}</a></p>{% endif %}
   {% else %}
-  <p>{{ result.text }}</p>
+  <p class="reading" id="ask-sentence">{{ result.text }}</p>
+  <p><button type="button" data-copy="ask-sentence">Copy</button></p>
   <ul class="cite">
     {% for uri in result.citations %}<li class="meta">{{ uri }}</li>{% endfor %}
   </ul>
@@ -39,4 +42,5 @@
 {% elif job and job.status in ('running', 'queued') %}
 <p class="meta">Waiting for the ask job…</p>
 {% endif %}
+</div>
 {% endblock %}

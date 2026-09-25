@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
-import traceback
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from dossier import ui as ui_mod
+
+
+log = logging.getLogger("dossier.jobs")
 
 
 class LockerBusy(RuntimeError):
@@ -40,6 +43,7 @@ class Job:
     status: str = "queued"  # queued | running | done | error
     error: str = ""
     result: Any = None
+    seed: dict[str, Any] = field(default_factory=dict)
     events: list[JobEvent] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     finished_at: float | None = None
@@ -97,11 +101,17 @@ class JobRunner:
         job = self.current
         return job is not None and job.status in {"queued", "running"}
 
-    def start(self, kind: str, fn: Callable[[Job], Any]) -> Job:
+    def start(
+        self,
+        kind: str,
+        fn: Callable[[Job], Any],
+        *,
+        seed: dict[str, Any] | None = None,
+    ) -> Job:
         with self._lock:
             if self._job is not None and self._job.status in {"queued", "running"}:
                 raise LockerBusy("locker busy")
-            job = Job(id=uuid.uuid4().hex[:12], kind=kind)
+            job = Job(id=uuid.uuid4().hex[:12], kind=kind, seed=dict(seed or {}))
             self._job = job
             self._thread = threading.Thread(
                 target=self._run,
@@ -137,7 +147,8 @@ class JobRunner:
         except Exception as exc:  # noqa: BLE001 — surface to the workbench
             job.status = "error"
             job.error = str(exc)
-            job.push("status", status="error", error=str(exc), detail=traceback.format_exc())
+            log.exception("job %s failed", job.kind)
+            job.push("status", status="error", error=str(exc))
         finally:
             ui_mod.set_progress_sink(token)
             job.finished_at = time.time()

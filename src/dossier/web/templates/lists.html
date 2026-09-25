@@ -20,6 +20,7 @@
       <p class="err">{{ row.env }} is set, so this file does not change that list until the variable is unset.</p>
       {% endif %}
       {% if row.default %}
+      {% include "partials/check_actions.html" %}
       <div class="checks">
         {% for phrase in row.default %}
         <label>

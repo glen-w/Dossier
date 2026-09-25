@@ -6,6 +6,8 @@ import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from dossier.cards import carrying_span
+from dossier.show import store_span
 from dossier.store import Corpus
 
 PAGE_SIZE = 20
@@ -220,7 +222,8 @@ function renderCards(data) {
     const block = el("article", null, "card");
     block.appendChild(el("h3", card.claim));
     block.appendChild(el("p", card.status + " · " + card.id, "meta"));
-    if (card.span) block.appendChild(el("p", card.span, "snippet"));
+    if (card.carrying) block.appendChild(el("p", card.carrying, "snippet"));
+    else if (card.span) block.appendChild(el("p", card.span, "snippet"));
     if (card.snippet) block.appendChild(el("p", card.snippet, "snippet"));
     if (card.citations && card.citations.length) {
       const list = document.createElement("ul");
@@ -233,11 +236,18 @@ function renderCards(data) {
       ok.addEventListener("click", () => act({ action: "approve", ids: [card.id] }));
       const no = el("button", "Refuse", "warn");
       no.addEventListener("click", () => act({ action: "refuse", ids: [card.id] }));
-      row.append(ok, no);
+      const hold = el("button", "Defend");
+      hold.addEventListener("click", () => act({ action: "defend", ids: [card.id] }));
+      row.append(ok, no, hold);
     } else {
       const back = el("button", "Reopen");
       back.addEventListener("click", () => act({ action: "reopen", ids: [card.id] }));
       row.appendChild(back);
+      if (card.status === "approved") {
+        const hold = el("button", "Defend");
+        hold.addEventListener("click", () => act({ action: "defend", ids: [card.id] }));
+        row.appendChild(hold);
+      }
     }
     block.appendChild(row);
     box.appendChild(block);
@@ -345,6 +355,13 @@ def summary(corpus: Corpus) -> dict:
     return {"sources": out}
 
 
+def card_sources(corpus: Corpus) -> list[str]:
+    rows = corpus._conn.execute(
+        "SELECT DISTINCT source FROM cards WHERE TRIM(source) != '' ORDER BY source"
+    ).fetchall()
+    return [str(row["source"]) for row in rows]
+
+
 def list_cards(
     corpus: Corpus,
     *,
@@ -404,17 +421,23 @@ def list_cards(
                 "lens": (extras.get("lens") or "").strip().lower() or "(none)",
                 "kind": (extras.get("kind") or "").strip().lower() or "(none)",
                 "span": (extras.get("span") or "").strip(),
+                "carrying": _carrying(corpus, row["claim"], extras, citations),
                 "snippet": snippets.get(citations[0], "") if citations else "",
             }
         )
+        for card in cards:
+            before, hit, after = _mark(card["snippet"], card["carrying"])
+            card["mark_before"] = before
+            card["mark_hit"] = hit
+            card["mark_after"] = after
     return {"total": total, "cards": cards}
 
 
 def apply_action(corpus: Corpus, body: dict) -> int:
     """Approve, refuse, or reopen cards by id, or by source and optional lens/kind."""
     action = str(body.get("action") or "").strip()
-    if action not in ("approve", "refuse", "reopen"):
-        raise ValueError("action must be approve, refuse, or reopen")
+    if action not in ("approve", "refuse", "reopen", "defend"):
+        raise ValueError("action must be approve, refuse, reopen, or defend")
     raw_ids = body.get("ids") or []
     if not isinstance(raw_ids, list):
         raise ValueError("ids must be a list")
@@ -427,6 +450,8 @@ def apply_action(corpus: Corpus, body: dict) -> int:
     lens = _optional_facet(body, "lens") if not ids else None
     kind = _optional_facet(body, "kind") if not ids else None
     sources = () if ids else ((source,) if source else ())
+    if action == "defend":
+        return _defend_matching(corpus, ids=ids, source=source, lens=lens, kind=kind)
     if action == "approve":
         return corpus.approve_pending(sources=sources, lens=lens, kind=kind, ids=ids)
     if action == "refuse":
@@ -442,6 +467,63 @@ def make_server(corpus: Corpus, port: int) -> HTTPServer:
 def serve(corpus: Corpus, port: int) -> None:
     httpd = make_server(corpus, port)
     httpd.serve_forever()
+
+
+def _mark(snippet: str, carrying: str) -> tuple[str, str, str]:
+    if not snippet or not carrying or carrying not in snippet:
+        return "", "", ""
+    at = snippet.index(carrying)
+    return snippet[:at], carrying, snippet[at + len(carrying) :]
+
+
+def _carrying(corpus: Corpus, claim: str, extras: dict[str, str], citations: list[str]) -> str:
+    stored = (extras.get("span") or "").strip()
+    if stored:
+        return stored
+    for uri in citations:
+        rec = corpus.get_record(uri)
+        if rec is None:
+            continue
+        sentence = carrying_span(claim, rec.text)
+        if sentence:
+            return sentence
+    return ""
+
+
+def _defend_matching(
+    corpus: Corpus,
+    *,
+    ids: tuple[str, ...],
+    source: str,
+    lens: str | None,
+    kind: str | None,
+) -> int:
+    """Store spans on pending and approved cards. Status stays put."""
+    changed = 0
+    if ids:
+        targets = []
+        for card_id in ids:
+            card = corpus.get_card(card_id)
+            if card is not None and card.status in ("pending", "approved"):
+                targets.append(card)
+    else:
+        where, params = _list_filter(status="", source=source, lens=lens, kind=kind)
+        rows = corpus._conn.execute(
+            f"""
+            SELECT id FROM cards
+            WHERE {where} AND status IN ('pending', 'approved')
+            """,
+            params,
+        ).fetchall()
+        targets = []
+        for row in rows:
+            card = corpus.get_card(str(row["id"]))
+            if card is not None:
+                targets.append(card)
+    for card in targets:
+        if store_span(corpus, card):
+            changed += 1
+    return changed
 
 
 def _optional_facet(body: dict, key: str) -> str | None:

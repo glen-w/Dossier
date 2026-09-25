@@ -50,9 +50,9 @@ Find what breaks when it is not Glen’s laptop and not synthetic fixtures. Matc
 
 ### After 1.0 — Workbench
 
-The optional loopback workbench (`dossier gui`, `[web]` extra) covers the daily loop: locker, ingest, extract, review, ask, match, index, brief, and run, plus effort (context and timeout ladder; `balanced` matches today's defaults), saved profiles, a prompt catalogue, and editable question packs. Failed jobs and ingest/extract counts surface on the page; the job strip polls only while busy. Vocabulary is in [vocab](vocab.md). The 1.0 path stays CLI plus `dossier review` with no new dependency.
+The loopback workbench (`dossier gui`, `[web]` extra) covers the daily loop: locker, ingest, extract, review (including the carrying sentence and defend), ask, match, tailor, packet, gaps, index, brief, and run, plus effort, saved profiles, a prompt catalogue, and editable question packs. Nav is grouped into Prepare, Decide, Use, and Settings; every page keeps its URL. The locker leads with the next step. Review can be a one-card queue on the same approve, refuse, reopen, and defend actions. Match shows a coverage rail and can open Tailor with the same posting; Tailor stays off the Match page. Ask, match, and tailor keep the submitted text when the job finishes. `dossier review` opens that same review page. Failed jobs surface the error only; tracebacks stay in the server log. Vocabulary is in [vocab](vocab.md). The scriptable path stays the CLI.
 
-Still later: tailor, packet, gaps, prove, and referees as pages, then cited chat streamed on the same ask path.
+Still later: prove and referees as pages, then cited chat streamed on the same ask path. A CV PDF renderer stays out. Office text (PDF via the `office` extra, Word and PowerPoint in the standard library) is capped record text, not a renderer.
 
 ## Boundaries that stay
 

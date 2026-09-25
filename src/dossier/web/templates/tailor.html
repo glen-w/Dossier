@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('tailor') }}</h1>
+<p class="lede">{{ blurbs.tailor }} Pending cards stay out. Approved cards with no span are listed and not quoted.</p>
+<form method="post" action="/tailor/run">
+  <label class="field">Posting
+    <textarea class="match-spec" name="posting" required placeholder="Paste the posting.">{{ posting_text }}</textarea>
+  </label>
+  <div class="row" style="margin-top:10px">
+    <label class="field">Kind
+      <select name="kind">
+        <option value="cv" {% if kind_value == 'cv' %}selected{% endif %}>cv</option>
+        <option value="letter" {% if kind_value == 'letter' %}selected{% endif %}>letter</option>
+      </select>
+    </label>
+    <label class="field">Arrange
+      <input type="checkbox" name="arrange" value="1"> letter only
+    </label>
+    <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Tailor</button>
+  </div>
+</form>
+<div id="job-result">
+{% if result %}
+<p class="meta">{{ result.path }}</p>
+<pre>{{ result.body }}</pre>
+{% elif job and job.status == 'error' %}
+<div class="err">{{ job.error or 'Tailor job failed.' }}</div>
+{% elif job and job.status in ('running', 'queued') %}
+<p class="meta">Waiting for the tailor job…</p>
+{% endif %}
+</div>
+{% endblock %}

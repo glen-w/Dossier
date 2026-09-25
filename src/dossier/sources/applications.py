@@ -1,4 +1,4 @@
-"""Prior job-application packs. One directory only. PDF bodies stay off the corpus."""
+"""Prior job-application packs. One directory only. Office text is capped; files stay off git."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from dossier.lists import application_dirs, application_files, excluded
+from dossier.office import INVENTORY_MARK, OFFICE_SUFFIXES, extract_office
 from dossier.store import Corpus, Record
 from dossier.util import record_id
 
@@ -73,11 +74,22 @@ class ApplicationsSource:
                 if not text:
                     continue
                 title = child.stem
+            elif suffix in OFFICE_SUFFIXES:
+                body, reason = extract_office(child)
+                if body:
+                    title = child.stem
+                    text = body
+                else:
+                    title = child.name
+                    text = (
+                        f"Job application pack file '{rel}'. Folder: {parent}. "
+                        f"{INVENTORY_MARK}. {reason}"
+                    )
             else:
                 title = child.name
                 text = (
                     f"Job application pack file '{rel}'. Folder: {parent}. "
-                    "Binary body not ingested."
+                    f"{INVENTORY_MARK}."
                 )
             corpus.upsert_record(
                 Record(

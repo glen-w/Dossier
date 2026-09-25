@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('packet') }}</h1>
+<p class="lede">{{ blurbs.packet }}</p>
+<form method="post" action="/packet/run">
+  <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Write packet</button>
+</form>
+{% if path %}
+<p class="meta">{{ path }}</p>
+<pre>{{ body }}</pre>
+{% endif %}
+{% endblock %}

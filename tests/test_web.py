@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
 
-from dossier.cards import ClaimCard, STATUS_PENDING, card_id
+from dossier.cards import STATUS_APPROVED, ClaimCard, STATUS_PENDING, card_id
 from dossier.store import Corpus, Record
 
 pytest.importorskip("fastapi")
@@ -24,6 +25,18 @@ def client(tmp_path: Path, monkeypatch):
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client, tmp_path
+
+
+def test_checkbox_sets_offer_select_all_and_clear(client) -> None:
+    test_client, _ = client
+    for path in ("/ask", "/match", "/brief", "/settings", "/settings/lists"):
+        page = test_client.get(path)
+        assert page.status_code == 200
+        html = page.text
+        sets = html.count('class="checks"')
+        assert sets >= 1
+        assert html.count('data-checks="all"') == sets
+        assert html.count('data-checks="none"') == sets
 
 
 def test_locker_page(client) -> None:
@@ -156,6 +169,81 @@ def test_review_approve(client) -> None:
         corpus.close()
 
 
+def test_review_defend_and_result_pages(client) -> None:
+    test_client, root = client
+    sentence = "Drafted the coastal governance workshop briefing for the ministry."
+    cid = card_id(sentence, ["file://employer/note"])
+    corpus = Corpus(root / "evidence.db")
+    try:
+        corpus.upsert_record(
+            Record(
+                id="emp",
+                source="employer",
+                uri="file://employer/note",
+                title="briefing",
+                text=sentence,
+            )
+        )
+        corpus.put_card(
+            ClaimCard(
+                id=cid,
+                claim=sentence,
+                citations=["file://employer/note"],
+                source="employer",
+                status=STATUS_PENDING,
+            )
+        )
+    finally:
+        corpus.close()
+
+    page = test_client.get("/review?status=pending")
+    assert page.status_code == 200
+    assert b"carrying sentence" in page.content
+    assert b"Defend" in page.content
+
+    resp = test_client.post(
+        "/review/act",
+        data={"action": "defend", "ids": cid, "status": "pending"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    corpus = Corpus(root / "evidence.db")
+    try:
+        card = corpus.get_card(cid)
+        assert card is not None
+        assert card.status == STATUS_PENDING
+        assert card.extras["span"] == sentence
+        corpus.approve(cid)
+    finally:
+        corpus.close()
+
+    for path in ("/gaps", "/packet", "/tailor", "/locker"):
+        assert test_client.get(path).status_code == 200
+
+    locker = test_client.get("/locker")
+    assert b"Match a job spec" in locker.content or b"Index passages" in locker.content
+    assert b"use the CLI" not in locker.content
+
+    resp = test_client.post("/packet/run", follow_redirects=True)
+    assert resp.status_code == 200
+    assert sentence.encode() in resp.content
+
+    resp = test_client.post(
+        "/tailor/run",
+        data={"posting": "- experience drafting a coastal governance workshop briefing\n", "kind": "cv"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    location = resp.headers["location"]
+    page = test_client.get(location)
+    for _ in range(40):
+        if sentence.encode() in page.content:
+            break
+        time.sleep(0.05)
+        page = test_client.get(location)
+    assert sentence.encode() in page.content
+
+
 def test_job_sse_fake(client) -> None:
     test_client, _ = client
 
@@ -224,6 +312,9 @@ def test_pack_brief_and_prompt_override(client) -> None:
     assert briefs
     text = briefs[0].read_text(encoding="utf-8")
     assert text.startswith("prompts: ask=none")
+    page = test_client.get(f"/brief?job={job_id}")
+    assert page.status_code == 200
+    assert b"What did I deliver?" in page.content
 
     resp = test_client.post("/index/run", follow_redirects=False)
     assert resp.status_code == 303
@@ -257,6 +348,47 @@ def test_pack_brief_and_prompt_override(client) -> None:
     )
     assert resp.status_code == 303
     assert not (root / "prompts" / "overrides" / "ask.json").is_file()
+
+
+def test_brief_viewer_shows_newest_and_rejects_other_paths(client) -> None:
+    test_client, root = client
+    empty = test_client.get("/brief")
+    assert b"No briefs in data/briefs yet." in empty.content
+
+    briefs = root / "briefs"
+    briefs.mkdir()
+    (briefs / "notes.md").write_text("NOT-A-STAMP", encoding="utf-8")
+    (root / "secret.md").write_text("SECRET-TOKEN", encoding="utf-8")
+    (briefs / "260101-000000.md").write_text(
+        "prompts: ask=none\n# Dossier brief\n\n## one\n\nWhat did I deliver?\n\nAn older report.\nmode: exact\n",
+        encoding="utf-8",
+    )
+    (briefs / "260923-120000.md").write_text(
+        "# Dossier brief\n\n## two\n\nWhat did I publish?\n\nA <script>alert(1)</script> paper.\ncitations: rec-1\n",
+        encoding="utf-8",
+    )
+
+    page = test_client.get("/brief")
+    assert b"What did I publish?" in page.content
+    assert b"An older report." not in page.content
+    assert b"NOT-A-STAMP" not in page.content
+    assert b"<script>alert" not in page.content
+    assert b"&lt;script&gt;alert(1)&lt;/script&gt;" in page.content
+    assert b'<p class="meta">citations: rec-1</p>' in page.content
+
+    older = test_client.get("/brief?file=260101-000000")
+    assert b"What did I deliver?" in older.content
+    assert b"An older report." in older.content
+    assert b'<p class="meta">prompts: ask=none</p>' in older.content
+    assert b"<h2>Dossier brief</h2>" in older.content
+    assert b'<p class="meta">mode: exact</p>' in older.content
+    assert b"An older report.\nmode:" not in older.content
+
+    sneaky = test_client.get("/brief?file=../secret")
+    assert sneaky.status_code == 200
+    assert b"SECRET-TOKEN" not in sneaky.content
+    assert b"No brief with that name." in sneaky.content
+    assert b"What did I publish?" not in sneaky.content
 
 
 def test_phrase_lists_page_saves_a_change(client) -> None:
@@ -548,6 +680,299 @@ def test_workbench_refuses_a_non_loopback_client(tmp_path: Path, monkeypatch) ->
         resp = remote.get("/locker")
     assert resp.status_code == 403
     assert resp.text == "loopback only"
+
+
+def test_locker_rooms_and_next_step(client) -> None:
+    test_client, _ = client
+    page = test_client.get("/locker")
+    assert page.status_code == 200
+    html = page.text
+    assert "Prepare" in html
+    assert "Decide" in html
+    assert "Use" in html
+    for path in (
+        "/locker",
+        "/sources",
+        "/extract",
+        "/review",
+        "/ask",
+        "/match",
+        "/tailor",
+        "/packet",
+        "/gaps",
+        "/index",
+        "/brief",
+        "/run",
+        "/settings",
+    ):
+        assert f'href="{path}"' in html
+    assert 'href="/sources"' in html
+    assert "Continue" in html
+    assert "Detected" in html
+
+
+def test_review_queue_advances_and_defend_keeps_status(client) -> None:
+    test_client, root = client
+    first = "Delivered a coastal governance workshop"
+    second = "Built fisheries data tables for the annual report."
+    corpus = Corpus(root / "evidence.db")
+    try:
+        corpus.upsert_record(
+            Record(
+                id="note",
+                source="employer",
+                uri="file://employer/note",
+                title="note",
+                text=second,
+            )
+        )
+        corpus.put_card(
+            ClaimCard(
+                id=card_id(first, ["fixture://one"]),
+                claim=first,
+                citations=["fixture://one"],
+                source="applications",
+                status=STATUS_PENDING,
+            )
+        )
+        held = card_id(second, ["file://employer/note"])
+        corpus.put_card(
+            ClaimCard(
+                id=held,
+                claim=second,
+                citations=["file://employer/note"],
+                source="employer",
+                status=STATUS_PENDING,
+            )
+        )
+    finally:
+        corpus.close()
+
+    weird = test_client.get("/review?view=nope")
+    assert weird.status_code == 200
+    assert b"coastal governance" in weird.content
+    assert b"fisheries data tables" in weird.content
+    assert b"1 of" not in weird.content
+
+    queue = test_client.get("/review?view=queue&status=pending")
+    assert b"1 of 2" in queue.content
+    assert b'class="chip"' in queue.content
+    assert b'data-key="a"' in queue.content
+    assert b'data-key="r"' in queue.content
+    assert b'data-key="d"' in queue.content
+    assert b'data-key="k"' in queue.content
+    assert b"coastal governance" in queue.content
+    assert b"fisheries data tables" not in queue.content
+    plain = test_client.get("/review?status=pending")
+    assert b"Approve matching" not in plain.content
+    sourced = test_client.get("/review?status=pending&source=applications")
+    assert b"Approve matching" in sourced.content
+
+    resp = test_client.post(
+        "/review/act",
+        data={
+            "action": "approve",
+            "ids": card_id(first, ["fixture://one"]),
+            "status": "pending",
+            "view": "queue",
+            "offset": "0",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert "view=queue" in resp.headers["location"]
+    assert "offset=0" in resp.headers["location"]
+    nxt = test_client.get(resp.headers["location"])
+    assert b"fisheries data tables" in nxt.content
+    assert b"coastal governance" not in nxt.content
+
+    resp = test_client.post(
+        "/review/act",
+        data={
+            "action": "defend",
+            "ids": held,
+            "status": "pending",
+            "view": "queue",
+            "offset": "0",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    assert "noted=span" in resp.headers["location"]
+    assert "offset=1" in resp.headers["location"]
+    corpus = Corpus(root / "evidence.db")
+    try:
+        card = corpus.get_card(held)
+        assert card is not None
+        assert card.status == STATUS_PENDING
+        assert card.extras["span"] == second
+    finally:
+        corpus.close()
+    stored = test_client.get(resp.headers["location"])
+    assert b"Status is unchanged" in stored.content
+    assert b"No cards left in this queue." in stored.content
+
+    bare = "Approved a claim with no stored span."
+    corpus = Corpus(root / "evidence.db")
+    try:
+        corpus.put_card(
+            ClaimCard(
+                id=card_id(bare, ["fixture://bare"]),
+                claim=bare,
+                citations=["fixture://bare"],
+                source="applications",
+                status=STATUS_APPROVED,
+            )
+        )
+    finally:
+        corpus.close()
+    gaps = test_client.get("/gaps")
+    assert b"view=queue" in gaps.content
+    assert bare.encode() in gaps.content
+
+
+def test_match_rail_and_tailor_prefill(client) -> None:
+    test_client, root = client
+    corpus = Corpus(root / "evidence.db")
+    try:
+        corpus.upsert_record(
+            Record(
+                id="ocean",
+                source="slack",
+                uri="slack://ocean",
+                title="Ocean workshop",
+                text="Led the ocean workshops for the coastal team.",
+            )
+        )
+    finally:
+        corpus.close()
+
+    spec = "- Experience leading ocean workshops\n- Knowledge of fisheries data tables\n"
+    resp = test_client.post("/match/run", data={"spec": spec}, follow_redirects=False)
+    location = resp.headers["location"]
+    job_id = location.split("job=", 1)[1]
+    job = RUNNER.get(job_id)
+    assert job is not None
+    deadline = time.time() + 5
+    while job.status not in {"done", "error"} and time.time() < deadline:
+        time.sleep(0.02)
+    assert job.status == "done", job.error
+    page = test_client.get(location)
+    assert b"1 with a quote" in page.content
+    assert b"1 gaps" in page.content
+    assert b'class="rail"' in page.content
+    assert b"rail-item met" in page.content
+    assert b"rail-item gap" in page.content
+    assert b"data-copy=" in page.content
+    assert b'action="/tailor/run"' not in page.content
+    assert spec.splitlines()[0].lstrip("- ").encode() in page.content
+    assert f"/tailor?from={job_id}".encode() in page.content
+
+    tailor = test_client.get(f"/tailor?from={job_id}")
+    assert b"Experience leading ocean workshops" in tailor.content
+    empty = test_client.get("/tailor?from=not-a-match")
+    assert b"Experience leading ocean workshops" not in empty.content
+
+
+def test_ask_refusal_keeps_the_next_link(client) -> None:
+    test_client, _ = client
+    resp = test_client.post(
+        "/ask/run",
+        data={"question": "What coastal workshop did I deliver?"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    location = resp.headers["location"]
+    job_id = location.split("job=", 1)[1]
+    job = RUNNER.get(job_id)
+    assert job is not None
+    deadline = time.time() + 5
+    while job.status not in {"done", "error"} and time.time() < deadline:
+        time.sleep(0.02)
+    assert job.status == "done", job.error
+    page = test_client.get(location)
+    assert b"Refused" in page.content
+    assert b"What coastal workshop did I deliver?" in page.content
+    assert any(
+        token in page.content
+        for token in (b'href="/sources"', b'href="/index"', b'href="/extract"', b'href="/review"', b'href="/ask"')
+    )
+
+
+def test_review_hides_actions_while_the_locker_is_busy(client) -> None:
+    import threading
+
+    test_client, root = client
+    corpus = Corpus(root / "evidence.db")
+    try:
+        corpus.put_card(
+            ClaimCard(
+                id=card_id("Delivered a coastal workshop", ["fixture://one"]),
+                claim="Delivered a coastal workshop",
+                citations=["fixture://one"],
+                source="applications",
+                status=STATUS_PENDING,
+            )
+        )
+    finally:
+        corpus.close()
+    started = threading.Event()
+    release = threading.Event()
+
+    def work(job):  # noqa: ANN001
+        started.set()
+        release.wait(2)
+        return {"ok": 1}
+
+    job = RUNNER.start("demo", work)
+    try:
+        assert started.wait(2)
+        page = test_client.get("/review?view=queue&status=pending")
+        assert b"Delivered a coastal workshop" in page.content
+        assert b">Approve<" not in page.content
+        assert b">Defend<" not in page.content
+    finally:
+        release.set()
+        deadline = time.time() + 2
+        while job.status not in {"done", "error"} and time.time() < deadline:
+            time.sleep(0.02)
+
+
+def test_ask_kept_answer_is_a_citation_card(client) -> None:
+    test_client, root = client
+    sentence = "Led the ocean workshops for the coastal team."
+    corpus = Corpus(root / "evidence.db")
+    try:
+        corpus.upsert_record(
+            Record(
+                id="ocean",
+                source="slack",
+                uri="slack://ocean",
+                title="Ocean workshop",
+                text=sentence,
+            )
+        )
+    finally:
+        corpus.close()
+    resp = test_client.post(
+        "/ask/run",
+        data={"question": sentence, "mode": "exact"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    location = resp.headers["location"]
+    job = RUNNER.get(location.split("job=", 1)[1])
+    assert job is not None
+    deadline = time.time() + 5
+    while job.status not in {"done", "error"} and time.time() < deadline:
+        time.sleep(0.02)
+    assert job.status == "done", job.error
+    page = test_client.get(location)
+    assert b'id="ask-sentence"' in page.content
+    assert b'data-copy="ask-sentence"' in page.content
+    assert sentence.encode() in page.content
+    assert b"slack://ocean" in page.content
+    assert b"Refused" not in page.content
 
 
 def test_gui_cli_missing_extra_message(monkeypatch) -> None:

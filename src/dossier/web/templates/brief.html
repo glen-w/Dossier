@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>{{ label('brief') }}</h1>
-<p class="lede">Answer a question pack into data/briefs. A pack is questions, not a prompt.</p>
+<p class="lede">Answer a question pack into data/briefs, then read it here. A pack is questions, not a prompt.</p>
 <form method="post" action="/brief/run">
   {% include "partials/request_scope.html" %}
   <div class="row">
@@ -37,5 +37,39 @@
 <div class="err">{{ job.error or 'Brief job failed.' }}</div>
 {% elif job and job.status in ('running', 'queued') %}
 <p class="meta">Waiting for the brief job…</p>
+{% endif %}
+
+<h2>Saved briefs</h2>
+{% if brief_names %}
+<form class="row" method="get" action="/brief">
+  {% if job_id %}<input type="hidden" name="job" value="{{ job_id }}">{% endif %}
+  <label class="field">File
+    <select name="file" onchange="this.form.submit()">
+      {% if brief_missing %}
+      <option value="" selected>choose a brief</option>
+      {% endif %}
+      {% for name in brief_names %}
+      <option value="{{ name }}" {% if name == brief_name %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+{% if brief_missing %}
+<p class="meta">No brief with that name.</p>
+{% endif %}
+{% if brief_blocks %}
+<article class="card brief-view">
+  {% for block in brief_blocks %}
+  {% if block.kind == 'h1' %}<h2>{{ block.text }}</h2>
+  {% elif block.kind == 'h2' %}<h3>{{ block.text }}</h3>
+  {% elif block.kind == 'h3' %}<h4>{{ block.text }}</h4>
+  {% elif block.kind == 'meta' %}<p class="meta">{{ block.text }}</p>
+  {% else %}<p class="brief-p">{{ block.text }}</p>
+  {% endif %}
+  {% endfor %}
+</article>
+{% endif %}
+{% else %}
+<p class="meta">No briefs in data/briefs yet.</p>
 {% endif %}
 {% endblock %}

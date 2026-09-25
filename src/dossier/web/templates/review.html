@@ -3,7 +3,13 @@
 <h1>{{ label('review') }}</h1>
 <p class="lede">{{ blurbs.review }} Disabled while a job holds the locker.</p>
 
+<p class="row">
+  <a class="btn {{ 'primary' if view == 'list' else '' }}" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=list">List</a>
+  <a class="btn {{ 'primary' if view == 'queue' else '' }}" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=queue">Queue</a>
+</p>
+
 <form class="row" method="get" action="/review">
+  <input type="hidden" name="view" value="{{ view }}">
   <label class="field">Status
     <select name="status">
       <option value="pending" {% if status == 'pending' %}selected{% endif %}>pending</option>
@@ -13,13 +19,36 @@
     </select>
   </label>
   <label class="field">Source
-    <input name="source" value="{{ source }}" placeholder="adapter name">
+    <select name="source">
+      <option value="">any source</option>
+      {% for name in sources %}
+      <option value="{{ name }}" {% if source == name %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
   </label>
   <label class="field">Lens
-    <input name="lens" value="{{ lens }}">
+    <select name="lens">
+      <option value="">any lens</option>
+      {% for name in lenses %}
+      <option value="{{ name }}" {% if lens == name %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+      {% if lens and lens not in lenses and lens != '(none)' %}
+      <option value="{{ lens }}" selected>{{ lens }}</option>
+      {% endif %}
+      <option value="(none)" {% if lens == '(none)' %}selected{% endif %}>(none)</option>
+    </select>
   </label>
   <label class="field">Kind
-    <input name="kind" value="{{ kind }}">
+    <select name="kind">
+      <option value="">any kind</option>
+      {% for name in kinds %}
+      <option value="{{ name }}" {% if kind == name %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+      {% if kind and kind not in kinds and kind != '(none)' %}
+      <option value="{{ kind }}" selected>{{ kind }}</option>
+      {% endif %}
+      <option value="(none)" {% if kind == '(none)' %}selected{% endif %}>(none)</option>
+    </select>
   </label>
   <label class="field">Search
     <input name="q" value="{{ q }}" placeholder="claim text">
@@ -27,7 +56,7 @@
   <button type="submit">Filter</button>
 </form>
 
-{% if source and not busy %}
+{% if source and not busy and view == 'list' %}
 <form class="row" method="post" action="/review/act" onsubmit="return confirm('Apply to matching pending cards?');">
   <input type="hidden" name="action" value="approve">
   <input type="hidden" name="source" value="{{ source }}">
@@ -35,6 +64,7 @@
   <input type="hidden" name="kind" value="{{ kind }}">
   <input type="hidden" name="status" value="{{ status }}">
   <input type="hidden" name="q" value="{{ q }}">
+  <input type="hidden" name="view" value="list">
   <button class="primary" type="submit">Approve matching</button>
 </form>
 <form class="row" method="post" action="/review/act" onsubmit="return confirm('Refuse matching pending cards?');">
@@ -44,17 +74,49 @@
   <input type="hidden" name="kind" value="{{ kind }}">
   <input type="hidden" name="status" value="{{ status }}">
   <input type="hidden" name="q" value="{{ q }}">
+  <input type="hidden" name="view" value="list">
   <button class="warn" type="submit">Refuse matching</button>
 </form>
 {% endif %}
 
-<p class="meta">{{ cards.total }} cards · showing {{ cards.cards | length }} from offset {{ cards.offset }}</p>
+{% if noted == 'span' %}
+<p class="ok" role="status">The carrying sentence was stored. Status is unchanged.</p>
+{% endif %}
+
+<p class="meta">{% if view == 'queue' %}{% if cards.cards %}{{ cards.offset + 1 }} of {{ cards.total }}{% elif cards.total %}No cards left in this queue.{% else %}No cards match.{% endif %}{% else %}{{ cards.total }} cards · showing {{ cards.cards | length }} from offset {{ cards.offset }}{% endif %}</p>
+
+{% if view == 'queue' %}
+<p class="row">
+  {% if cards.offset > 0 %}
+  <a class="btn" data-key="j" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=queue&offset={{ cards.offset - 1 }}">Previous</a>
+  {% endif %}
+  {% if cards.has_more %}
+  <a class="btn" data-key="k" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=queue&offset={{ cards.offset + 1 }}">Next</a>
+  {% endif %}
+</p>
+{% endif %}
 
 {% for card in cards.cards %}
-<div class="card">
-  <h3>{{ card.claim }}</h3>
+<div class="card{% if view == 'queue' %} queue{% endif %}">
+  <h2 class="reading">{{ card.claim }}</h2>
+  {% if view == 'queue' %}
+  <p class="chips">
+    <span class="chip">{{ card.status }}</span>
+    <span class="chip">{{ card.source }}</span>
+    {% if card.lens and card.lens != '(none)' %}<span class="chip">{{ card.lens }}</span><span class="chip">{{ card.kind }}</span>{% endif %}
+  </p>
+  {% else %}
   <p class="meta">{{ card.status }} · {{ card.source }}{% if card.lens and card.lens != '(none)' %} · {{ card.lens }}/{{ card.kind }}{% endif %}</p>
-  {% if card.snippet %}<p class="snippet">{{ card.snippet }}</p>{% endif %}
+  {% endif %}
+  {% if card.carrying %}
+  <p class="carrying">{{ card.carrying }}</p>
+  <p class="meta">{% if card.span %}stored span{% else %}carrying sentence — defend stores it{% endif %}</p>
+  {% endif %}
+  {% if card.mark_hit %}
+  <p class="snippet">{{ card.mark_before }}<mark>{{ card.mark_hit }}</mark>{{ card.mark_after }}</p>
+  {% elif card.snippet %}
+  <p class="snippet">{{ card.snippet }}</p>
+  {% endif %}
   <ul class="cite">
     {% for uri in card.citations %}<li class="meta">{{ uri }}</li>{% endfor %}
   </ul>
@@ -69,7 +131,9 @@
       <input type="hidden" name="lens" value="{{ lens }}">
       <input type="hidden" name="kind" value="{{ kind }}">
       <input type="hidden" name="q" value="{{ q }}">
-      <button class="primary" type="submit">Approve</button>
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="hidden" name="offset" value="{{ cards.offset }}">
+      <button class="primary" type="submit" {% if view == 'queue' %}data-key="a"{% endif %}>Approve</button>
     </form>
     <form method="post" action="/review/act">
       <input type="hidden" name="action" value="refuse">
@@ -79,9 +143,37 @@
       <input type="hidden" name="lens" value="{{ lens }}">
       <input type="hidden" name="kind" value="{{ kind }}">
       <input type="hidden" name="q" value="{{ q }}">
-      <button class="warn" type="submit">Refuse</button>
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="hidden" name="offset" value="{{ cards.offset }}">
+      <button class="warn" type="submit" {% if view == 'queue' %}data-key="r"{% endif %}>Refuse</button>
+    </form>
+    <form method="post" action="/review/act">
+      <input type="hidden" name="action" value="defend">
+      <input type="hidden" name="ids" value="{{ card.id }}">
+      <input type="hidden" name="status" value="{{ status }}">
+      <input type="hidden" name="source" value="{{ source }}">
+      <input type="hidden" name="lens" value="{{ lens }}">
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="hidden" name="offset" value="{{ cards.offset }}">
+      <button type="submit" {% if view == 'queue' %}data-key="d"{% endif %}>Defend</button>
     </form>
     {% else %}
+    {% if card.status == 'approved' %}
+    <form method="post" action="/review/act">
+      <input type="hidden" name="action" value="defend">
+      <input type="hidden" name="ids" value="{{ card.id }}">
+      <input type="hidden" name="status" value="{{ status }}">
+      <input type="hidden" name="source" value="{{ source }}">
+      <input type="hidden" name="lens" value="{{ lens }}">
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="hidden" name="offset" value="{{ cards.offset }}">
+      <button type="submit" {% if view == 'queue' %}data-key="d"{% endif %}>Defend</button>
+    </form>
+    {% endif %}
     <form method="post" action="/review/act">
       <input type="hidden" name="action" value="reopen">
       <input type="hidden" name="ids" value="{{ card.id }}">
@@ -90,7 +182,9 @@
       <input type="hidden" name="lens" value="{{ lens }}">
       <input type="hidden" name="kind" value="{{ kind }}">
       <input type="hidden" name="q" value="{{ q }}">
-      <button type="submit">Reopen</button>
+      <input type="hidden" name="view" value="{{ view }}">
+      <input type="hidden" name="offset" value="{{ cards.offset }}">
+      <button type="submit" {% if view == 'queue' %}data-key="u"{% endif %}>Reopen</button>
     </form>
     {% endif %}
   </div>
@@ -100,7 +194,7 @@
 <p class="meta">No cards match.</p>
 {% endfor %}
 
-{% if cards.has_more %}
-<p><a class="btn" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&offset={{ cards.offset + cards.cards|length }}">Next page</a></p>
+{% if view != 'queue' and cards.has_more %}
+<p><a class="btn" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=list&offset={{ cards.offset + cards.cards|length }}">Next page</a></p>
 {% endif %}
 {% endblock %}

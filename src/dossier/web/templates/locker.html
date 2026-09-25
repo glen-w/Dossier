@@ -1,7 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>{{ label('locker') }}</h1>
+{% if snap.next %}
+<div class="hero">
+  <p class="lede hero-line">{{ snap.next }}</p>
+  <p><a class="btn primary" href="{{ snap.next_href }}">Continue</a></p>
+</div>
+{% else %}
 <p class="lede">{{ blurbs.locker }}</p>
+{% endif %}
+
+<ol class="stages">
+  {% for key, title in snap.stages %}
+  <li class="{{ 'on' if snap.next_stage == key else '' }}">{{ title }}</li>
+  {% endfor %}
+</ol>
 
 <div class="grid">
   <div class="stat"><div class="n">{{ snap.records }}</div><div class="k">records</div></div>
@@ -21,15 +34,9 @@
   <p class="meta">effort: {{ snap.effort }} · model: {{ snap.model }} · ask: {{ snap.ask_mode }}
     · <a href="/settings">Settings</a></p>
   <p class="meta">extract LLM: {{ 'on' if snap.extract_llm else 'off' }} · max_calls: {{ 'unlimited' if snap.max_calls == 0 else snap.max_calls }}</p>
-  {% if not snap.fts5 %}
-  <p class="err">FTS5 is off — prove and ask prefer it. Check your Python SQLite build. <a href="/settings">Settings</a></p>
-  {% endif %}
-  {% if snap.spanned == 0 and snap.approved %}
-  <p class="meta">Approved cards need <code>defend</code> before tailor can quote. Review spans on the CLI for now.</p>
-  {% endif %}
-  {% if snap.pending %}
-  <p class="meta"><a href="/review">Review {{ snap.pending }} pending card{{ 's' if snap.pending != 1 else '' }}</a></p>
-  {% endif %}
+  {% for line in snap.notes %}
+  <p class="err">{{ line }}</p>
+  {% endfor %}
 </div>
 
 <div class="card">

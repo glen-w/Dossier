@@ -4,27 +4,36 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dossier · {{ label(active) }}</title>
-  <link rel="stylesheet" href="/static/workbench.css">
+  <link rel="stylesheet" href="/static/workbench.css?v=4">
   <script src="/static/htmx.min.js" defer></script>
-  <script src="/static/workbench.js" defer></script>
+  <script src="/static/workbench.js?v=4" defer></script>
 </head>
 <body data-job-id="{{ job_id or (job.id if job else '') }}">
+  <a class="skip" href="#content">Skip to content</a>
   <div class="shell">
     <nav class="side" aria-label="Workbench">
       <a class="mark" href="/locker"><img src="/static/logo.png" alt="Dossier"></a>
-      {% for key, title in nav %}
-      <a href="/{{ key }}" class="{{ 'on' if active == key else '' }}">{{ title }}</a>
-      {% endfor %}
-      {% if active == 'settings' or active == 'lists' or active == 'prompts' or active == 'packs' %}
-      <div class="subnav">
-        <a href="/settings" class="{{ 'on' if active == 'settings' else '' }}">Knobs</a>
-        <a href="/settings/lists" class="{{ 'on' if active == 'lists' else '' }}">Lists</a>
-        <a href="/settings/prompts" class="{{ 'on' if active == 'prompts' else '' }}">Prompts</a>
-        <a href="/settings/packs" class="{{ 'on' if active == 'packs' else '' }}">Packs</a>
-      </div>
-      {% endif %}
+      <details class="nav-fold">
+        <summary>Menu</summary>
+        <div class="rooms">
+          {% for room, keys in nav_rooms %}
+          <p class="room">{{ room }}</p>
+          {% for key in keys %}
+          <a href="/{{ key }}" class="{{ 'on' if active == key else '' }}">{{ label(key) }}</a>
+          {% endfor %}
+          {% endfor %}
+          {% if active == 'settings' or active == 'lists' or active == 'prompts' or active == 'packs' %}
+          <div class="subnav">
+            <a href="/settings" class="{{ 'on' if active == 'settings' else '' }}">Knobs</a>
+            <a href="/settings/lists" class="{{ 'on' if active == 'lists' else '' }}">Lists</a>
+            <a href="/settings/prompts" class="{{ 'on' if active == 'prompts' else '' }}">Prompts</a>
+            <a href="/settings/packs" class="{{ 'on' if active == 'packs' else '' }}">Packs</a>
+          </div>
+          {% endif %}
+        </div>
+      </details>
     </nav>
-    <main>
+    <main id="content">
       {% include "partials/job_strip.html" %}
       {% if notice %}
       <div class="notice" role="status">{{ notice }}</div>

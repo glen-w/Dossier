@@ -31,6 +31,26 @@ a {
   color: var(--do-sea-deep);
 }
 
+.skip {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  transform: translateY(-120%);
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  z-index: 3;
+}
+
+.skip:focus {
+  transform: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--do-sea);
+  outline-offset: 2px;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -45,7 +65,6 @@ nav.side {
 
 nav.side .mark {
   display: block;
-  background: var(--do-paper);
   border-radius: 10px;
   padding: 6px 8px 2px;
   margin: 0 0 16px;
@@ -56,6 +75,122 @@ nav.side .mark img {
   width: min(168px, 100%);
   height: auto;
   margin: 0 auto;
+}
+
+nav.side .room {
+  margin: 14px 10px 4px;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #b7c4bc;
+}
+
+nav.side summary {
+  cursor: pointer;
+  margin: 0 0 8px;
+}
+
+.reading {
+  font-family: var(--do-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0 0 8px;
+}
+
+.hero {
+  margin: 0 0 16px;
+}
+
+.hero-line {
+  font-size: 1.15rem;
+}
+
+.stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+}
+
+.stages li {
+  border: 1px solid var(--do-line);
+  background: var(--do-card);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  color: var(--do-ink-soft);
+}
+
+.stages li.on {
+  background: var(--do-sea);
+  color: #fff;
+  border-color: var(--do-sea);
+}
+
+.carrying {
+  font-family: var(--do-display);
+  font-size: 1.15rem;
+  margin: 10px 0 0;
+}
+
+mark {
+  background: #f3e2a4;
+  padding: 0 2px;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.rail {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rail-item {
+  display: block;
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: var(--do-card);
+  border: 1px solid var(--do-line);
+  font-size: 0.85rem;
+}
+
+.rail-item.gap {
+  border-color: #e2b2a8;
+}
+
+.rail-item.met {
+  border-color: #b7d9c2;
+}
+
+.card.queue .reading {
+  font-size: 1.6rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.chip {
+  border: 1px solid var(--do-line);
+  background: var(--do-paper);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
 }
 
 nav.side a {
@@ -162,6 +297,28 @@ h1 {
   font-size: 1rem;
 }
 
+.card.brief-view h2 {
+  font-family: var(--do-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.card.brief-view h3 {
+  margin: 18px 0 6px;
+  font-size: 1.05rem;
+}
+
+.card.brief-view h4 {
+  margin: 14px 0 4px;
+  font-size: 1rem;
+}
+
+.card.brief-view .brief-p {
+  white-space: pre-wrap;
+  margin: 0 0 10px;
+}
+
 fieldset.phrase-list {
   border: 1px solid var(--do-line);
   border-radius: 8px;
@@ -174,10 +331,25 @@ fieldset.phrase-list legend {
   font-weight: 600;
 }
 
-.checks {
+.check-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
+  gap: 12px;
+  margin: 2px 0 0;
+}
+
+.check-actions button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--do-sea-deep);
+  font-size: 0.85rem;
+  text-decoration: underline;
+}
+
+.checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 6px 16px;
   margin: 8px 0 12px;
 }
 
@@ -186,6 +358,7 @@ fieldset.phrase-list legend {
   align-items: center;
   gap: 6px;
   font-size: 0.92rem;
+  min-width: 0;
 }
 
 .grid {
@@ -257,13 +430,24 @@ button {
   font: inherit;
 }
 
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
   padding: 7px 9px;
   border: 1px solid #c8c4b8;
   border-radius: 6px;
   min-width: 12rem;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  min-width: 1rem;
+  max-width: 1rem;
+  padding: 0;
+  margin: 0;
+  flex: 0 0 auto;
 }
 
 textarea {
@@ -326,6 +510,16 @@ ul.cite {
   padding-left: 18px;
 }
 
+@media (min-width: 801px) {
+  nav.side summary {
+    display: none;
+  }
+
+  .nav-fold:not([open]) > .rooms {
+    display: block !important;
+  }
+}
+
 @media (max-width: 800px) {
   .shell {
     grid-template-columns: 1fr;
@@ -335,8 +529,11 @@ ul.cite {
     padding-bottom: 12px;
   }
 
-  nav.side a {
-    display: inline-block;
-    margin-right: 4px;
+  .board {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    position: static;
   }
 }
