@@ -7,6 +7,7 @@ from pathlib import Path
 from dossier.config import Config
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.client import LLMClient
+from dossier.office import INVENTORY_MARK, OFFICE_SUFFIXES, extract_office
 from dossier.paths import employer_paths
 from dossier.sources.employer_filter import FilterStats, select_files
 from dossier.store import Corpus, Record
@@ -86,11 +87,25 @@ class EmployerSource:
                         continue
                     title = child.stem
                     stored += 1
+                elif suffix in OFFICE_SUFFIXES:
+                    body, reason = extract_office(child)
+                    if body:
+                        title = child.stem
+                        text = body
+                        stored += 1
+                    else:
+                        title = child.name
+                        text = (
+                            f"Employer folder file '{rel.as_posix()}'. Folder: {parent}. "
+                            f"{INVENTORY_MARK}. {reason}"
+                        )
+                        kind = "inventory"
+                        inventory += 1
                 else:
                     title = child.name
                     text = (
                         f"Employer folder file '{rel.as_posix()}'. Folder: {parent}. "
-                        "Binary body not ingested."
+                        f"{INVENTORY_MARK}."
                     )
                     kind = "inventory"
                     inventory += 1

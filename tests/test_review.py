@@ -96,7 +96,7 @@ def test_list_cards_pages_and_rejects_an_unscoped_action(corpus: Corpus) -> None
     assert [card["id"] for card in second["cards"]] == ["c2"]
     with pytest.raises(ValueError, match="pass ids or a source"):
         apply_action(corpus, {"action": "approve"})
-    with pytest.raises(ValueError, match="approve, refuse, or reopen"):
+    with pytest.raises(ValueError, match="approve, refuse, reopen, or defend"):
         apply_action(corpus, {"action": "drop", "source": "slack"})
 
 

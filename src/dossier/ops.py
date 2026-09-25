@@ -102,24 +102,126 @@ def source_rows() -> list[dict[str, Any]]:
     return rows
 
 
-def locker_snapshot(cfg: Config, corpus: Corpus) -> dict[str, Any]:
+def loop_counts(cfg: Config, corpus: Corpus) -> dict[str, int]:
+    """Counts the result loop uses to name a next step."""
     pending = len(corpus.cards(STATUS_PENDING))
     approved = len(corpus.cards(STATUS_APPROVED))
-    refused = len(corpus.cards(STATUS_REFUSED))
     spanned = sum(
         1
         for card in corpus.cards(STATUS_APPROVED)
         if (card.extras.get("span") or "").strip()
     )
+    adapters = source_rows()
     return {
-        "data_dir": cfg.data_dir,
-        "evidence_db": str(evidence_db(Path(cfg.data_dir))),
         "records": len(corpus.records()),
         "pending": pending,
         "approved": approved,
-        "refused": refused,
+        "refused": len(corpus.cards(STATUS_REFUSED)),
         "spanned": spanned,
         "vectors": corpus.vector_count(cfg.embed_model),
+        "detected": sum(1 for row in adapters if row["detected"]),
+    }
+
+
+def readiness_notes(cfg: Config, corpus: Corpus) -> list[str]:
+    """Shared doctor and locker warnings. Does not write."""
+    from dossier.identity import (
+        configured_slack_user_ids,
+        is_sent_metadata_uri,
+        resolve_speaker_names,
+    )
+    from dossier.office import office_extra_ready
+
+    notes: list[str] = []
+    if not corpus.fts_ok:
+        notes.append("FTS5 is off. Prove and ask prefer it. Check this Python SQLite build.")
+    if llm_egress_is_remote(cfg):
+        notes.append("Egress is on. Text can leave the machine for a remote model.")
+    identity_empty = not configured_slack_user_ids() and not resolve_speaker_names()
+    for item in CONTRIBUTIONS:
+        default = default_path(item.name)
+        seen = default is not None and item.source.detect(default)
+        if item.name == "pubs" and seen:
+            rows = len(item.source.records_for(default))  # type: ignore[attr-defined]
+            if pubs_collection() and rows == 0:
+                notes.append("Pubs collection is set but rows=0. Check the collection name and zotero_db.")
+        if seen and item.name == "slack" and identity_empty:
+            notes.append("Slack is detected but identity is empty. Set slack_user_ids or speaker_names.")
+        if seen and item.name == "meetings" and not resolve_speaker_names():
+            notes.append("Meetings are detected but speaker_names is empty.")
+    sent_meta = sum(1 for rec in corpus.records("mbox") if is_sent_metadata_uri(rec.uri))
+    if sent_meta:
+        notes.append(
+            f"{sent_meta} mail records are Sent-folder metadata only (subjects and attachments, no body)."
+        )
+    office = 0
+    for rec in corpus.records():
+        if "Binary body not ingested" in rec.text and any(
+            rec.uri.lower().endswith(ext) for ext in (".pdf", ".docx", ".pptx")
+        ):
+            office += 1
+    if office and not office_extra_ready():
+        notes.append(
+            f"{office} office files are still inventory. Install the office extra to read PDF text "
+            "(uv sync --extra office). Word and PowerPoint use the standard library."
+        )
+    elif office:
+        notes.append(f"{office} office files are still inventory. Re-ingest after the office extra is installed.")
+    spanned = sum(
+        1
+        for card in corpus.cards(STATUS_APPROVED)
+        if (card.extras.get("span") or "").strip()
+    )
+    if spanned == 0 and corpus.cards(STATUS_APPROVED):
+        notes.append("Approved cards need defend before tailor can quote them.")
+    return notes
+
+
+def _next_stage(href: str, counts: dict[str, int]) -> str:
+    """Which readiness stage the next step is pointing at. Empty when the loop is past them."""
+    if href == "/sources":
+        return "detected" if counts["detected"] < 1 else "records"
+    if href == "/extract":
+        return "records"
+    if href == "/review":
+        return "pending" if counts["pending"] else "spanned"
+    if href == "/index":
+        return "vectors"
+    return ""
+
+
+def locker_snapshot(cfg: Config, corpus: Corpus) -> dict[str, Any]:
+    from dossier.nextstep import next_step
+
+    counts = loop_counts(cfg, corpus)
+    href, sentence = next_step(
+        records=counts["records"],
+        pending=counts["pending"],
+        approved=counts["approved"],
+        spanned=counts["spanned"],
+        vectors=counts["vectors"],
+        detected=counts["detected"],
+    )
+    return {
+        "data_dir": cfg.data_dir,
+        "evidence_db": str(evidence_db(Path(cfg.data_dir))),
+        "records": counts["records"],
+        "pending": counts["pending"],
+        "approved": counts["approved"],
+        "refused": counts["refused"],
+        "spanned": counts["spanned"],
+        "vectors": counts["vectors"],
+        "next": sentence,
+        "next_href": href,
+        "next_stage": _next_stage(href, counts),
+        "stages": (
+            ("detected", "Detected"),
+            ("records", "Records"),
+            ("pending", "Pending"),
+            ("spanned", "Spanned"),
+            ("vectors", "Vectors"),
+        ),
+        "notes": readiness_notes(cfg, corpus),
         "fts5": corpus.fts_ok,
         "python": sys.executable,
         "sqlite": sqlite3.sqlite_version,

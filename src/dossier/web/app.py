@@ -20,6 +20,7 @@ from dossier.extract import ExtractProgress, extract_corpus
 from dossier.ingest_run import run_ingest_targets
 from dossier.interview import conduct
 from dossier.jobs import LockerBusy, RUNNER, Job
+from dossier.lenses import KINDS, LENSES
 from dossier.lists import PHRASE_LISTS, phrase_list_groups, phrase_list_patch
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
@@ -41,7 +42,7 @@ from dossier.profiles import (
     list_profiles,
     save_profile,
 )
-from dossier.review import apply_action, list_cards, summary
+from dossier.review import PAGE_SIZE, apply_action, card_sources, list_cards, summary
 from dossier.scope import (
     RequestScope,
     apply_request_scope,
@@ -54,7 +55,7 @@ from dossier.scope import (
 from dossier.settings_io import common_settings_patch, save_common_settings
 from dossier.store import Corpus
 from dossier.ui import Progress, note, stage
-from dossier.vocab import BLURBS, NAV, err_message, label
+from dossier.vocab import BLURBS, NAV, NAV_ROOMS, err_message, label
 
 _PKG = Path(__file__).resolve().parent
 _TEMPLATES = Jinja2Templates(directory=str(_PKG / "templates"))
@@ -173,10 +174,12 @@ def create_app() -> FastAPI:
         kind: str = "",
         q: str = "",
         offset: int = 0,
+        view: str = "list",
     ) -> HTMLResponse:
         cfg, corpus = _open()
         try:
             status_key = status if status in {"", "pending", "approved", "refused"} else "pending"
+            shown = view if view in {"list", "queue"} else "list"
             start = max(0, offset)
             payload = list_cards(
                 corpus,
@@ -186,9 +189,13 @@ def create_app() -> FastAPI:
                 kind=kind or None,
                 q=q,
                 offset=start,
+                limit=1 if shown == "queue" else PAGE_SIZE,
             )
             payload["offset"] = start
             payload["has_more"] = start + len(payload["cards"]) < payload["total"]
+            sources = card_sources(corpus)
+            if source and source not in sources:
+                sources = [source, *sources]
             return _page(
                 request,
                 "review.html",
@@ -201,6 +208,11 @@ def create_app() -> FastAPI:
                 lens=lens,
                 kind=kind,
                 q=q,
+                view=shown,
+                sources=sources,
+                lenses=LENSES,
+                kinds=KINDS,
+                noted=request.query_params.get("noted", ""),
                 busy=RUNNER.busy(),
                 notice=_egress_notice(cfg),
             )
@@ -216,9 +228,12 @@ def create_app() -> FastAPI:
         kind: str = Form(""),
         status: str = Form("pending"),
         q: str = Form(""),
+        view: str = Form("list"),
+        offset: int = Form(0),
     ) -> RedirectResponse:
         if RUNNER.busy():
             return RedirectResponse("/review?err=busy", status_code=303)
+        shown = view if view == "queue" else "list"
         cfg, corpus = _open()
         try:
             body: dict[str, Any] = {"action": action}
@@ -232,9 +247,27 @@ def create_app() -> FastAPI:
             if kind:
                 body["kind"] = kind
             apply_action(corpus, body)
+            next_offset = max(0, offset)
+            if shown == "queue" and id_list:
+                payload = list_cards(
+                    corpus,
+                    status=status if status in {"", "pending", "approved", "refused"} else "pending",
+                    source=source,
+                    lens=lens or None,
+                    kind=kind or None,
+                    q=q,
+                    offset=next_offset,
+                    limit=1,
+                )
+                if payload["cards"] and payload["cards"][0]["id"] == id_list[0]:
+                    next_offset += 1
         finally:
             corpus.close()
         params = f"status={status}&source={source}&lens={lens}&kind={kind}&q={_q(q)}"
+        if shown == "queue":
+            params += f"&view=queue&offset={next_offset}"
+            if action == "defend":
+                params += "&noted=span"
         return RedirectResponse(f"/review?{params}", status_code=303)
 
     @app.get("/ask", response_class=HTMLResponse)
@@ -252,6 +285,7 @@ def create_app() -> FastAPI:
             cfg=cfg,
             busy=RUNNER.busy(),
             result=result,
+            question_text=_kept_text(job, result, "question"),
             job=job.snapshot() if job else None,
             notice=_egress_notice(cfg),
             modes=ASK_MODES,
@@ -274,6 +308,7 @@ def create_app() -> FastAPI:
             cfg=cfg,
             busy=RUNNER.busy(),
             result=result,
+            spec_text=_kept_text(job, result, "spec"),
             job=job.snapshot() if job else None,
             notice=_egress_notice(cfg),
             efforts=EFFORT_NAMES,
@@ -300,6 +335,101 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             return RedirectResponse(f"/match?err={_q(str(exc))}", status_code=303)
         return RedirectResponse(f"/match?job={job.id}", status_code=303)
+
+    @app.get("/gaps", response_class=HTMLResponse)
+    async def gaps_page(request: Request) -> HTMLResponse:
+        from dossier.show import gap_report
+
+        cfg, corpus = _open()
+        try:
+            return _page(
+                request,
+                "gaps.html",
+                "gaps",
+                cfg=cfg,
+                report=gap_report(corpus),
+                notice=_egress_notice(cfg),
+            )
+        finally:
+            corpus.close()
+
+    @app.get("/packet", response_class=HTMLResponse)
+    async def packet_page(request: Request) -> HTMLResponse:
+        cfg = Config.from_env()
+        raw = Path(request.query_params.get("path", "")).name
+        body = ""
+        shown = ""
+        if raw and raw not in {".", ".."}:
+            root = (Path(cfg.data_dir) / "packets").resolve()
+            resolved = (root / raw).resolve()
+            if resolved.parent == root and resolved.is_file():
+                shown = str(resolved)
+                body = resolved.read_text(encoding="utf-8")
+        return _page(
+            request,
+            "packet.html",
+            "packet",
+            cfg=cfg,
+            path=shown,
+            body=body,
+            busy=RUNNER.busy(),
+            notice=_egress_notice(cfg),
+        )
+
+    @app.post("/packet/run")
+    async def packet_run() -> RedirectResponse:
+        from dossier.show import write_packet
+
+        if RUNNER.busy():
+            return RedirectResponse("/packet?err=busy", status_code=303)
+        cfg, corpus = _open()
+        try:
+            path = write_packet(corpus, Path(cfg.data_dir) / "packets")
+        finally:
+            corpus.close()
+        return RedirectResponse(f"/packet?path={_q(path.name)}", status_code=303)
+
+    @app.get("/tailor", response_class=HTMLResponse)
+    async def tailor_page(request: Request) -> HTMLResponse:
+        cfg = Config.from_env()
+        job = _job_from_query(request)
+        result = (
+            job.result
+            if job is not None and job.status == "done" and isinstance(job.result, dict)
+            else None
+        )
+        posting_text = _kept_text(job, result, "posting") or _match_spec(request.query_params.get("from", ""))
+        kind_value = _kept_text(job, result, "kind") or "cv"
+        if kind_value not in {"cv", "letter"}:
+            kind_value = "cv"
+        return _page(
+            request,
+            "tailor.html",
+            "tailor",
+            cfg=cfg,
+            busy=RUNNER.busy(),
+            result=result,
+            posting_text=posting_text,
+            kind_value=kind_value,
+            job=job.snapshot() if job else None,
+            notice=_egress_notice(cfg),
+        )
+
+    @app.post("/tailor/run")
+    async def tailor_run(
+        posting: str = Form(...),
+        kind: str = Form("cv"),
+        arrange: str = Form(""),
+    ) -> RedirectResponse:
+        text = posting.strip()
+        if not text:
+            return RedirectResponse("/tailor?err=Paste+a+posting", status_code=303)
+        chosen = kind if kind in {"cv", "letter"} else "cv"
+        try:
+            job = _start_tailor(text, chosen, arrange == "1")
+        except LockerBusy:
+            return RedirectResponse("/tailor?err=busy", status_code=303)
+        return RedirectResponse(f"/tailor?job={job.id}", status_code=303)
 
     @app.post("/ask/run")
     async def ask_run(
@@ -754,6 +884,7 @@ def _page(
     base = {
         "request": request,
         "nav": NAV,
+        "nav_rooms": NAV_ROOMS,
         "active": active,
         "label": label,
         "blurbs": BLURBS,
@@ -949,6 +1080,7 @@ def _start_ask(question: str, mode: str | None, scope: RequestScope | None = Non
                 refused=result.refused,
                 reason=result.reason,
             )
+            href, sentence = _loop_next(cfg, corpus, result.reason if result.refused else "")
             return {
                 "question": question,
                 "mode": chosen,
@@ -956,12 +1088,14 @@ def _start_ask(question: str, mode: str | None, scope: RequestScope | None = Non
                 "citations": result.citations,
                 "refused": result.refused,
                 "reason": result.reason,
+                "next": sentence if result.refused else "",
+                "next_href": href if result.refused else "",
                 "scope": scope_label(cfg),
             }
         finally:
             corpus.close()
 
-    return RUNNER.start("ask", run)
+    return RUNNER.start("ask", run, seed={"question": question})
 
 
 def _start_match(spec: str, scope: RequestScope | None = None) -> Job:
@@ -981,12 +1115,116 @@ def _start_match(spec: str, scope: RequestScope | None = None) -> Job:
             path = write_match(report, Path(cfg.data_dir) / "matches")
             data = report.as_dict()
             data["path"] = str(path)
+            data["spec"] = spec
             data["scope"] = scope_label(cfg)
+            reqs = data.get("requirements") or []
+            data["met"] = sum(1 for req in reqs if req.get("evidence") and not req.get("gap"))
+            data["gaps"] = sum(1 for req in reqs if req.get("gap"))
+            for req in data.get("requirements") or []:
+                gap = str(req.get("gap") or "")
+                if not gap:
+                    req["next"] = ""
+                    req["next_href"] = ""
+                    continue
+                href, sentence = _loop_next(cfg, corpus, gap)
+                req["next"] = sentence
+                req["next_href"] = href
             return data
         finally:
             corpus.close()
 
-    return RUNNER.start("match", run)
+    return RUNNER.start("match", run, seed={"spec": spec})
+
+
+def _loop_next(cfg: Config, corpus: Corpus, reason: str) -> tuple[str, str]:
+    from dossier.nextstep import next_step
+    from dossier.ops import loop_counts
+
+    counts = loop_counts(cfg, corpus)
+    return next_step(
+        records=counts["records"],
+        pending=counts["pending"],
+        approved=counts["approved"],
+        spanned=counts["spanned"],
+        vectors=counts["vectors"],
+        detected=counts["detected"],
+        reason=reason,
+    )
+
+
+def _start_tailor(posting: str, kind: str, arrange: bool) -> Job:
+    def run(job: Job) -> dict[str, Any]:
+        from dossier.llm import get_client, llm_egress_is_remote
+        from dossier.ops import note_egress
+        from dossier.prompts import start_prompt_log, stop_prompt_log
+        from dossier.tailor import (
+            CV_CAP,
+            LETTER_CAP,
+            arrange_letter,
+            linkedin_subtitle,
+            render_draft,
+            select_cards,
+            write_draft,
+        )
+
+        cfg = Config.from_env()
+        corpus = Corpus(evidence_db(Path(cfg.data_dir)))
+        try:
+            limit = LETTER_CAP if kind == "letter" else CV_CAP
+            picked, bare = select_cards(corpus, posting, limit=limit)
+            paragraphs = None
+            prompt_stamp = "prompts: none"
+            if arrange and kind == "letter" and picked and cfg.llm_enabled:
+                if llm_egress_is_remote(cfg):
+                    note_egress(cfg)
+                client = CallBudget(cfg.llm_max_calls).wrap(get_client(cfg))
+                spans = [item.card.extras["span"] for item in picked]
+                token = start_prompt_log()
+                try:
+                    paragraphs = arrange_letter(
+                        spans,
+                        client,
+                        cfg.llm_model,
+                        max_num_ctx=cfg.llm_max_num_ctx,
+                        timeout_seconds=cfg.llm_timeout_seconds,
+                    )
+                    prompt_stamp = stop_prompt_log(token, empty="none")
+                except Exception:
+                    stop_prompt_log(token, empty="none")
+                    raise
+            body = render_draft(
+                kind=kind,
+                posting=posting,
+                picked=picked,
+                bare=bare,
+                name=cfg.cv_name,
+                subtitle=linkedin_subtitle(corpus),
+                paragraphs=paragraphs,
+            )
+            path = write_draft(body, Path(cfg.data_dir) / "drafts", prompt_stamp=prompt_stamp)
+            return {"path": str(path), "body": body, "posting": posting, "kind": kind}
+        finally:
+            corpus.close()
+
+    return RUNNER.start("tailor", run, seed={"posting": posting, "kind": kind})
+
+
+def _kept_text(job: Job | None, result: dict[str, Any] | None, key: str) -> str:
+    if isinstance(result, dict) and result.get(key):
+        return str(result[key])
+    if job is not None:
+        return str(job.seed.get(key) or "")
+    return ""
+
+
+def _match_spec(job_id: str) -> str:
+    """Posting text from a finished match job. Empty when the id is missing or not a match."""
+    if not job_id:
+        return ""
+    job = RUNNER.get(job_id)
+    if job is None or job.kind != "match" or job.status != "done" or not isinstance(job.result, dict):
+        return ""
+    return str(job.result.get("spec") or "")
 
 
 def _job_from_query(request: Request) -> Job | None:

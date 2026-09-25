@@ -60,20 +60,25 @@ A card id and `--all` cannot be combined. A name in both `--source` and
 `--except` is skipped. A `--source` with no cards is reported and not treated
 as a match.
 
-`dossier review` serves one page on `127.0.0.1:8765` (override with `--port`).
-Sources open into lens and kind groups. Approve or refuse applies to pending
-cards in that group, that source, or one card. Reopen walks a card back to
-pending. Source and group actions ask before they run. A claim search and the
-first cited record's opening text sit on each card.
+`dossier review` opens the workbench review page (`127.0.0.1:8766/review`,
+override with `--port`). It needs the `[web]` extra, the same one as
+`dossier gui`. Approve, refuse, reopen, and defend live on that page. Defend
+stores the carrying sentence and does not change status. Gaps, packet, and
+tailor are workbench pages too. Tailor stays off the Match page; Match only
+links to it.
 
 `dossier gui` serves the optional workbench on `127.0.0.1:8766` (override with
-`--port`). It needs the `[web]` extra (`uv sync --extra web`). Pages cover
-locker status, ingest, extract, review, ask, match, index, brief, run, effort, saved
-profiles, prompts, question packs, and phrase lists. Live job progress uses Server-Sent
-Events; the job strip polls only while a job is busy. Failed jobs and ingest/extract
-counts show on the page after reload. Known `err=` query keys map to short blurbs.
-The CLI stays the scriptable surface; `dossier review` stays available
-without the extra. See [vocab](vocab.md).
+`--port`). It needs the `[web]` extra (`uv sync --extra web`). Pages sit in
+four rooms — Prepare, Decide, Use, and Settings — and still use the same URLs:
+locker, ingest, extract, review, ask, match, index, brief, run, effort, saved
+profiles, prompts, question packs, and phrase lists. Review can open as a
+one-card queue. Match keeps the pasted spec and links to Tailor with that
+posting; Tailor stays its own page. Live job progress uses Server-Sent
+Events; the job strip polls only while a job is busy. Ask, match, and tailor
+swap in the result when the job finishes and keep the text you submitted.
+Other pages reload. Failed jobs show the error only. Known `err=` query keys
+map to short blurbs. The CLI stays the scriptable surface; `dossier review`
+stays available without the extra. See [vocab](vocab.md).
 
 `dossier tailor` writes CV or letter markdown under `data/drafts/` from
 approved cards that already have a span. `--arrange` is letter-only.

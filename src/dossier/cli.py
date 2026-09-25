@@ -76,8 +76,11 @@ def main(argv: list[str] | None = None) -> int:
     p_reopen.add_argument("card_id", nargs="?", default=None)
     _add_gate_filters(p_reopen)
 
-    p_review = sub.add_parser("review", help="Loopback page to sift claim cards")
-    p_review.add_argument("--port", type=int, default=8765)
+    p_review = sub.add_parser(
+        "review",
+        help="Open the workbench review page (needs the [web] extra)",
+    )
+    p_review.add_argument("--port", type=int, default=8766)
 
     p_gui = sub.add_parser(
         "gui",
@@ -222,6 +225,8 @@ def main(argv: list[str] | None = None) -> int:
         return _doctor(cfg)
     if args.cmd == "gui":
         return _gui(args)
+    if args.cmd == "review":
+        return _review(args)
     db = evidence_db(Path(cfg.data_dir))
     corpus = Corpus(db)
     try:
@@ -237,8 +242,6 @@ def main(argv: list[str] | None = None) -> int:
             return _refuse(args, corpus)
         if args.cmd == "reopen":
             return _reopen(args, corpus)
-        if args.cmd == "review":
-            return _review(args, corpus)
         if args.cmd == "ask":
             return _ask(args, cfg, corpus)
         if args.cmd == "brief":
@@ -673,23 +676,15 @@ def _gui(args: argparse.Namespace) -> int:
     return web_main(["--host", args.host, "--port", str(args.port)])
 
 
-def _review(args: argparse.Namespace, corpus: Corpus) -> int:
-    from dossier.review import serve
-
+def _review(args: argparse.Namespace) -> int:
     port = args.port
     if port < 1 or port > 65535:
         print("port must be 1-65535", file=sys.stderr)
         return 2
-    print(f"http://127.0.0.1:{port}/")
-    try:
-        serve(corpus, port)
-    except KeyboardInterrupt:
-        print("\nstopped")
-        return 0
-    except OSError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-    return 0
+    print(f"http://127.0.0.1:{port}/review")
+    from dossier.web.__main__ import main as web_main
+
+    return web_main(["--host", "127.0.0.1", "--port", str(port)])
 
 
 def _ask(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
@@ -1113,6 +1108,10 @@ def _doctor(cfg: Config) -> int:
                     "warn: meetings detected but speaker_names empty "
                     "(set [identity] speaker_names)"
                 )
+        from dossier.ops import readiness_notes
+
+        for line in readiness_notes(cfg, corpus):
+            print(f"note: {line}")
     finally:
         corpus.close()
     return 0

@@ -31,7 +31,7 @@ Use these words in the GUI and in new docs. Prefer the locked term over a synony
 | **Draft** | A model-free claim sentence inside extract. Tailor output is never a “draft” in the GUI. |
 | **Card** | One claim: `pending`, `approved`, or `refused`. |
 | **Lens / kind** | Closed facets on a card. |
-| **Review** | The human gate: approve, refuse, reopen. The CLI list command stays `buffet`. |
+| **Review** | The human gate on the workbench: approve, refuse, reopen, defend. The CLI list command stays `buffet`. |
 | **Span / defend** | The one sentence that carries the claim; `defend` stores it on the card. |
 | **Packet** | Markdown of spanned approved cards under `data/packets/`. |
 

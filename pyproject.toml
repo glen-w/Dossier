@@ -13,6 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 llm = ["litellm>=1.70,<2"]
+office = ["pypdf>=5"]
 web = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
