@@ -59,7 +59,7 @@ BLURBS = {
     "packet": "Markdown of spanned approved cards.",
     "gaps": "Empty lenses, unspanned cards, and records still waiting on extract.",
     "settings": "Common knobs. Phrase lists and the rest of the file stay in the gitignored dossier.toml.",
-    "effort": "How hard the model should try: light, balanced, or high. Balanced matches today's defaults. Light and high also change context and timeout.",
+    "effort": "How hard the model should try: light, balanced, or high. Balanced uses a fast model for extract and the answer model for ask. Light drafts without a model. High uses the answer model for both.",
     "profile": "A named overlay of tunable knobs. Not identity.",
     "scope": "Sources, years, and effort for one request. Settings and profiles hold the defaults.",
     "prompt": "A versioned template for extract, ask, or tailor. A pack is a list of questions, not a prompt.",

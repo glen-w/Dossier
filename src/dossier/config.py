@@ -16,6 +16,7 @@ from dossier.paths import TomlConfigError, data_dir, pubs_url, read_toml_dict, w
 ASK_MODES = ("exact", "auto", "rich")
 DECOMPOSE_MODES = ("off", "auto", "on")
 PLANNER_MODES = ("off", "rich")
+DEFAULT_LLM_FAST = "qwen2.5:3b"
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,8 @@ class Config:
     llm_allow_remote: bool = False
     llm_api_base: str | None = None
     llm_model: str = "qwen3.8:latest"
+    llm_fast: str = DEFAULT_LLM_FAST
+    fast_model: str = DEFAULT_LLM_FAST
     data_dir: str = ""
     warehouse: str = ""
     pubs_url: str = ""
@@ -59,6 +62,9 @@ class Config:
     effort_model_light: str = ""
     effort_model_balanced: str = ""
     effort_model_high: str = ""
+    effort_fast_light: str = ""
+    effort_fast_balanced: str = ""
+    effort_fast_high: str = ""
     # None means every source. An empty tuple means none.
     scope_sources: tuple[str, ...] | None = None
     scope_year_from: int = 0
@@ -118,6 +124,16 @@ class Config:
                 "DOSSIER_LLM_MODEL",
                 str(llm.get("model") or "qwen3.8:latest"),
             ),
+            llm_fast=_env_str(
+                "DOSSIER_LLM_FAST",
+                str(llm.get("fast") or DEFAULT_LLM_FAST),
+            ).strip()
+            or DEFAULT_LLM_FAST,
+            fast_model=_env_str(
+                "DOSSIER_LLM_FAST",
+                str(llm.get("fast") or DEFAULT_LLM_FAST),
+            ).strip()
+            or DEFAULT_LLM_FAST,
             data_dir=str(root),
             warehouse=str(warehouse_db()),
             pubs_url=pubs_url(),
@@ -203,9 +219,12 @@ class Config:
             ),
             effort=effort,
             llm_max_num_ctx=32_768,
-            effort_model_light=_effort_model(efforts, "light"),
-            effort_model_balanced=_effort_model(efforts, "balanced"),
-            effort_model_high=_effort_model(efforts, "high"),
+            effort_model_light=_effort_key(efforts, "light", "model"),
+            effort_model_balanced=_effort_key(efforts, "balanced", "model"),
+            effort_model_high=_effort_key(efforts, "high", "model"),
+            effort_fast_light=_effort_key(efforts, "light", "fast"),
+            effort_fast_balanced=_effort_key(efforts, "balanced", "fast"),
+            effort_fast_high=_effort_key(efforts, "high", "fast"),
             scope_sources=_scope_sources(scope),
             scope_year_from=_scope_year("DOSSIER_SCOPE_YEAR_FROM", scope.get("year_from")),
             scope_year_to=_scope_year("DOSSIER_SCOPE_YEAR_TO", scope.get("year_to")),
@@ -231,11 +250,11 @@ def _scope_year(env_name: str, file_value: object) -> int:
     return year
 
 
-def _effort_model(efforts: dict, name: str) -> str:
+def _effort_key(efforts: dict, name: str, key: str) -> str:
     block = efforts.get(name)
     if not isinstance(block, dict):
         return ""
-    return str(block.get("model") or "").strip()
+    return str(block.get(key) or "").strip()
 
 
 def _choice(value: str, allowed: tuple[str, ...], default: str) -> str:

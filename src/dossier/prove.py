@@ -199,20 +199,32 @@ def _run_prove_body(
             client = budget.wrap(live)
 
         from dossier.cli import _extract_progress
+        from dossier.llm.client import select_fast_model
+
+        extract_model = cfg.fast_model
+        extract_llm = bool(use_llm and cfg.extract_llm)
+        if extract_llm:
+            extract_model, fast_note = select_fast_model(cfg, client)  # type: ignore[arg-type]
+            if fast_note:
+                print(fast_note, file=sys.stderr)
+            ok_fast, fast_msg = client.check_config(extract_model)  # type: ignore[attr-defined]
+            if not ok_fast:
+                print(fast_msg, file=sys.stderr)
+                extract_llm = False
 
         cards = extract_corpus(
             corpus,
             client,  # type: ignore[arg-type]
-            cfg.llm_model,
+            extract_model,
             source=None,
             limit=None,
-            use_llm=bool(use_llm and cfg.extract_llm),
+            use_llm=extract_llm,
             timeout_seconds=cfg.llm_timeout_seconds,
             chunk_chars=cfg.extract_chunk_chars,
             max_chunks=cfg.extract_max_chunks,
             on_progress=_extract_progress(
-                use_llm=bool(use_llm and cfg.extract_llm),
-                model=cfg.llm_model,
+                use_llm=extract_llm,
+                model=extract_model,
             ),
         )
         print(f"extract: {len(cards)} cards")

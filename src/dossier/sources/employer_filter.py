@@ -283,6 +283,7 @@ def _llm_drop(
                     temperature=0.0,
                     num_ctx=ctx_tokens_for(prompt, max_num_ctx=8192),
                     max_tokens=512,
+                    think=False,
                 )
             )
         except LLMClientError:

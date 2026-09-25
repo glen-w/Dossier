@@ -43,7 +43,7 @@ FTS5 is missing unless you pass `--allow-overlap`.
 
 ## Where it runs
 
-`uv sync` on the host. The corpus is `data/evidence.db` on that machine. Adapters read paths you list there: an employer folder, a git repo, an export, an mbox, or `DATA_DUMPS_WAREHOUSE`. The default model is Ollama at `http://127.0.0.1:11434`.
+`uv sync` on the host. The corpus is `data/evidence.db` on that machine. Adapters read paths you list there: an employer folder, a git repo, an export, an mbox, or `DATA_DUMPS_WAREHOUSE`. Generation stays on Ollama at `http://127.0.0.1:11434`: a fast tag for extract and an answer tag for ask.
 
 A container would need a bind mount for each of those paths and a second route to loopback Ollama. The 1.0 install is this page. FTS5 is the interpreter note above (`UV_PYTHON`), not an image pin. The refuse line is in [roadmap](roadmap.md).
 
@@ -51,7 +51,7 @@ Publications come from the Zotero collection named under `[pubs]` in `data/dossi
 
 ## Model
 
-The default model is Ollama at `http://127.0.0.1:11434` with `allow_remote = false`. Completions are unlimited unless `DOSSIER_LLM_MAX_CALLS` (or `[llm] max_calls`) is a positive cap. Set `DOSSIER_LLM_PROVIDER=off` to skip model calls. `dossier ask --mode exact` still quotes from the corpus.
+Ollama stays on loopback at `http://127.0.0.1:11434` with `allow_remote = false`. Two generation tags: `[llm] model` (default `qwen3.8:latest`) answers ask and brief; `[llm] fast` (default `qwen2.5:3b`) runs extract, the employer folder filter, the ask planner, and letter arrange, with thinking off. Embeddings stay on `[llm] embed_model`. If the fast tag is not installed, that role uses the answer model. `effort = high` uses the answer model for both roles. Completions are unlimited unless `DOSSIER_LLM_MAX_CALLS` (or `[llm] max_calls`) is a positive cap. Set `DOSSIER_LLM_PROVIDER=off` to skip model calls. `dossier ask --mode exact` still quotes from the corpus. Pull the fast tag once: `ollama pull qwen2.5:3b`.
 
 Text leaves the machine only if you opt into a remote LLM. That is `DOSSIER_LLM_PROVIDER=litellm` (plus `dossier[llm]`), or `DOSSIER_LLM_ALLOW_REMOTE=true` so Ollama may use a non-loopback host. The prompt for that call is what is sent. The corpus file is not. The CLI prints an egress notice first. A remote Ollama URL without the flag is refused and does not print that notice. `dossier doctor` prints `egress: no` until you opt in (including `egress: no (remote URL blocked…)` when the URL is non-loopback without the flag).
 

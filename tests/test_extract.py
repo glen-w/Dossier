@@ -15,6 +15,7 @@ class FakeLLM:
     def __init__(self, payload: dict) -> None:
         self.payload = payload
         self.prompts: list[str] = []
+        self.requests: list = []
 
     def check_config(self, model: str) -> tuple[bool, str]:
         return True, "ok"
@@ -26,6 +27,7 @@ class FakeLLM:
 
     def complete_json(self, request) -> dict:
         self.prompts.append(request.prompt)
+        self.requests.append(request)
         return self.payload
 
 
@@ -74,6 +76,7 @@ def test_extract_record_chunks_large_text(corpus) -> None:
         timeout_seconds=60.0,
     )
     assert len(client.prompts) == 3
+    assert all(request.think is False for request in client.requests)
     assert all(len(p) < 2000 for p in client.prompts)
     assert cards[0].status == STATUS_PENDING
 

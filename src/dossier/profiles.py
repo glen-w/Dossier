@@ -19,7 +19,7 @@ VIRTUAL_DEFAULT = "default"
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 _ALLOWED_TOP = frozenset({"effort", "llm", "ask", "extract", "scope"})
 _ALLOWED_SCOPE = frozenset({"all_sources", "sources", "year_from", "year_to"})
-_ALLOWED_LLM = frozenset({"model", "max_calls", "provider", "timeout", "embed_model"})
+_ALLOWED_LLM = frozenset({"model", "fast", "max_calls", "provider", "timeout", "embed_model"})
 _ALLOWED_ASK = frozenset({"mode", "limit", "planner", "decompose", "hops"})
 _ALLOWED_EXTRACT = frozenset({"llm", "chunk_chars", "max_chunks"})
 

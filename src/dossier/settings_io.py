@@ -42,6 +42,7 @@ def common_settings_patch(
     *,
     effort: str | None = None,
     model: str | None = None,
+    fast: str | None = None,
     max_calls: int | None = None,
     ask_mode: str | None = None,
     extract_llm: bool | None = None,
@@ -54,6 +55,8 @@ def common_settings_patch(
     llm: dict[str, Any] = {}
     if model is not None:
         llm["model"] = model
+    if fast is not None:
+        llm["fast"] = fast
     if max_calls is not None:
         llm["max_calls"] = int(max_calls)
     if llm:

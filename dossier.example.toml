@@ -3,9 +3,9 @@
 # Leave a key out to keep the built-in default.
 
 # Global LLM investment: light | balanced | high
-# balanced keeps today's model, timeout, and context cap.
+# balanced: extract on [llm] fast, ask on [llm] model.
 # light: extract drafts only, ask exact, context 8192, timeout 120s.
-# high: ask rich, planner rich, timeout 600s.
+# high: ask and extract on the answer model, ask rich, planner rich, timeout 600s.
 # effort = "balanced"
 
 # Default sources and years for ask, match, and brief.
@@ -16,7 +16,9 @@
 # year_from = 2016
 # year_to = 2024
 
-# Model-only override for one effort. Leave unset to keep [llm] model.
+# model overrides the answer model for that effort.
+# fast overrides the fast model. Leave fast unset to keep [llm] fast,
+# except high, which uses the answer model for both roles unless fast is set.
 # [efforts.high]
 # model = "qwen3.8:latest"
 
@@ -26,7 +28,8 @@
 
 [llm]
 provider = "ollama" # ollama | litellm | off
-model = "qwen3.8:latest"
+model = "qwen3.8:latest" # ask and brief
+fast = "qwen2.5:3b" # extract, employer filter, ask planner, letter arrange
 embed_model = "nomic-embed-text"
 base_url = "http://127.0.0.1:11434"
 allow_remote = false # off. true permits a non-loopback Ollama host; the prompt may then leave

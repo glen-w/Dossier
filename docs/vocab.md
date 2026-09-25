@@ -53,7 +53,9 @@ Use these words in the GUI and in new docs. Prefer the locked term over a synony
 
 | Term | Meaning |
 | --- | --- |
-| **Effort** | Global LLM investment: `light`, `balanced`, or `high`. Balanced matches today's defaults. Light and high also set a context cap and a timeout. |
+| **Answer model** | `[llm] model`. Ask and brief. Default `qwen3.8:latest`. |
+| **Fast model** | `[llm] fast`. Extract, the employer folder filter, the ask planner, and letter arrange. Default `qwen2.5:3b`. Thinking is off. A missing tag uses the answer model. |
+| **Effort** | Global LLM investment: `light`, `balanced`, or `high`. Balanced uses the fast model for extract and the answer model for ask. Light drafts without a model. High uses the answer model for both, and sets a context cap and a timeout. |
 | **Profile** | A named saved overlay of tunable knobs. Not identity, not effort itself, not a referee. |
 | **Scope** | Sources, year range, and effort for one ask, match, or brief. Defaults live in settings and in a profile. |
 | **Identity** | Slack ids, speaker names, and the mail-folder map in gitignored `dossier.toml`. |

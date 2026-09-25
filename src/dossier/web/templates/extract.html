@@ -18,7 +18,7 @@
   <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Extract</button>
 </form>
 
-<p class="meta">Current: extract LLM {{ 'on' if cfg.extract_llm else 'off' }} · effort {{ cfg.effort }} · model {{ cfg.llm_model }}</p>
+<p class="meta">Current: extract LLM {{ 'on' if cfg.extract_llm else 'off' }} · effort {{ cfg.effort }} · fast {{ cfg.fast_model }} · answer {{ cfg.llm_model }}</p>
 
 {% if result %}
 <div class="card">

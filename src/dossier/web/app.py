@@ -24,7 +24,7 @@ from dossier.lenses import KINDS, LENSES
 from dossier.lists import PHRASE_LISTS, phrase_list_groups, phrase_list_patch
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
-from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
+from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient, select_fast_model
 from dossier.ops import (
     LazyClient,
     client_for_mode,
@@ -477,6 +477,7 @@ def create_app() -> FastAPI:
     async def settings_save(
         effort: str = Form(DEFAULT_EFFORT),
         model: str = Form(""),
+        fast: str = Form(""),
         max_calls: str = Form("0"),
         ask_mode: str = Form("auto"),
         extract_llm: str = Form(""),
@@ -504,6 +505,7 @@ def create_app() -> FastAPI:
         patch = common_settings_patch(
             effort=normalize_effort(effort),
             model=model.strip() or cfg.llm_model,
+            fast=fast.strip() or cfg.llm_fast,
             max_calls=calls,
             ask_mode=mode,
             extract_llm=extract_llm in {"1", "true", "on", "yes"},
@@ -558,7 +560,11 @@ def create_app() -> FastAPI:
                 description=description,
                 config={
                     "effort": cfg.effort,
-                    "llm": {"model": cfg.llm_model, "max_calls": cfg.llm_max_calls},
+                    "llm": {
+                        "model": cfg.llm_model,
+                        "fast": cfg.llm_fast,
+                        "max_calls": cfg.llm_max_calls,
+                    },
                     "ask": {"mode": cfg.ask_mode, "planner": cfg.ask_planner},
                     "extract": {"llm": cfg.extract_llm},
                     "scope": _profile_scope(cfg),
@@ -988,9 +994,13 @@ def _start_extract(source: str | None, limit: int | None) -> Job:
         try:
             use_llm = cfg.extract_llm and cfg.llm_enabled
             client: LLMClient = NullLLMClient()
+            model = cfg.fast_model
             if use_llm:
                 client = get_client(cfg)
-                ok_cfg, msg = client.check_config(cfg.llm_model)
+                model, fast_note = select_fast_model(cfg, client)
+                if fast_note:
+                    note(fast_note)
+                ok_cfg, msg = client.check_config(model)
                 if not ok_cfg:
                     note(msg)
                     use_llm = False
@@ -1004,7 +1014,7 @@ def _start_extract(source: str | None, limit: int | None) -> Job:
             def on_progress(ev: ExtractProgress) -> None:
                 nonlocal bar, drafted, cards_n
                 if ev.phase == "start":
-                    mode = f"llm={cfg.llm_model}" if use_llm else "llm=off (drafts only)"
+                    mode = f"llm={model}" if use_llm else "llm=off (drafts only)"
                     stage("extract", f"{mode} · {ev.total} to draft")
                     if ev.total:
                         bar = Progress(ev.total, label="extract")
@@ -1022,7 +1032,7 @@ def _start_extract(source: str | None, limit: int | None) -> Job:
             cards = extract_corpus(
                 corpus,
                 client,
-                cfg.llm_model,
+                model,
                 source=source,
                 limit=limit,
                 use_llm=use_llm,
@@ -1177,14 +1187,18 @@ def _start_tailor(posting: str, kind: str, arrange: bool) -> Job:
             if arrange and kind == "letter" and picked and cfg.llm_enabled:
                 if llm_egress_is_remote(cfg):
                     note_egress(cfg)
-                client = CallBudget(cfg.llm_max_calls).wrap(get_client(cfg))
+                raw_client = get_client(cfg)
+                arrange_model, arrange_note = select_fast_model(cfg, raw_client)
+                if arrange_note:
+                    note(arrange_note)
+                client = CallBudget(cfg.llm_max_calls).wrap(raw_client)
                 spans = [item.card.extras["span"] for item in picked]
                 token = start_prompt_log()
                 try:
                     paragraphs = arrange_letter(
                         spans,
                         client,
-                        cfg.llm_model,
+                        arrange_model,
                         max_num_ctx=cfg.llm_max_num_ctx,
                         timeout_seconds=cfg.llm_timeout_seconds,
                     )

@@ -22,7 +22,7 @@ Ingest an adapter you have. Records land in `data/evidence.db`. Extract drafts a
 
 Point `DATA_DUMPS_WAREHOUSE` at an existing DuckDB file when you already have one. LinkedIn, and the warehouse paths for ChatGPT, Slack, and mail, read that file. They do not build it.
 
-A thin install has no warehouse. Turn on sources you actually have: an employer folder you list, a ChatGPT export, a Slack export, a git repo you list, one exported mbox folder, or a meetings library. Two of those can fill a buffet. Then extract, `review` or approve, `defend`, and `tailor`. The same adapters serve both setups. There is no plugin scan. Ollama stays the default. Completions are unlimited unless you set a call cap. A remote model is opt-in and prints an egress notice.
+A thin install has no warehouse. Turn on sources you actually have: an employer folder you list, a ChatGPT export, a Slack export, a git repo you list, one exported mbox folder, or a meetings library. Two of those can fill a buffet. Then extract, `review` or approve, `defend`, and `tailor`. The same adapters serve both setups. There is no plugin scan. Ollama stays the default: a fast local model for extract, and a separate answer model for ask and brief. Completions are unlimited unless you set a call cap. A remote model is opt-in and prints an egress notice.
 
 ## Adapters
 
@@ -30,7 +30,7 @@ The list is `src/dossier/contributions.py`. Names and limits: [Adapters](docs/ad
 
 ## Install
 
-Python 3.11+ and [uv](https://docs.astral.sh/uv/) on the machine that holds the folders. There is no container image. The default model is Ollama on loopback. `DOSSIER_LLM_PROVIDER=off` skips model calls. A remote completion prints an egress notice. Interpreter and FTS5 notes: [Install](docs/install.md).
+Python 3.11+ and [uv](https://docs.astral.sh/uv/) on the machine that holds the folders. There is no container image. The default is Ollama on loopback, with `[llm] fast` for extract and `[llm] model` for ask. `DOSSIER_LLM_PROVIDER=off` skips model calls. A remote completion prints an egress notice. Interpreter and FTS5 notes: [Install](docs/install.md).
 
 ```text
 uv sync --extra dev

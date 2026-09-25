@@ -223,9 +223,13 @@ def test_planner_spends_one_call_then_quotes(corpus: Corpus) -> None:
 
         def __init__(self) -> None:
             self.calls = 0
+            self.model = ""
+            self.think = None
 
         def complete_json(self, request) -> dict:
             self.calls += 1
+            self.model = request.model
+            self.think = request.think
             if "Split the question" in request.prompt:
                 return {
                     "questions": [
@@ -245,6 +249,8 @@ def test_planner_spends_one_call_then_quotes(corpus: Corpus) -> None:
         limit=5,
     )
     assert client.calls == 1
+    assert client.model == "qwen2.5:3b"
+    assert client.think is False
     assert not result.refused
     assert result.route == "exact"
 

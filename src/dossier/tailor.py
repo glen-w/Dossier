@@ -131,6 +131,7 @@ def arrange_letter(
                 json_mode=True,
                 num_ctx=ctx_tokens_for(prompt, max_num_ctx=max_num_ctx),
                 timeout_seconds=timeout_seconds,
+                think=False,
             )
         )
     except LLMClientError:

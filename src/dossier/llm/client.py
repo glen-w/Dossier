@@ -29,6 +29,7 @@ class CompletionRequest:
     max_tokens: int | None = None
     json_mode: bool = False
     num_ctx: int | None = None
+    think: bool | None = None
 
 
 def ctx_tokens_for(
@@ -101,6 +102,8 @@ class OllamaClient:
             "stream": False,
             "options": options,
         }
+        if request.think is not None:
+            payload["think"] = request.think
         try:
             with httpx.Client(timeout=request.timeout_seconds) as client:
                 resp = client.post(f"{self._api_root()}/api/generate", json=payload)
@@ -174,6 +177,32 @@ def get_client_impl(cfg) -> LLMClient:
 
 def get_client(cfg) -> LLMClient:
     return get_client_impl(cfg)
+
+
+def select_fast_model(cfg, client: LLMClient) -> tuple[str, str]:
+    """Return the fast tag to call, and a note when falling back to the answer model.
+
+    A missing fast tag does not turn extract off. When the answer model is
+    installed, that tag is used instead. When neither tag is installed, the
+    preferred fast tag is returned with the client's error so the caller can
+    draft without a model.
+    """
+    preferred = str(getattr(cfg, "fast_model", "") or "").strip()
+    answer = str(getattr(cfg, "llm_model", "") or "").strip()
+    if not preferred:
+        return answer, ""
+    if preferred == answer:
+        return preferred, ""
+    check = getattr(client, "check_config", None)
+    if check is None:
+        return preferred, ""
+    ok, message = check(preferred)
+    if ok:
+        return preferred, ""
+    ok_answer, _ = check(answer)
+    if ok_answer:
+        return answer, f"fast model {preferred!r} not installed; using {answer}"
+    return preferred, message
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:

@@ -18,7 +18,7 @@ from dossier.ingest_run import run_ingest_targets
 from dossier.interview import conduct
 from dossier.llm import EGRESS_NOTICE, egress_status, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
-from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient
+from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient, select_fast_model
 from dossier.match import match_posting, write_match
 from dossier.packs import posting_pack, resolve_pack
 from dossier.prove import DEFAULT_ADAPTERS, run_prove
@@ -344,16 +344,20 @@ def _extract_cards(
     use_llm = cfg.extract_llm and cfg.llm_enabled
     client: LLMClient = NullLLMClient()
     spent = budget
+    model = cfg.fast_model
     if use_llm:
         if llm_egress_is_remote(cfg):
             _note_egress(cfg)
         client = get_client(cfg)
-        ok_cfg, msg = client.check_config(cfg.llm_model)
+        model, note = select_fast_model(cfg, client)
+        if note:
+            print(note, file=sys.stderr)
+        ok_cfg, msg = client.check_config(model)
         if not ok_cfg:
             drafted = extract_corpus(
                 corpus,
                 NullLLMClient(),
-                cfg.llm_model,
+                model,
                 source=source,
                 limit=limit,
                 use_llm=False,
@@ -361,7 +365,7 @@ def _extract_cards(
                 chunk_chars=cfg.extract_chunk_chars,
                 max_chunks=cfg.extract_max_chunks,
                 max_num_ctx=cfg.llm_max_num_ctx,
-                on_progress=_extract_progress(use_llm=False, model=cfg.llm_model),
+                on_progress=_extract_progress(use_llm=False, model=model),
             )
             _print_extract(drafted)
             print(msg, file=sys.stderr)
@@ -372,7 +376,7 @@ def _extract_cards(
     cards = extract_corpus(
         corpus,
         client,
-        cfg.llm_model,
+        model,
         source=source,
         limit=limit,
         use_llm=use_llm,
@@ -380,7 +384,7 @@ def _extract_cards(
         chunk_chars=cfg.extract_chunk_chars,
         max_chunks=cfg.extract_max_chunks,
         max_num_ctx=cfg.llm_max_num_ctx,
-        on_progress=_extract_progress(use_llm=use_llm, model=cfg.llm_model),
+        on_progress=_extract_progress(use_llm=use_llm, model=model),
     )
     _print_extract(cards)
     return 0
@@ -979,6 +983,9 @@ def _tailor(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
         if llm_egress_is_remote(cfg):
             _note_egress(cfg)
         client = CallBudget(cfg.llm_max_calls).wrap(get_client(cfg))
+        arrange_model, arrange_note = select_fast_model(cfg, client)
+        if arrange_note:
+            print(arrange_note, file=sys.stderr)
         spans = [item.card.extras["span"] for item in picked]
         from dossier.prompts import start_prompt_log, stop_prompt_log
 
@@ -987,7 +994,7 @@ def _tailor(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
             paragraphs = arrange_letter(
                 spans,
                 client,
-                cfg.llm_model,
+                arrange_model,
                 max_num_ctx=cfg.llm_max_num_ctx,
                 timeout_seconds=cfg.llm_timeout_seconds,
             )
@@ -1040,6 +1047,13 @@ def _doctor(cfg: Config) -> int:
         print(f"provider: {cfg.llm_provider if cfg.llm_enabled else 'off'}")
         print(egress_status(cfg))
         print(f"effort: {cfg.effort}")
+        print(f"model: {cfg.llm_model}")
+        print(f"fast: {cfg.fast_model}")
+        if cfg.llm_enabled and cfg.fast_model != cfg.llm_model:
+            fast_client = get_client(cfg)
+            _chosen, fast_note = select_fast_model(cfg, fast_client)
+            if fast_note:
+                print(fast_note)
         print(f"llm.timeout: {cfg.llm_timeout_seconds}")
         print(f"llm.max_ctx: {cfg.llm_max_num_ctx}")
         print(

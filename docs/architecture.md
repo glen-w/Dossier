@@ -7,13 +7,13 @@ Authority: Pipeline shape and where an adapter plugs in. What a command refuses 
 adapters you enable
     → local corpus (data/evidence.db, gitignored)
         → dossier index (passage vectors in that same file)
-        → deterministic drafts, then the model for what is left
+        → deterministic drafts, then the fast model for what is left
             → human gate (buffet, approve, refuse, reopen, review)
                 → buffet of cards you can paste
                     → defend stores the carrying sentence
                         → data/packets when you write a packet
                         → data/drafts when you tailor a posting
-        → interview ask (approved claim, full text, vectors when thin, hops, one completion)
+        → interview ask (approved claim, full text, vectors when thin, hops, one answer-model completion)
             → cited answer, or a refusal
             → data/briefs when you run a question pack
             → data/matches when you match a job spec (evidence per requirement)

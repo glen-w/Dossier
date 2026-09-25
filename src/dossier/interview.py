@@ -121,7 +121,7 @@ def _subquestions(
         planned = _plan(
             question,
             client,
-            cfg.llm_model,
+            cfg.fast_model,
             max_num_ctx=cfg.llm_max_num_ctx,
             timeout_seconds=cfg.llm_timeout_seconds,
         )
@@ -145,6 +145,7 @@ def _plan(
         json_mode=True,
         num_ctx=ctx_tokens_for(prompt, max_num_ctx=max_num_ctx),
         timeout_seconds=timeout_seconds,
+        think=False,
     )
     try:
         data = client.complete_json(request)

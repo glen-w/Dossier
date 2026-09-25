@@ -65,6 +65,30 @@ def test_blocked_remote_ollama_is_not_egress() -> None:
     assert not llm_egress_is_remote(cfg)
 
 
+def test_ollama_think_flag_is_sent_only_when_set() -> None:
+    client = OllamaClient(base_url="http://127.0.0.1:11434", allow_remote=False)
+    captured: dict = {}
+
+    class _Resp:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"response": "ok"}
+
+    def _post(url: str, json: dict) -> _Resp:  # noqa: A002
+        captured["url"] = url
+        captured["payload"] = json
+        return _Resp()
+
+    with patch("dossier.llm.client.httpx.Client") as mock_cls:
+        mock_cls.return_value.__enter__.return_value.post.side_effect = _post
+        client.complete(CompletionRequest(model="toy", prompt="hi", think=False))
+        assert captured["payload"]["think"] is False
+        client.complete(CompletionRequest(model="toy", prompt="hi"))
+        assert "think" not in captured["payload"]
+
+
 def test_ollama_timeout_is_llm_client_error() -> None:
     client = OllamaClient(base_url="http://127.0.0.1:11434", allow_remote=False)
     req = CompletionRequest(model="toy", prompt="hi", timeout_seconds=1.0)

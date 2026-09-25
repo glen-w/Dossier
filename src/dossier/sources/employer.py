@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dossier.config import Config
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
-from dossier.llm.client import LLMClient
+from dossier.llm.client import LLMClient, select_fast_model
 from dossier.office import INVENTORY_MARK, OFFICE_SUFFIXES, extract_office
 from dossier.paths import employer_paths
 from dossier.sources.employer_filter import FilterStats, select_files
@@ -32,6 +32,11 @@ class EmployerSource:
         slug = root.name or "folder"
         cfg = Config.from_env()
         client = _filter_client(cfg)
+        filter_model = cfg.fast_model
+        if client is not None:
+            filter_model, filter_note = select_fast_model(cfg, client)
+            if filter_note:
+                note(filter_note)
         with Progress(0, label=f"filter {slug}") as scan:
 
             def on_dir(rel: str, stats: FilterStats) -> None:
@@ -45,7 +50,7 @@ class EmployerSource:
                 root,
                 enabled=cfg.employer_filter,
                 client=client,
-                model=cfg.llm_model,
+                model=filter_model,
                 max_calls=cfg.employer_filter_llm_calls,
                 timeout_seconds=min(cfg.llm_timeout_seconds, 60.0),
                 on_dir=on_dir,

@@ -43,6 +43,7 @@ def test_apply_effort_balanced_leaves_knobs() -> None:
     assert out.llm_timeout_seconds == 90.0
     assert out.llm_max_num_ctx == 32_768
     assert out.llm_model == "qwen3.8:latest"
+    assert out.fast_model == "qwen2.5:3b"
 
 
 def test_apply_effort_light_and_high() -> None:
@@ -68,7 +69,9 @@ def test_high_model_override_does_not_leak() -> None:
         effort_model_high="other:27b",
     )
     assert apply_effort(cfg, "balanced").llm_model == "qwen3.8:latest"
-    assert apply_effort(cfg, "high").llm_model == "other:27b"
+    high = apply_effort(cfg, "high")
+    assert high.llm_model == "other:27b"
+    assert high.fast_model == "other:27b"
 
 
 def test_from_env_keeps_high_model_off_balanced(tmp_path: Path, monkeypatch) -> None:
@@ -94,6 +97,89 @@ def test_from_env_keeps_high_model_off_balanced(tmp_path: Path, monkeypatch) -> 
     assert cfg.llm_timeout_seconds == 300.0
     assert cfg.llm_max_num_ctx == 32_768
     assert cfg.effort_model_high == "other:27b"
+    assert cfg.llm_fast == "qwen2.5:3b"
+    assert cfg.fast_model == "qwen2.5:3b"
+
+
+def test_from_env_high_fast_override_stays_off_balanced(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DOSSIER_DATA", str(tmp_path))
+    monkeypatch.setenv("DOSSIER_LLM_FAST", "qwen2.5:3b")
+    (tmp_path / "dossier.toml").write_text(
+        "\n".join(
+            [
+                'effort = "balanced"',
+                "",
+                "[llm]",
+                'model = "qwen3.8:latest"',
+                'fast = "ignored-by-env"',
+                "",
+                "[efforts.high]",
+                'fast = "tiny:1b"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    cfg = Config.from_env()
+    assert cfg.llm_model == "qwen3.8:latest"
+    assert cfg.fast_model == "qwen2.5:3b"
+    assert cfg.effort_fast_high == "tiny:1b"
+    high = apply_effort(cfg, "high")
+    assert high.llm_model == "qwen3.8:latest"
+    assert high.fast_model == "tiny:1b"
+
+
+def test_neither_tag_installed_keeps_the_fast_name() -> None:
+    from dossier.llm.client import select_fast_model
+
+    class _Down:
+        def check_config(self, model: str) -> tuple[bool, str]:
+            return False, f"missing {model}"
+
+    cfg = Config(llm_model="qwen3.8:latest", fast_model="qwen2.5:3b")
+    model, note = select_fast_model(cfg, _Down())
+    assert model == "qwen2.5:3b"
+    assert "qwen2.5:3b" in note
+
+
+def test_balanced_fast_override_does_not_change_answer() -> None:
+    cfg = Config(
+        llm_model="qwen3.8:latest",
+        llm_fast="qwen2.5:3b",
+        effort_fast_balanced="tiny:1b",
+    )
+    out = apply_effort(cfg, "balanced")
+    assert out.llm_model == "qwen3.8:latest"
+    assert out.fast_model == "tiny:1b"
+
+
+def test_missing_fast_tag_uses_answer_model() -> None:
+    from dossier.llm.client import select_fast_model
+
+    class _Tags:
+        def check_config(self, model: str) -> tuple[bool, str]:
+            if model == "qwen3.8:latest":
+                return True, "ok"
+            return False, f"missing {model}"
+
+    cfg = Config(llm_model="qwen3.8:latest", fast_model="qwen2.5:3b")
+    model, note = select_fast_model(cfg, _Tags())
+    assert model == "qwen3.8:latest"
+    assert "qwen2.5:3b" in note
+    assert "qwen3.8:latest" in note
+
+
+def test_installed_fast_tag_stays() -> None:
+    from dossier.llm.client import select_fast_model
+
+    class _Tags:
+        def check_config(self, model: str) -> tuple[bool, str]:
+            return True, "ok"
+
+    cfg = Config(llm_model="qwen3.8:latest", fast_model="qwen2.5:3b")
+    model, note = select_fast_model(cfg, _Tags())
+    assert model == "qwen2.5:3b"
+    assert note == ""
 
 
 def test_settings_round_trip(tmp_path: Path, monkeypatch) -> None:

@@ -1,7 +1,7 @@
 """Global LLM investment presets (Rollup-style effort).
 
-``balanced`` matches today's defaults. ``light`` and ``high`` remap a few
-ask/extract knobs at resolve time. Model ladders stay for a later wave.
+``balanced`` keeps the answer model and uses the fast model for extract.
+``light`` and ``high`` remap ask/extract knobs at resolve time.
 """
 
 from __future__ import annotations
@@ -27,21 +27,29 @@ def apply_effort(cfg: "Config", effort: str | None = None) -> "Config":
     """Return a copy of *cfg* with effort overlays applied.
 
     ``balanced`` leaves loaded ask/extract knobs, timeout, and context cap
-    alone, and substitutes a model only when ``[efforts.balanced]`` sets one.
+    alone. ``[efforts.balanced] model`` overrides the answer model only.
+    The fast role stays on ``[llm] fast`` unless that preset sets ``fast``.
     ``light`` turns extract LLM off, sets ask mode to ``exact``, and caps
     context at 8192 and timeout at 120. ``high`` sets ask ``rich`` and planner
-    ``rich``, and raises timeout to 600 with the same 32768 context cap.
+    ``rich``, raises timeout to 600, and points both roles at the answer model
+    unless that preset sets ``fast``.
     """
     name = normalize_effort(effort if effort is not None else getattr(cfg, "effort", None))
     updated = replace(cfg, effort=name)
-    override = _effort_model(cfg, name)
+    override = _effort_field(cfg, name, "model")
     model = override or cfg.llm_model
+    fast_override = _effort_field(cfg, name, "fast")
+    if name == "high":
+        fast = fast_override or model
+    else:
+        fast = fast_override or cfg.llm_fast or cfg.fast_model
     if name == "light":
         return replace(
             updated,
             extract_llm=False,
             ask_mode="exact",
             llm_model=model,
+            fast_model=fast,
             llm_timeout_seconds=120.0,
             llm_max_num_ctx=8192,
         )
@@ -51,20 +59,22 @@ def apply_effort(cfg: "Config", effort: str | None = None) -> "Config":
             ask_mode="rich",
             ask_planner="rich",
             llm_model=model,
+            fast_model=fast,
             llm_timeout_seconds=600.0,
             llm_max_num_ctx=32_768,
         )
-    if override:
-        return replace(updated, llm_model=override)
-    return updated
+    return replace(updated, llm_model=model, fast_model=fast)
 
 
-def _effort_model(cfg: "Config", name: str) -> str:
+def _effort_field(cfg: "Config", name: str, key: str) -> str:
     field = {
-        "light": "effort_model_light",
-        "balanced": "effort_model_balanced",
-        "high": "effort_model_high",
-    }.get(name, "")
+        ("light", "model"): "effort_model_light",
+        ("balanced", "model"): "effort_model_balanced",
+        ("high", "model"): "effort_model_high",
+        ("light", "fast"): "effort_fast_light",
+        ("balanced", "fast"): "effort_fast_balanced",
+        ("high", "fast"): "effort_fast_high",
+    }.get((name, key), "")
     return str(getattr(cfg, field, "") or "").strip()
 
 
@@ -73,5 +83,5 @@ def effort_blurb(name: str) -> str:
     if name == "light":
         return "Extract drafts only; ask stays exact. Context 8192, timeout 120s."
     if name == "high":
-        return "Ask uses rich mode and the planner. Timeout 600s."
-    return "Same behaviour as today's defaults."
+        return "Ask and extract use the answer model. Ask is rich, with the planner. Timeout 600s."
+    return "Extract uses the fast model. Ask uses the answer model."

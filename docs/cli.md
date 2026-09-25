@@ -49,7 +49,14 @@ Split the pipeline when you want control:
 - `DOSSIER_EXTRACT_LLM=0 uv run dossier extract` — deterministic drafts only
   (no Ollama). Fast on a large corpus.
 - `uv run dossier extract --limit 20` — only the first N records without an
-  open card; useful while tuning the model.
+  open card; useful while tuning the fast model.
+
+Extract, the employer folder filter, the ask planner, and letter arrange use
+`[llm] fast` (default `qwen2.5:3b`) and send `think: false`. Ask and brief
+use `[llm] model` (default `qwen3.8:latest`). If the fast tag is not
+installed, that role uses the answer model and says so. `effort = high`
+points both roles at the answer model unless `[efforts.high] fast` is set.
+`dossier doctor` prints `model:` and `fast:`.
 - `uv run dossier brief` — answer the question pack without re-ingesting or
   re-extracting.
 
@@ -109,7 +116,8 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 
 | Variable | Use |
 | --- | --- |
-| `DOSSIER_LLM_MODEL` | Ollama tag (default `qwen3.8:latest`) |
+| `DOSSIER_LLM_MODEL` | Answer model for ask and brief (default `qwen3.8:latest`) |
+| `DOSSIER_LLM_FAST` | Fast model for extract, the employer folder filter, the ask planner, and letter arrange (default `qwen2.5:3b`). A missing tag falls back to the answer model. Extract calls send `think: false` |
 | `DOSSIER_ASK_MODE` | `exact`, `auto` (default), or `rich` |
 | `DOSSIER_ASK_FTS` | Full text on title, text, and passages (`true` by default). Whole-word overlap when this Python has no FTS5, and when full-text hits fall outside the current source or lens filter |
 | `DOSSIER_ASK_CARDS_FIRST` | Prefer an approved claim that carries the question (`true` by default) |
@@ -124,7 +132,7 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DOSSIER_REFEREE_PUBS` | Treat a name on an ingested pubs record as a coauthor (`true` by default) |
 | `DOSSIER_EMPLOYER_PATHS` | Comma-separated employer folders. `~/Documents` itself is ignored |
 | `DOSSIER_EMPLOYER_FILTER` | Skip caches, junk types, and older copies (`true` by default) |
-| `DOSSIER_EMPLOYER_FILTER_LLM` | Ask the model which remaining folders to drop (`true` by default; no call when the provider is off) |
+| `DOSSIER_EMPLOYER_FILTER_LLM` | Ask the fast model which remaining folders to drop (`true` by default; no call when the provider is off) |
 | `DOSSIER_EMPLOYER_FILTER_LLM_CALLS` | Cap for that folder pass (default `4`). Does not spend `DOSSIER_LLM_MAX_CALLS` |
 | `DOSSIER_CHATGPT_EXPORT` | ChatGPT export zip or folder, used before the warehouse |
 | `DOSSIER_SLACK_EXPORT` | Slack export zip or folder, used before the warehouse |
@@ -132,8 +140,8 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DOSSIER_GIT_USER` | Author name or email fragment. Empty keeps every author |
 | `DOSSIER_MBOX_MAX_FILES` | Max mbox files opened in one exported folder (default 40) |
 | `DOSSIER_LLM_MAX_CALLS` | Cap completions per process (`0` = unlimited, the default) |
-| `DOSSIER_EFFORT` | Global LLM investment: `light`, `balanced` (default), or `high`. Balanced keeps the loaded model, timeout, and context cap. Light caps context at 8192 and timeout at 120s and turns extract LLM off. High uses ask `rich`, planner `rich`, and a 600s timeout. `[efforts.light]`, `[efforts.balanced]`, or `[efforts.high]` may set `model` only |
-| `DOSSIER_EXTRACT_LLM` | Ask the model after drafts (`true` by default) |
+| `DOSSIER_EFFORT` | Global LLM investment: `light`, `balanced` (default), or `high`. Balanced uses the fast model for extract and the answer model for ask. Light caps context at 8192 and timeout at 120s and turns extract LLM off. High uses ask `rich`, planner `rich`, a 600s timeout, and the answer model for both roles. `[efforts.light]`, `[efforts.balanced]`, or `[efforts.high]` may set `model` and `fast` |
+| `DOSSIER_EXTRACT_LLM` | Ask the fast model after drafts (`true` by default) |
 | `DOSSIER_RUN_PACK` | Question pack for `brief` and `run` (default `career`) |
 | `DOSSIER_RUN_POSTING` | Local posting path for the posting pack |
 | `DOSSIER_RUN_ADAPTERS` | Comma-separated adapter allowlist for `run` |
