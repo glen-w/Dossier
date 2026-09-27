@@ -23,6 +23,15 @@ class LLMClientError(Exception):
 # Short JSON replies: extract, folder filter, ask planner, letter arrange.
 FAST_MAX_TOKENS = 512
 
+# When the configured fast tag is missing, use the first of these that is
+# installed. The answer model is the last resort.
+FAST_ALTERNATES = (
+    "qwen2.5:7b",
+    "llama3.2:3b",
+    "qwen3:4b",
+    "gemma3:4b",
+)
+
 # Tags that park the answer in a thinking trace and leave JSON response empty.
 _THINKING_MARKERS = ("qwen3", "deepseek-r1", "gpt-oss")
 
@@ -205,12 +214,13 @@ def get_client(cfg) -> LLMClient:
 
 
 def select_fast_model(cfg, client: LLMClient) -> tuple[str, str]:
-    """Return the fast tag to call, and a note when falling back to the answer model.
+    """Return the fast tag to call, and a note when the configured tag is missing.
 
-    A missing fast tag does not turn extract off. When the answer model is
-    installed, that tag is used instead. When neither tag is installed, the
-    preferred fast tag is returned with the client's error so the caller can
-    draft without a model.
+    A missing fast tag does not turn extract off. The first installed tag in
+    ``FAST_ALTERNATES`` is used. The answer model is used only when none of
+    those tags are installed. When nothing is installed, the preferred fast
+    tag is returned with the client's error so the caller can draft without
+    a model.
     """
     preferred = str(getattr(cfg, "fast_model", "") or "").strip()
     answer = str(getattr(cfg, "llm_model", "") or "").strip()
@@ -224,6 +234,12 @@ def select_fast_model(cfg, client: LLMClient) -> tuple[str, str]:
     ok, message = check(preferred)
     if ok:
         return preferred, ""
+    for tag in FAST_ALTERNATES:
+        if tag in {preferred, answer}:
+            continue
+        ok_alt, _msg = check(tag)
+        if ok_alt:
+            return tag, f"fast model {preferred!r} not installed; using {tag}"
     ok_answer, _ = check(answer)
     if ok_answer:
         return answer, f"fast model {preferred!r} not installed; using {answer}"

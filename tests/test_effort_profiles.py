@@ -210,6 +210,22 @@ def test_balanced_fast_override_does_not_change_answer() -> None:
     assert out.fast_model == "tiny:1b"
 
 
+def test_missing_fast_tag_uses_installed_alternate() -> None:
+    from dossier.llm.client import select_fast_model
+
+    class _Tags:
+        def check_config(self, model: str) -> tuple[bool, str]:
+            if model in {"qwen3.8:latest", "qwen2.5:7b"}:
+                return True, "ok"
+            return False, f"missing {model}"
+
+    cfg = Config(llm_model="qwen3.8:latest", fast_model="qwen2.5:3b")
+    model, note = select_fast_model(cfg, _Tags())
+    assert model == "qwen2.5:7b"
+    assert "qwen2.5:3b" in note
+    assert "qwen2.5:7b" in note
+
+
 def test_missing_fast_tag_uses_answer_model() -> None:
     from dossier.llm.client import select_fast_model
 

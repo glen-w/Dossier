@@ -6,6 +6,7 @@ import argparse
 import os
 import sqlite3
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from dossier.ask import ASK_MODES
@@ -853,6 +854,13 @@ def _pack_questions(args: argparse.Namespace, cfg: Config) -> list:
 
 
 def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
+    if cfg.llm_enabled and cfg.extract_llm and cfg.fast_model != cfg.llm_model:
+        client = get_client(cfg)
+        model, note = select_fast_model(cfg, client)
+        if note:
+            print(note, file=sys.stderr)
+        if model != cfg.fast_model:
+            cfg = replace(cfg, fast_model=model)
     targets, skipped = _detected_targets(cfg.run_adapters)
     for line in skipped:
         print(line)

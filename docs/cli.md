@@ -120,7 +120,7 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | Variable | Use |
 | --- | --- |
 | `DOSSIER_LLM_MODEL` | Answer model for ask and brief (default `qwen3.8:latest`) |
-| `DOSSIER_LLM_FAST` | Fast model for extract, the employer folder filter, the ask planner, and letter arrange (default `qwen2.5:3b`). Those calls send `think: false` and stop after 512 tokens. A missing tag falls back to the answer model |
+| `DOSSIER_LLM_FAST` | Fast model for extract, the employer folder filter, the ask planner, and letter arrange (default `qwen2.5:3b`). Those calls send `think: false` and stop after 512 tokens. A missing tag uses the first installed alternate (`qwen2.5:7b`, `llama3.2:3b`, `qwen3:4b`, `gemma3:4b`), then the answer model |
 | `DOSSIER_ASK_MODE` | `exact`, `auto` (default), or `rich` |
 | `DOSSIER_ASK_FTS` | Full text on title, text, and passages (`true` by default). Whole-word overlap when this Python has no FTS5, and when full-text hits fall outside the current source or lens filter |
 | `DOSSIER_ASK_CARDS_FIRST` | Prefer an approved claim that carries the question (`true` by default) |
