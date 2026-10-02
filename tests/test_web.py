@@ -1049,3 +1049,29 @@ def test_review_per_page_dropdown_sets_page_size(client) -> None:
     assert "showing 12 from offset 0" in big
     for n in (10, 20, 50, 100):
         assert f'<option value="{n}"' in big
+
+
+def test_review_page_year_range_filters_cards(client) -> None:
+    test_client, root = client
+    corpus = Corpus(root / "evidence.db")
+    try:
+        for n, year in enumerate(("2019", "2021")):
+            uri = f"fixture://yr{n}"
+            corpus.upsert_record(
+                Record(id=f"yr{n}", source="zotero", uri=uri, title="T", text=f"T\n\nYear: {year}\n\nBody.")
+            )
+            claim = f"Synthetic year claim {year}"
+            corpus.put_card(
+                ClaimCard(
+                    id=card_id(claim, [uri]),
+                    claim=claim,
+                    citations=[uri],
+                    source="zotero",
+                    status=STATUS_PENDING,
+                )
+            )
+    finally:
+        corpus.close()
+
+    page = test_client.get("/review?year_from=2020&year_to=2021").text
+    assert "year claim 2021" in page and "year claim 2019" not in page
