@@ -172,7 +172,8 @@ def create_app() -> FastAPI:
         source: str = "",
         lens: str = "",
         kind: str = "",
-        year: str = "",
+        year_from: str = "",
+        year_to: str = "",
         q: str = "",
         offset: int = 0,
         view: str = "list",
@@ -190,7 +191,8 @@ def create_app() -> FastAPI:
                 source=source,
                 lens=lens or None,
                 kind=kind or None,
-                year=year,
+                year_from=year_from,
+                year_to=year_to,
                 q=q,
                 offset=start,
                 limit=1 if shown == "queue" else per,
@@ -198,8 +200,7 @@ def create_app() -> FastAPI:
             payload["offset"] = start
             payload["has_more"] = start + len(payload["cards"]) < payload["total"]
             years = card_years(corpus)
-            if year and year != "(none)" and year not in years:
-                years = [year, *years]
+            years = sorted({*years, *(y for y in (year_from, year_to) if y)}, reverse=True)
             sources = card_sources(corpus)
             if source and source not in sources:
                 sources = [source, *sources]
@@ -214,7 +215,8 @@ def create_app() -> FastAPI:
                 source=source,
                 lens=lens,
                 kind=kind,
-                year=year,
+                year_from=year_from,
+                year_to=year_to,
                 years=years,
                 per=per,
                 per_choices=PER_PAGE_CHOICES,
@@ -238,7 +240,8 @@ def create_app() -> FastAPI:
         source: str = Form(""),
         lens: str = Form(""),
         kind: str = Form(""),
-        year: str = Form(""),
+        year_from: str = Form(""),
+        year_to: str = Form(""),
         status: str = Form("pending"),
         q: str = Form(""),
         view: str = Form("list"),
@@ -261,8 +264,10 @@ def create_app() -> FastAPI:
                 body["lens"] = lens
             if kind:
                 body["kind"] = kind
-            if year:
-                body["year"] = year
+            if year_from:
+                body["year_from"] = year_from
+            if year_to:
+                body["year_to"] = year_to
             apply_action(corpus, body)
             next_offset = max(0, offset)
             if shown == "queue" and id_list:
@@ -272,7 +277,8 @@ def create_app() -> FastAPI:
                     source=source,
                     lens=lens or None,
                     kind=kind or None,
-                    year=year,
+                    year_from=year_from,
+                    year_to=year_to,
                     q=q,
                     offset=next_offset,
                     limit=1,
@@ -281,7 +287,7 @@ def create_app() -> FastAPI:
                     next_offset += 1
         finally:
             corpus.close()
-        params = f"status={status}&source={source}&lens={lens}&kind={kind}&year={year}&per={per if per in PER_PAGE_CHOICES else PAGE_SIZE}&q={_q(q)}"
+        params = f"status={status}&source={source}&lens={lens}&kind={kind}&year_from={year_from}&year_to={year_to}&per={per if per in PER_PAGE_CHOICES else PAGE_SIZE}&q={_q(q)}"
         if shown == "queue":
             params += f"&view=queue&offset={next_offset}"
             if action == "defend":

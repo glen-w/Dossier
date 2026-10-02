@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from dossier.cards import carrying_span
+from dossier.scope import parse_year
 from dossier.show import store_span
 from dossier.store import Corpus
 
@@ -378,7 +379,8 @@ def list_cards(
     source: str = "",
     lens: str | None = None,
     kind: str | None = None,
-    year: str = "",
+    year_from: str = "",
+    year_to: str = "",
     q: str = "",
     offset: int = 0,
     limit: int = PAGE_SIZE,
@@ -393,7 +395,8 @@ def list_cards(
         source=source,
         lens=lens,
         kind=kind,
-        year=year,
+        year_from=year_from,
+        year_to=year_to,
         q=query,
     )
     total = int(
@@ -461,9 +464,12 @@ def apply_action(corpus: Corpus, body: dict) -> int:
     lens = _optional_facet(body, "lens") if not ids else None
     kind = _optional_facet(body, "kind") if not ids else None
     sources = () if ids else ((source,) if source else ())
-    year = str(body.get("year") or "").strip() if not ids else ""
-    if year:
-        where, params = _list_filter(status="", source=source, lens=lens, kind=kind, year=year)
+    year_from = str(body.get("year_from") or "").strip() if not ids else ""
+    year_to = str(body.get("year_to") or "").strip() if not ids else ""
+    if year_from or year_to:
+        where, params = _list_filter(
+            status="", source=source, lens=lens, kind=kind, year_from=year_from, year_to=year_to
+        )
         ids = tuple(
             str(row["id"])
             for row in corpus._conn.execute(f"SELECT id FROM cards WHERE {where}", params)
@@ -571,18 +577,23 @@ def _list_filter(
     source: str,
     lens: str | None,
     kind: str | None,
-    year: str = "",
+    year_from: str = "",
+    year_to: str = "",
     q: str = "",
 ) -> tuple[str, list]:
     clauses = ["1 = 1"]
     params: list = []
-    if year == "(none)":
-        clauses.append(f"{_YEAR_SQL} = ''")
-    elif year:
-        if not (len(year) == 4 and year.isdigit()):
-            raise ValueError("year must be four digits or (none)")
-        clauses.append(f"{_YEAR_SQL} = ?")
-        params.append(year)
+    low, high = parse_year(year_from), parse_year(year_to)
+    if low and high and low > high:
+        low, high = high, low
+    if low or high:
+        clauses.append(f"{_YEAR_SQL} != ''")
+    if low:
+        clauses.append(f"{_YEAR_SQL} >= ?")
+        params.append(str(low))
+    if high:
+        clauses.append(f"{_YEAR_SQL} <= ?")
+        params.append(str(high))
     if status:
         clauses.append("status = ?")
         params.append(status)

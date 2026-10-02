@@ -158,15 +158,18 @@ def test_list_cards_filters_by_source_record_year(corpus: Corpus) -> None:
 
     _year_corpus(corpus)
     assert card_years(corpus) == ["2021", "2019"]
-    assert [c["id"] for c in list_cards(corpus, year="2019")["cards"]] == ["y1"]
-    assert [c["id"] for c in list_cards(corpus, year="(none)")["cards"]] == ["y3"]
+    assert [c["id"] for c in list_cards(corpus, year_from="2019", year_to="2019")["cards"]] == ["y1"]
+    assert [c["id"] for c in list_cards(corpus, year_from="2020")["cards"]] == ["y2"]
+    assert [c["id"] for c in list_cards(corpus, year_to="2020")["cards"]] == ["y1"]
+    assert list_cards(corpus, year_from="2019", year_to="2021")["total"] == 2
+    assert list_cards(corpus, year_from="2021", year_to="2019")["total"] == 2
     assert list_cards(corpus)["total"] == 3
     with pytest.raises(ValueError):
-        list_cards(corpus, year="20x1")
+        list_cards(corpus, year_from="20x1")
 
 
 def test_bulk_action_respects_year(corpus: Corpus) -> None:
     _year_corpus(corpus)
-    assert apply_action(corpus, {"action": "approve", "source": "zotero", "year": "2021"}) == 1
+    assert apply_action(corpus, {"action": "approve", "source": "zotero", "year_from": "2020"}) == 1
     assert list_cards(corpus, status="approved")["total"] == 1
     assert list_cards(corpus, status="pending")["total"] == 2
