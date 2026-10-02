@@ -276,6 +276,15 @@
 <p class="meta">No cards match.</p>
 {% endfor %}
 
+{% if view == 'list' and cards.cards and not busy %}
+<p class="row">
+  <span class="meta" data-pick-count>0 selected</span>
+  <button class="primary" type="submit" form="bulk" name="action" value="approve" data-needs-pick disabled>Approve selected</button>
+  <button class="warn" type="submit" form="bulk" name="action" value="refuse" data-needs-pick disabled>Refuse selected</button>
+  <button type="submit" form="bulk" name="action" value="reopen" data-needs-pick disabled>Reopen selected</button>
+</p>
+{% endif %}
+
 {% if view != 'queue' and cards.has_more %}
 <p><a class="btn" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&year_from={{ year_from }}&year_to={{ year_to }}&per={{ per }}&q={{ q }}&view=list&offset={{ cards.offset + cards.cards|length }}">Next page</a></p>
 {% endif %}

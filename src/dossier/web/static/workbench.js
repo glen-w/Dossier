@@ -116,11 +116,11 @@
   if (!form) return;
   var boxes = Array.prototype.slice.call(document.querySelectorAll("[data-pick]"));
   var all = form.querySelector("[data-pick-all]");
-  var count = form.querySelector("[data-pick-count]");
-  var buttons = form.querySelectorAll("[data-needs-pick]");
+  var counts = document.querySelectorAll("[data-pick-count]");
+  var buttons = document.querySelectorAll("[data-needs-pick]");
   function sync() {
     var n = boxes.filter(function (b) { return b.checked; }).length;
-    if (count) count.textContent = n + " selected";
+    counts.forEach(function (c) { c.textContent = n + " selected"; });
     buttons.forEach(function (b) { b.disabled = n === 0; });
     if (all) all.checked = n > 0 && n === boxes.length;
   }

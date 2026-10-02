@@ -1075,3 +1075,24 @@ def test_review_page_year_range_filters_cards(client) -> None:
 
     page = test_client.get("/review?year_from=2020&year_to=2021").text
     assert "year claim 2021" in page and "year claim 2019" not in page
+
+
+def test_review_bulk_buttons_repeat_below_the_cards(client) -> None:
+    test_client, root = client
+    corpus = Corpus(root / "evidence.db")
+    try:
+        claim = "Synthetic bottom bar claim"
+        corpus.put_card(
+            ClaimCard(
+                id=card_id(claim, ["fixture://bb"]),
+                claim=claim,
+                citations=["fixture://bb"],
+                source="applications",
+                status=STATUS_PENDING,
+            )
+        )
+    finally:
+        corpus.close()
+    page = test_client.get("/review").text
+    assert page.count("Approve selected") == 2
+    assert page.count('form="bulk" name="action"') == 3
