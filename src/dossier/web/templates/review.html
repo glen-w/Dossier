@@ -4,8 +4,8 @@
 <p class="lede">{{ blurbs.review }} Disabled while a job holds the locker.</p>
 
 <p class="row">
-  <a class="btn {{ 'primary' if view == 'list' else '' }}" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=list">List</a>
-  <a class="btn {{ 'primary' if view == 'queue' else '' }}" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=queue">Queue</a>
+  <a class="btn {{ 'primary' if view == 'list' else '' }}" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&year={{ year }}&per={{ per }}&q={{ q }}&view=list">List</a>
+  <a class="btn {{ 'primary' if view == 'queue' else '' }}" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&year={{ year }}&per={{ per }}&q={{ q }}&view=queue">Queue</a>
 </p>
 
 <form class="row" method="get" action="/review">
@@ -50,6 +50,22 @@
       <option value="(none)" {% if kind == '(none)' %}selected{% endif %}>(none)</option>
     </select>
   </label>
+  <label class="field">Year
+    <select name="year">
+      <option value="">any year</option>
+      {% for name in years %}
+      <option value="{{ name }}" {% if year == name %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+      <option value="(none)" {% if year == '(none)' %}selected{% endif %}>(none)</option>
+    </select>
+  </label>
+  <label class="field">Per page
+    <select name="per">
+      {% for n in per_choices %}
+      <option value="{{ n }}" {% if per == n %}selected{% endif %}>{{ n }}</option>
+      {% endfor %}
+    </select>
+  </label>
   <label class="field">Search
     <input name="q" value="{{ q }}" placeholder="claim text">
   </label>
@@ -62,6 +78,8 @@
   <input type="hidden" name="source" value="{{ source }}">
   <input type="hidden" name="lens" value="{{ lens }}">
   <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
   <input type="hidden" name="status" value="{{ status }}">
   <input type="hidden" name="q" value="{{ q }}">
   <input type="hidden" name="view" value="list">
@@ -72,6 +90,8 @@
   <input type="hidden" name="source" value="{{ source }}">
   <input type="hidden" name="lens" value="{{ lens }}">
   <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
   <input type="hidden" name="status" value="{{ status }}">
   <input type="hidden" name="q" value="{{ q }}">
   <input type="hidden" name="view" value="list">
@@ -88,16 +108,38 @@
 {% if view == 'queue' %}
 <p class="row">
   {% if cards.offset > 0 %}
-  <a class="btn" data-key="j" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=queue&offset={{ cards.offset - 1 }}">Previous</a>
+  <a class="btn" data-key="j" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&year={{ year }}&per={{ per }}&q={{ q }}&view=queue&offset={{ cards.offset - 1 }}">Previous</a>
   {% endif %}
   {% if cards.has_more %}
-  <a class="btn" data-key="k" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=queue&offset={{ cards.offset + 1 }}">Next</a>
+  <a class="btn" data-key="k" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&year={{ year }}&per={{ per }}&q={{ q }}&view=queue&offset={{ cards.offset + 1 }}">Next</a>
   {% endif %}
 </p>
 {% endif %}
 
+{% if view == 'list' and cards.cards and not busy %}
+<form id="bulk" class="row" method="post" action="/review/act" data-bulk>
+  <input type="hidden" name="status" value="{{ status }}">
+  <input type="hidden" name="source" value="{{ source }}">
+  <input type="hidden" name="lens" value="{{ lens }}">
+  <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
+  <input type="hidden" name="q" value="{{ q }}">
+  <input type="hidden" name="view" value="list">
+  <input type="hidden" name="offset" value="{{ cards.offset }}">
+  <label class="field"><input type="checkbox" data-pick-all> Select all on this page</label>
+  <span class="meta" data-pick-count>0 selected</span>
+  <button class="primary" type="submit" name="action" value="approve" data-needs-pick disabled>Approve selected</button>
+  <button class="warn" type="submit" name="action" value="refuse" data-needs-pick disabled>Refuse selected</button>
+  <button type="submit" name="action" value="reopen" data-needs-pick disabled>Reopen selected</button>
+</form>
+{% endif %}
+
 {% for card in cards.cards %}
 <div class="card{% if view == 'queue' %} queue{% endif %}">
+  {% if view == 'list' and not busy %}
+  <label class="meta"><input type="checkbox" name="pick" value="{{ card.id }}" form="bulk" data-pick> Select</label>
+  {% endif %}
   <h2 class="reading">{{ card.claim }}</h2>
   {% if view == 'queue' %}
   <p class="chips">
@@ -130,6 +172,10 @@
       <input type="hidden" name="source" value="{{ source }}">
       <input type="hidden" name="lens" value="{{ lens }}">
       <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
+      <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
       <input type="hidden" name="q" value="{{ q }}">
       <input type="hidden" name="view" value="{{ view }}">
       <input type="hidden" name="offset" value="{{ cards.offset }}">
@@ -142,6 +188,10 @@
       <input type="hidden" name="source" value="{{ source }}">
       <input type="hidden" name="lens" value="{{ lens }}">
       <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
+      <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
       <input type="hidden" name="q" value="{{ q }}">
       <input type="hidden" name="view" value="{{ view }}">
       <input type="hidden" name="offset" value="{{ cards.offset }}">
@@ -154,6 +204,10 @@
       <input type="hidden" name="source" value="{{ source }}">
       <input type="hidden" name="lens" value="{{ lens }}">
       <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
+      <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
       <input type="hidden" name="q" value="{{ q }}">
       <input type="hidden" name="view" value="{{ view }}">
       <input type="hidden" name="offset" value="{{ cards.offset }}">
@@ -168,6 +222,10 @@
       <input type="hidden" name="source" value="{{ source }}">
       <input type="hidden" name="lens" value="{{ lens }}">
       <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
+      <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
       <input type="hidden" name="q" value="{{ q }}">
       <input type="hidden" name="view" value="{{ view }}">
       <input type="hidden" name="offset" value="{{ cards.offset }}">
@@ -181,6 +239,10 @@
       <input type="hidden" name="source" value="{{ source }}">
       <input type="hidden" name="lens" value="{{ lens }}">
       <input type="hidden" name="kind" value="{{ kind }}">
+  <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
+      <input type="hidden" name="year" value="{{ year }}">
+  <input type="hidden" name="per" value="{{ per }}">
       <input type="hidden" name="q" value="{{ q }}">
       <input type="hidden" name="view" value="{{ view }}">
       <input type="hidden" name="offset" value="{{ cards.offset }}">
@@ -195,6 +257,6 @@
 {% endfor %}
 
 {% if view != 'queue' and cards.has_more %}
-<p><a class="btn" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&q={{ q }}&view=list&offset={{ cards.offset + cards.cards|length }}">Next page</a></p>
+<p><a class="btn" href="/review?status={{ status }}&source={{ source }}&lens={{ lens }}&kind={{ kind }}&year={{ year }}&per={{ per }}&q={{ q }}&view=list&offset={{ cards.offset + cards.cards|length }}">Next page</a></p>
 {% endif %}
 {% endblock %}

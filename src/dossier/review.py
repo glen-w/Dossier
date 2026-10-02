@@ -11,6 +11,7 @@ from dossier.show import store_span
 from dossier.store import Corpus
 
 PAGE_SIZE = 20
+PER_PAGE_CHOICES = (10, 20, 50, 100)
 _FACETS = ("lens", "kind")
 _STATUSES = frozenset({"", "pending", "approved", "refused"})
 _SNIPPET = 400
@@ -362,6 +363,14 @@ def card_sources(corpus: Corpus) -> list[str]:
     return [str(row["source"]) for row in rows]
 
 
+def card_years(corpus: Corpus) -> list[str]:
+    """Distinct source-record years behind the cards, newest first."""
+    rows = corpus._conn.execute(
+        f"SELECT DISTINCT {_YEAR_SQL} AS year FROM cards WHERE {_YEAR_SQL} != '' ORDER BY year DESC"
+    ).fetchall()
+    return [str(row["year"]) for row in rows]
+
+
 def list_cards(
     corpus: Corpus,
     *,
@@ -369,6 +378,7 @@ def list_cards(
     source: str = "",
     lens: str | None = None,
     kind: str | None = None,
+    year: str = "",
     q: str = "",
     offset: int = 0,
     limit: int = PAGE_SIZE,
@@ -383,6 +393,7 @@ def list_cards(
         source=source,
         lens=lens,
         kind=kind,
+        year=year,
         q=query,
     )
     total = int(
@@ -450,6 +461,17 @@ def apply_action(corpus: Corpus, body: dict) -> int:
     lens = _optional_facet(body, "lens") if not ids else None
     kind = _optional_facet(body, "kind") if not ids else None
     sources = () if ids else ((source,) if source else ())
+    year = str(body.get("year") or "").strip() if not ids else ""
+    if year:
+        where, params = _list_filter(status="", source=source, lens=lens, kind=kind, year=year)
+        ids = tuple(
+            str(row["id"])
+            for row in corpus._conn.execute(f"SELECT id FROM cards WHERE {where}", params)
+        )
+        if not ids:
+            return 0
+        lens = kind = None
+        sources = ()
     if action == "defend":
         return _defend_matching(corpus, ids=ids, source=source, lens=lens, kind=kind)
     if action == "approve":
@@ -532,16 +554,35 @@ def _optional_facet(body: dict, key: str) -> str | None:
     return str(body[key])
 
 
+# Year of the first cited record, read from its "Year: YYYY" line; '' when absent.
+_YEAR_SQL = """COALESCE((
+    SELECT CASE
+        WHEN instr(char(10) || r.text, char(10) || 'Year: ') > 0
+         AND substr(r.text, instr(char(10) || r.text, char(10) || 'Year: ') + 6, 4) GLOB '[0-9][0-9][0-9][0-9]'
+        THEN substr(r.text, instr(char(10) || r.text, char(10) || 'Year: ') + 6, 4)
+        ELSE '' END
+    FROM records r WHERE r.uri = json_extract(cards.citations, '$[0]')
+), '')"""
+
+
 def _list_filter(
     *,
     status: str,
     source: str,
     lens: str | None,
     kind: str | None,
+    year: str = "",
     q: str = "",
 ) -> tuple[str, list]:
     clauses = ["1 = 1"]
     params: list = []
+    if year == "(none)":
+        clauses.append(f"{_YEAR_SQL} = ''")
+    elif year:
+        if not (len(year) == 4 and year.isdigit()):
+            raise ValueError("year must be four digits or (none)")
+        clauses.append(f"{_YEAR_SQL} = ?")
+        params.append(year)
     if status:
         clauses.append("status = ?")
         params.append(status)

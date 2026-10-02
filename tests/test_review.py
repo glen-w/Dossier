@@ -142,3 +142,31 @@ def test_summary_route_stays_on_loopback(corpus: Corpus) -> None:
     assert found["summary"]["sources"][0]["source"] == "mbox"
     assert found["acted"]["changed"] == 1
     assert corpus.get_card("a").status == "approved"
+
+
+def _year_corpus(corpus: Corpus) -> None:
+    for card_id, year in (("y1", "2019"), ("y2", "2021"), ("y3", "")):
+        text = f"Title\n\nYear: {year}\n\nBody." if year else "Title\n\nBody."
+        corpus.upsert_record(
+            Record(id=f"r{card_id}", source="zotero", uri=f"fixture://{card_id}", title="T", text=text)
+        )
+        corpus.put_card(_card(card_id, "zotero", "delivered"))
+
+
+def test_list_cards_filters_by_source_record_year(corpus: Corpus) -> None:
+    from dossier.review import card_years
+
+    _year_corpus(corpus)
+    assert card_years(corpus) == ["2021", "2019"]
+    assert [c["id"] for c in list_cards(corpus, year="2019")["cards"]] == ["y1"]
+    assert [c["id"] for c in list_cards(corpus, year="(none)")["cards"]] == ["y3"]
+    assert list_cards(corpus)["total"] == 3
+    with pytest.raises(ValueError):
+        list_cards(corpus, year="20x1")
+
+
+def test_bulk_action_respects_year(corpus: Corpus) -> None:
+    _year_corpus(corpus)
+    assert apply_action(corpus, {"action": "approve", "source": "zotero", "year": "2021"}) == 1
+    assert list_cards(corpus, status="approved")["total"] == 1
+    assert list_cards(corpus, status="pending")["total"] == 2

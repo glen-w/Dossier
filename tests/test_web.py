@@ -984,3 +984,68 @@ def test_gui_cli_missing_extra_message(monkeypatch) -> None:
     # Invalid host is checked inside web main after import.
     code = main(["gui", "--host", "0.0.0.0", "--port", "8766"])
     assert code == 2
+
+
+def test_review_bulk_pick_acts_on_selected_cards_only(client) -> None:
+    test_client, root = client
+    ids = []
+    corpus = Corpus(root / "evidence.db")
+    try:
+        for n in range(3):
+            claim = f"Synthetic pick claim {n}"
+            cid = card_id(claim, [f"fixture://pick{n}"])
+            ids.append(cid)
+            corpus.put_card(
+                ClaimCard(
+                    id=cid,
+                    claim=claim,
+                    citations=[f"fixture://pick{n}"],
+                    source="applications",
+                    status=STATUS_PENDING,
+                )
+            )
+    finally:
+        corpus.close()
+
+    page = test_client.get("/review?status=pending").text
+    assert 'name="pick"' in page and "data-pick-all" in page
+
+    resp = test_client.post(
+        "/review/act",
+        data={"action": "refuse", "pick": ids[:2], "status": "pending", "view": "list"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 303
+    corpus = Corpus(root / "evidence.db")
+    try:
+        assert {c.id for c in corpus.cards("refused")} == set(ids[:2])
+        assert {c.id for c in corpus.cards("pending")} == {ids[2]}
+    finally:
+        corpus.close()
+
+
+def test_review_per_page_dropdown_sets_page_size(client) -> None:
+    test_client, root = client
+    corpus = Corpus(root / "evidence.db")
+    try:
+        for n in range(12):
+            claim = f"Synthetic per-page claim {n}"
+            corpus.put_card(
+                ClaimCard(
+                    id=card_id(claim, [f"fixture://pp{n}"]),
+                    claim=claim,
+                    citations=[f"fixture://pp{n}"],
+                    source="applications",
+                    status=STATUS_PENDING,
+                )
+            )
+    finally:
+        corpus.close()
+
+    small = test_client.get("/review?per=10").text
+    assert "showing 10 from offset 0" in small
+    assert "per=10" in small and "offset=10" in small
+    big = test_client.get("/review?per=50").text
+    assert "showing 12 from offset 0" in big
+    for n in (10, 20, 50, 100):
+        assert f'<option value="{n}"' in big

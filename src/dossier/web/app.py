@@ -42,7 +42,7 @@ from dossier.profiles import (
     list_profiles,
     save_profile,
 )
-from dossier.review import PAGE_SIZE, apply_action, card_sources, list_cards, summary
+from dossier.review import PAGE_SIZE, PER_PAGE_CHOICES, apply_action, card_sources, card_years, list_cards, summary
 from dossier.scope import (
     RequestScope,
     apply_request_scope,
@@ -172,27 +172,34 @@ def create_app() -> FastAPI:
         source: str = "",
         lens: str = "",
         kind: str = "",
+        year: str = "",
         q: str = "",
         offset: int = 0,
         view: str = "list",
+        per: int = PAGE_SIZE,
     ) -> HTMLResponse:
         cfg, corpus = _open()
         try:
             status_key = status if status in {"", "pending", "approved", "refused"} else "pending"
             shown = view if view in {"list", "queue"} else "list"
             start = max(0, offset)
+            per = per if per in PER_PAGE_CHOICES else PAGE_SIZE
             payload = list_cards(
                 corpus,
                 status=status_key,
                 source=source,
                 lens=lens or None,
                 kind=kind or None,
+                year=year,
                 q=q,
                 offset=start,
-                limit=1 if shown == "queue" else PAGE_SIZE,
+                limit=1 if shown == "queue" else per,
             )
             payload["offset"] = start
             payload["has_more"] = start + len(payload["cards"]) < payload["total"]
+            years = card_years(corpus)
+            if year and year != "(none)" and year not in years:
+                years = [year, *years]
             sources = card_sources(corpus)
             if source and source not in sources:
                 sources = [source, *sources]
@@ -207,6 +214,10 @@ def create_app() -> FastAPI:
                 source=source,
                 lens=lens,
                 kind=kind,
+                year=year,
+                years=years,
+                per=per,
+                per_choices=PER_PAGE_CHOICES,
                 q=q,
                 view=shown,
                 sources=sources,
@@ -223,13 +234,16 @@ def create_app() -> FastAPI:
     async def review_act(
         action: str = Form(...),
         ids: str = Form(""),
+        pick: list[str] = Form([]),
         source: str = Form(""),
         lens: str = Form(""),
         kind: str = Form(""),
+        year: str = Form(""),
         status: str = Form("pending"),
         q: str = Form(""),
         view: str = Form("list"),
         offset: int = Form(0),
+        per: int = Form(PAGE_SIZE),
     ) -> RedirectResponse:
         if RUNNER.busy():
             return RedirectResponse("/review?err=busy", status_code=303)
@@ -238,6 +252,7 @@ def create_app() -> FastAPI:
         try:
             body: dict[str, Any] = {"action": action}
             id_list = [part.strip() for part in ids.split(",") if part.strip()]
+            id_list += [item.strip() for item in pick if item.strip() and item.strip() not in id_list]
             if id_list:
                 body["ids"] = id_list
             if source:
@@ -246,6 +261,8 @@ def create_app() -> FastAPI:
                 body["lens"] = lens
             if kind:
                 body["kind"] = kind
+            if year:
+                body["year"] = year
             apply_action(corpus, body)
             next_offset = max(0, offset)
             if shown == "queue" and id_list:
@@ -255,6 +272,7 @@ def create_app() -> FastAPI:
                     source=source,
                     lens=lens or None,
                     kind=kind or None,
+                    year=year,
                     q=q,
                     offset=next_offset,
                     limit=1,
@@ -263,7 +281,7 @@ def create_app() -> FastAPI:
                     next_offset += 1
         finally:
             corpus.close()
-        params = f"status={status}&source={source}&lens={lens}&kind={kind}&q={_q(q)}"
+        params = f"status={status}&source={source}&lens={lens}&kind={kind}&year={year}&per={per if per in PER_PAGE_CHOICES else PAGE_SIZE}&q={_q(q)}"
         if shown == "queue":
             params += f"&view=queue&offset={next_offset}"
             if action == "defend":
