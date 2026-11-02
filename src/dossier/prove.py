@@ -252,8 +252,8 @@ def _run_prove_body(
             print(f"lens {lens}: {report.lens_counts[lens]}")
         if report.empty_lenses:
             print("empty: " + ", ".join(report.empty_lenses))
-        for line in report.singles:
-            print(f"single {line.lens}/{line.kind} {line.card.id}  {line.card.claim}")
+        for gap in report.singles:
+            print(f"single {gap.lens}/{gap.kind} {gap.card.id}  {gap.card.claim}")
 
         packet = write_packet(corpus, root / "packets")
         ledger.packet_path = str(packet)

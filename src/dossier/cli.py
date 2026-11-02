@@ -160,9 +160,14 @@ def main(argv: list[str] | None = None) -> int:
     p_tailor.add_argument("--kind", choices=("cv", "letter"), default="cv")
     p_tailor.add_argument(
         "--format",
-        choices=("markdown", "json-resume"),
+        choices=("markdown", "json-resume", "html", "docx", "pdf"),
         default="markdown",
         dest="fmt",
+    )
+    p_tailor.add_argument(
+        "--with-sources",
+        action="store_true",
+        help="Append the cited record URIs for you to check (not for sending)",
     )
     p_tailor.add_argument(
         "--arrange",
@@ -175,7 +180,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_match.add_argument("--posting", type=Path, required=True)
     _add_scope_flags(p_match)
-    sub.add_parser("index", help="Embed passages into evidence.db with the local model")
+    p_index = sub.add_parser(
+        "index", help="Embed passages into evidence.db with the local model (resumable)"
+    )
+    p_index.add_argument(
+        "--sources",
+        help="Comma-separated sources to embed this run (default: every source)",
+    )
+    p_index.add_argument(
+        "--limit", type=int, help="Embed at most this many passages this run"
+    )
 
     p_doc = sub.add_parser("doctor", help="Print local readiness without writing")
     p_doc.add_argument(
@@ -206,6 +220,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p_eval = sub.add_parser("eval", help="Run the synthetic golden set")
     p_eval.add_argument("--path", type=Path, help="JSON golden set (default: bundled)")
+    p_eval.add_argument(
+        "--retrieval",
+        action="store_true",
+        help="Also report recall@k and MRR on a generated locker (no model needed)",
+    )
 
     p_exp = sub.add_parser("export", help="Write cards, spans, and answers as JSON")
     p_exp.add_argument("--out", type=Path, required=True)
@@ -324,7 +343,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "match":
             return _match(args, cfg, corpus)
         if args.cmd == "index":
-            return _index(cfg, corpus)
+            return _index(
+                cfg,
+                corpus,
+                sources=tuple(
+                    part.strip()
+                    for part in (getattr(args, "sources", None) or "").split(",")
+                    if part.strip()
+                ),
+                limit=getattr(args, "limit", None),
+            )
         if args.cmd == "audit-cards":
             return _audit_cards(corpus, write_ids=getattr(args, "write_ids", False))
         if args.cmd == "backup":
@@ -338,6 +366,10 @@ def main(argv: list[str] | None = None) -> int:
 
             report = run_eval(corpus, path=getattr(args, "path", None))
             print(report)
+            if getattr(args, "retrieval", False):
+                from dossier.eval import retrieval_metrics
+
+                print(retrieval_metrics())
             return 0 if report.ok else 1
         if args.cmd == "export":
             from dossier.portability import export_locker
@@ -1151,6 +1183,11 @@ def _tailor(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
         path.write_text(text, encoding="utf-8")
         print(path)
         return 0
+    fmt = getattr(args, "fmt", "markdown")
+    if fmt in ("html", "docx", "pdf"):
+        return _tailor_render(
+            args, cfg, corpus, posting=posting, picked=picked, bare=bare, paragraphs=paragraphs, fmt=fmt
+        )
     text = render_draft(
         kind=args.kind,
         posting=posting,
@@ -1161,6 +1198,50 @@ def _tailor(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
         paragraphs=paragraphs,
     )
     path = write_draft(text, Path(cfg.data_dir) / "drafts", prompt_stamp=prompt_stamp)
+    print(path)
+    if not picked:
+        print("nothing to quote; approve and defend first", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _tailor_render(
+    args: argparse.Namespace,
+    cfg: Config,
+    corpus: Corpus,
+    *,
+    posting: str,
+    picked: list,
+    bare: list,
+    paragraphs: list[str] | None,
+    fmt: str,
+) -> int:
+    """HTML, DOCX, or PDF from the same typed draft. Layout only; no prose is added."""
+    from dossier.render import RenderError, Theme, write_render
+    from dossier.tailor import build_doc, linkedin_subtitle
+
+    doc = build_doc(
+        kind=args.kind,
+        posting=posting,
+        picked=picked,
+        bare=bare,
+        name=cfg.cv_name,
+        subtitle=linkedin_subtitle(corpus),
+        contact=cfg.render_contact,
+        paragraphs=paragraphs,
+        with_sources=bool(getattr(args, "with_sources", False)),
+    )
+    theme = Theme(
+        font_pt=cfg.render_font_pt,
+        margin_mm=cfg.render_margin_mm,
+        page=cfg.render_page,
+        accent=cfg.render_accent,
+    )
+    try:
+        path = write_render(doc, fmt, Path(cfg.data_dir) / "drafts", theme)
+    except RenderError as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        return 2
     print(path)
     if not picked:
         print("nothing to quote; approve and defend first", file=sys.stderr)
@@ -1223,6 +1304,9 @@ def _doctor(cfg: Config, *, deep: bool = False) -> int:
         print(f"ask.planner: {cfg.ask_planner}")
         print(f"embed_model: {cfg.embed_model}")
         print(f"vectors: {corpus.vector_count(cfg.embed_model)}")
+        from dossier.vecindex import backend as _vec_backend
+
+        print(f"vector_search: {_vec_backend().name}")
         print(f"ask.pubs: {'yes' if cfg.ask_pubs else 'no'}")
         print(f"pubs_url: {cfg.pubs_url}")
         from dossier.cards import span_is_usable
@@ -1313,6 +1397,10 @@ def _doctor_deep(corpus: Corpus) -> None:
             print(f"orphan_card {card.id}")
     missing = [uri for uri in cited if corpus.get_record(uri) is None]
     print(f"orphan_citations: {len(missing)}")
+    from dossier.show import stale_spans
+
+    print(f"stale_spans: {len(stale_spans(corpus))}")
+    print(f"schema: v{corpus.schema_version()}")
 
 
 def _client_for_mode(cfg: Config, mode: str) -> tuple[LLMClient, int | None]:
@@ -1329,7 +1417,13 @@ def _detected_targets(
     return detected_targets_report(allowlist)
 
 
-def _index(cfg: Config, corpus: Corpus) -> int:
+def _index(
+    cfg: Config,
+    corpus: Corpus,
+    *,
+    sources: tuple[str, ...] = (),
+    limit: int | None = None,
+) -> int:
     from dossier.embed import EmbedError, OllamaEmbedder, index_passages
     from dossier.llm.validate import LlmConfigError, validate_ollama_url
 
@@ -1352,7 +1446,7 @@ def _index(cfg: Config, corpus: Corpus) -> int:
         print(f"index: skipped ({msg})")
         return 0
     try:
-        count = index_passages(corpus, embedder)
+        count = index_passages(corpus, embedder, sources=sources, limit=limit)
     except (EmbedError, LlmConfigError) as exc:
         print(f"index: skipped ({exc})")
         return 0

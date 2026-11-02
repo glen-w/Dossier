@@ -30,6 +30,7 @@ from dossier.lists import (
 )
 from dossier.seekers.hits import Hit
 from dossier.sources.warehouse import has_table
+from dossier.util import to_int
 
 
 def hunt_mail(conn: duckdb.DuckDBPyConnection) -> list[Hit]:
@@ -83,7 +84,7 @@ def _noise_params(has_signals: bool) -> list[str]:
 
 def _year(value: object) -> int:
     try:
-        return int(value) if value is not None else 0
+        return to_int(value)
     except (TypeError, ValueError):
         return 0
 

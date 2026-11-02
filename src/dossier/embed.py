@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import struct
 from collections.abc import Callable
+from typing import Protocol
 
 import httpx
 
@@ -16,6 +17,14 @@ BATCH = 16
 
 class EmbedError(Exception):
     """The embedder could not return vectors."""
+
+
+class Embedder(Protocol):
+    model: str
+
+    def check(self) -> tuple[bool, str]: ...
+
+    def embed(self, texts: list[str]) -> list[list[float]]: ...
 
 
 class OllamaEmbedder:
@@ -71,29 +80,86 @@ class OllamaEmbedder:
         return out
 
 
+PAGE = BATCH * 8
+
+
+class HashEmbedder:
+    """Deterministic bag-of-words vectors. No model and no network.
+
+    For tests and the retrieval eval, so CI never needs Ollama. Words hash into
+    `dim` buckets, so texts that share words are close and texts that do not are not.
+    """
+
+    def __init__(self, model: str = "hash-bow", dim: int = 64) -> None:
+        self.model = model
+        self.dim = dim
+
+    def check(self) -> tuple[bool, str]:
+        return True, "ok"
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        import hashlib
+        import re
+
+        out: list[list[float]] = []
+        for text in texts:
+            vec = [0.0] * self.dim
+            for word in re.findall(r"[a-z0-9]{3,}", text.lower()):
+                digest = hashlib.sha256(word.encode()).digest()
+                bucket = int.from_bytes(digest[:4], "little") % self.dim
+                sign = 1.0 if digest[4] % 2 == 0 else -1.0
+                vec[bucket] += sign
+            if not any(vec):
+                vec[0] = 1.0
+            out.append(vec)
+        return out
+
+
 def index_passages(
     corpus: Corpus,
-    embedder: OllamaEmbedder,
+    embedder: Embedder,
     *,
     on_batch: Callable[[int, int], None] | None = None,
+    sources: tuple[str, ...] = (),
+    limit: int | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> int:
-    """Store vectors for passages missing this model. Returns how many exist."""
+    """Store vectors for passages missing this model. Returns how many exist.
+
+    Each page is committed, so a stop or a crash keeps what was embedded and the
+    next run resumes with what is still missing. `sources` and `limit` narrow a run.
+    A model that now returns a different vector size is refused, never mixed in.
+    """
     model = embedder.model
     corpus.drop_other_vectors(model)
-    missing = corpus.passages_missing_vector(model)
-    total = len(missing)
+    total = corpus.count_missing_vectors(model, sources=sources)
+    if limit is not None:
+        total = min(total, max(0, int(limit)))
     done = 0
     if on_batch is not None:
         on_batch(done, total)
-    with corpus.batch():
-        for start in range(0, total, BATCH):
-            chunk = missing[start : start + BATCH]
-            vectors = embedder.embed([text for _uri, _ordinal, text in chunk])
-            for (uri, ordinal, _text), vector in zip(chunk, vectors, strict=True):
-                corpus.upsert_vector(uri, ordinal, model, vector)
-            done += len(chunk)
-            if on_batch is not None:
-                on_batch(done, total)
+    dim = corpus.vector_dim(model)
+    while done < total:
+        if should_stop is not None and should_stop():
+            break
+        page = corpus.passages_missing_vector(model, limit=min(PAGE, total - done), sources=sources)
+        if not page:
+            break
+        with corpus.batch():
+            for start in range(0, len(page), BATCH):
+                chunk = page[start : start + BATCH]
+                vectors = embedder.embed([text for _uri, _ordinal, text in chunk])
+                for (uri, ordinal, _text), vector in zip(chunk, vectors, strict=True):
+                    if dim and len(vector) != dim:
+                        raise EmbedError(
+                            f"{model} returned {len(vector)} numbers, the locker holds {dim}; "
+                            "the model changed. Run `dossier index` after dropping its vectors."
+                        )
+                    dim = dim or len(vector)
+                    corpus.upsert_vector(uri, ordinal, model, vector)
+                done += len(chunk)
+                if on_batch is not None:
+                    on_batch(done, total)
     return corpus.vector_count(model)
 
 

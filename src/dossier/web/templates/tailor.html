@@ -13,6 +13,17 @@
         <option value="letter" {% if kind_value == 'letter' %}selected{% endif %}>letter</option>
       </select>
     </label>
+    <label class="field">Format
+      <select name="fmt">
+        <option value="markdown">markdown</option>
+        <option value="html">html (print to PDF)</option>
+        <option value="docx">docx</option>
+        <option value="pdf">pdf</option>
+      </select>
+    </label>
+    <label class="field">Sources
+      <input type="checkbox" name="with_sources" value="1"> list cited records
+    </label>
     <label class="field">Arrange
       <input type="checkbox" name="arrange" value="1"> letter only
     </label>
@@ -22,6 +33,11 @@
 <div id="job-result">
 {% if result %}
 <p class="meta">{{ result.path }}</p>
+{% if result.file %}
+<p><a class="primary" href="/tailor/file?name={{ result.file|urlencode }}">Download {{ result.file }}</a></p>
+{% elif result.render_error %}
+<div class="err">{{ result.render_error }}</div>
+{% endif %}
 <pre>{{ result.body }}</pre>
 {% elif job and job.status == 'error' %}
 <div class="err">{{ job.error or 'Tailor job failed.' }}</div>

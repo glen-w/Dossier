@@ -10,6 +10,7 @@ uv sync --extra dev
 uv sync --extra web     # workbench (dossier gui / review)
 uv sync --extra office  # PDF text (Word and PowerPoint use the standard library)
 uv sync --extra vec     # optional sqlite-vec; pure Python stays the default
+uv sync --extra render  # tailor --format pdf (bundled font; html and docx need nothing)
 uv run dossier --help
 uv run dossier doctor
 uv run dossier doctor --deep
@@ -30,7 +31,7 @@ overlap is the fallback when this interpreter was built without the module.
 - `employer_paths:` and `git_paths:` — how many folders you listed
 - `tailor:` — how many spanned approved cards a posting draft can quote. What that draft contains is in [status](status.md).
 - Warnings when Slack or meetings detect but identity is empty, when a pubs collection is set but `rows=0`, when a stored span exceeds `SPAN_MAX`, or when mbox records cite hard-closed folders (`mbox_sent_metadata`)
-- `--deep` — integrity check, span-length histogram, FTS parity, orphan cards
+- `--deep` — integrity check, span-length histogram, FTS parity, orphan cards, stale spans (a stored span its record no longer holds), schema version
 
 Invalid `$DOSSIER_DATA/dossier.toml` fails the process with exit code 2 (`FAIL:` on stderr) instead of silently using empty config.
 
@@ -62,6 +63,26 @@ Text leaves the machine only if you opt into a remote LLM. That is `DOSSIER_LLM_
 
 Copy `dossier.example.toml` to `$DOSSIER_DATA/dossier.toml` to change
 defaults; environment variables win. Bad TOML fails load (exit 2).
+
+## Upgrading an existing locker
+
+Opening a locker runs numbered migrations. When it already holds records,
+Dossier first copies it to `evidence.pre-v<N>.db` next to it (gitignored, and
+not overwritten on the next open). A locker written by a newer Dossier is
+refused rather than opened. Before you re-span a large locker, in order:
+
+```text
+uv run dossier backup
+uv run dossier doctor --deep
+uv run dossier defend --refresh --dry-run   # length histogram, nothing written
+uv run dossier defend --refresh
+uv run dossier audit-cards                  # approved cards the span rule would refuse
+uv run dossier reopen --from-audit          # sends them back to pending for you to review
+uv run dossier index --sources slack        # optional, resumable; repeat to finish
+```
+
+None of these approve a card. `reopen` is the only status change, and it only
+returns a card to pending.
 
 ## Docs site (optional)
 

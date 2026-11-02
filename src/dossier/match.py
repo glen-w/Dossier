@@ -30,6 +30,7 @@ from dossier.cards import (
     carrying_span,
     content_token_set,
     content_tokens,
+    current_span,
     evidence_carries,
     header_values,
     sentences,
@@ -335,7 +336,7 @@ def _approved_rows(
         if card.id in seen_ids:
             continue
         seen_ids.add(card.id)
-        span = (card.extras.get("span") or "").strip()
+        span = current_span(corpus, card)
         if not span or not _shares_specific(requirement, span):
             continue
         if not carrying_span(requirement, span):

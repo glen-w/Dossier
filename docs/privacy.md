@@ -19,6 +19,8 @@ Loopback calls that are not that exception:
 - Pubs search defaults to `http://127.0.0.1:8012` and `ask.pubs` is off. A non-loopback pubs URL is not contacted.
 - `dossier referees` reads Twenty only when both `DOSSIER_TWENTY_API_URL` and `DOSSIER_TWENTY_API_KEY` are set. The URL must be loopback, or `DOSSIER_TWENTY_ALLOW_REMOTE=true`. The request is a fixed people query, not your corpus. It does not write Twenty. The workbench prints the same egress notice when that remote read is allowed.
 
+Rendering a CV or letter (`tailor --format html|docx|pdf`) makes no network call. Drafts, including the PDF and DOCX, stay under the gitignored `data/drafts/`.
+
 Before every push, run `python3 scripts/release/check_gitignore.py`. It fails if `.gitignore` drops a personal-data pattern or if a corpus, export, or secret is already tracked. Do not push when it fails.
 
 Also off git: dumps, DuckDB, LanceDB, `.env`, mbox, PDFs, office exports, and local `assessments/`. Slack ids, speaker names, the mail-folder map, and include/exclude phrase edits live only in gitignored `$DOSSIER_DATA/dossier.toml`. Invalid TOML fails load instead of silently using empty config.

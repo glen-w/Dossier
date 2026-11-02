@@ -185,6 +185,7 @@ def test_packet_quotes_spanned_cards_and_lists_the_rest(corpus: Corpus, tmp_path
         source="slack",
         status=STATUS_APPROVED,
     )
+    corpus.upsert_record(_record("slack://1", "Drafted the ocean chapter for the report."))
     corpus.put_card(quoted)
     corpus.put_card(bare)
     text = render_packet(corpus)

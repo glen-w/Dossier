@@ -11,8 +11,8 @@ from dossier.cards import (
     STATUS_APPROVED,
     ClaimCard,
     content_token_set,
+    current_span,
     header_values,
-    span_is_usable,
 )
 from dossier.lenses import infer_skills, kinds_mentioned
 from dossier.llm.client import (
@@ -23,6 +23,7 @@ from dossier.llm.client import (
     ctx_tokens_for,
 )
 from dossier.prompts import ARRANGE_BODY, active_prompt, render
+from dossier.render import DraftDoc, Entry, Section, to_markdown
 from dossier.store import Corpus
 
 CV_CAP = 8
@@ -47,8 +48,8 @@ def select_cards(corpus: Corpus, posting: str, *, limit: int) -> tuple[list[Pick
     picked: list[Picked] = []
     bare: list[ClaimCard] = []
     for card in corpus.cards(STATUS_APPROVED):
-        span = (card.extras.get("span") or "").strip()
-        if not span or not span_is_usable(card.claim, span):
+        span = current_span(corpus, card)
+        if not span:
             bare.append(card)
             continue
         lens, kind = _lens_kind(corpus, card)
@@ -73,6 +74,39 @@ def linkedin_subtitle(corpus: Corpus) -> str:
     return ""
 
 
+def build_doc(
+    *,
+    kind: str,
+    posting: str,
+    picked: list[Picked],
+    bare: list[ClaimCard],
+    name: str = "",
+    subtitle: str = "",
+    contact: str = "",
+    paragraphs: list[str] | None = None,
+    with_sources: bool = False,
+) -> DraftDoc:
+    """The typed document every format is laid out from. Spans are copied, never edited."""
+    body: tuple[str, ...] = ()
+    sections: tuple[Section, ...] = ()
+    if kind == "letter":
+        source = paragraphs if paragraphs else [item.card.extras["span"].strip() for item in picked]
+        body = tuple(source)
+    else:
+        sections = tuple(_cv_doc_sections(picked))
+    return DraftDoc(
+        kind="letter" if kind == "letter" else "cv",
+        name=name.strip(),
+        subtitle=subtitle.strip(),
+        contact=contact.strip(),
+        paragraphs=body,
+        sections=sections,
+        not_included=tuple((card.id, card.claim) for card in bare),
+        coverage=tuple(coverage_lines(posting, picked)),
+        with_sources=with_sources,
+    )
+
+
 def render_draft(
     *,
     kind: str,
@@ -83,24 +117,18 @@ def render_draft(
     subtitle: str = "",
     paragraphs: list[str] | None = None,
 ) -> str:
-    lines = ["# Letter" if kind == "letter" else "# CV", ""]
-    if name.strip():
-        lines.extend([name.strip(), ""])
-    if kind != "letter" and subtitle.strip():
-        lines.extend([subtitle.strip(), ""])
-    if kind == "letter":
-        body = paragraphs if paragraphs else [item.card.extras["span"].strip() for item in picked]
-        for paragraph in body:
-            lines.extend([paragraph, ""])
-    else:
-        lines.extend(_cv_sections(picked))
-    if bare:
-        lines.extend(["# Not included", ""])
-        for card in bare:
-            lines.append(f"- {card.id}: {card.claim}")
-        lines.append("")
-    lines.extend(_coverage(posting, picked))
-    return "\n".join(lines).rstrip() + "\n"
+    """Markdown draft. Same text as before; `build_doc` plus `render.to_markdown`."""
+    return to_markdown(
+        build_doc(
+            kind=kind,
+            posting=posting,
+            picked=picked,
+            bare=bare,
+            name=name,
+            subtitle=subtitle,
+            paragraphs=paragraphs,
+        )
+    )
 
 
 def render_json_resume(
@@ -205,30 +233,27 @@ def _accept(raw: list, spans: list[str]) -> list[str] | None:
     return out
 
 
-def _cv_sections(picked: list[Picked]) -> list[str]:
-    lines: list[str] = []
+def _cv_doc_sections(picked: list[Picked]) -> list[Section]:
     groups: dict[str, list[Picked]] = {}
     for item in picked:
         groups.setdefault(item.lens or "other", []).append(item)
+    sections: list[Section] = []
     for lens in sorted(groups):
-        lines.extend([f"## {lens}", ""])
+        entries = []
         for item in groups[lens]:
-            span = item.card.extras["span"].strip()
             uri = (item.card.extras.get("span_uri") or "").strip() or (
                 item.card.citations[0] if item.card.citations else ""
             )
-            lines.append(f"- {item.card.claim}")
-            lines.append("")
-            lines.append(f"> {span}")
-            lines.append("")
-            if uri:
-                lines.append(f"citation: {uri}")
-                lines.append("")
-    return lines
+            entries.append(
+                Entry(claim=item.card.claim, span=item.card.extras["span"].strip(), uri=uri)
+            )
+        sections.append(Section(heading=lens, entries=tuple(entries)))
+    return sections
 
 
-def _coverage(posting: str, picked: list[Picked]) -> list[str]:
-    lines = ["# Coverage", ""]
+def coverage_lines(posting: str, picked: list[Picked]) -> list[str]:
+    """Which posting kinds and skills have a card. Labels and names, never prose."""
+    lines: list[str] = []
     kind_hit, kind_miss = _split(
         kinds_mentioned(posting),
         lambda name: any(item.kind == name or _mentions(item, name) for item in picked),
@@ -243,7 +268,6 @@ def _coverage(posting: str, picked: list[Picked]) -> list[str]:
     lines.append("matched skills: " + (", ".join(skill_hit) if skill_hit else "none"))
     for name in skill_miss:
         lines.append(f"empty skills: {name} — defend or extract")
-    lines.append("")
     return lines
 
 

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import zipfile
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 from dossier.lists import excluded
 from dossier.store import Corpus, Record
@@ -74,6 +76,7 @@ def _conversations(data: object) -> list:
 def _messages(conv: dict) -> list[tuple[str, str, str]]:
     mapping = conv.get("mapping")
     rows: list[tuple[float, str, str, str]] = []
+    nodes: Iterable[Any]
     if isinstance(mapping, dict):
         nodes = mapping.values()
     else:

@@ -149,18 +149,18 @@ def profile_to_toml_patch(profile: Profile) -> dict[str, Any]:
             patch[section] = dict(block)
     scope = cfg.get("scope")
     if isinstance(scope, dict):
-        block: dict[str, Any] = {}
+        scope_block: dict[str, Any] = {}
         if scope.get("all_sources"):
-            block["all"] = True
-            block["sources"] = []
+            scope_block["all"] = True
+            scope_block["sources"] = []
         elif isinstance(scope.get("sources"), list):
-            block["all"] = False
-            block["sources"] = list(scope["sources"])
+            scope_block["all"] = False
+            scope_block["sources"] = list(scope["sources"])
         for key in ("year_from", "year_to"):
             if key in scope:
-                block[key] = int(scope[key])
-        if block:
-            patch["scope"] = block
+                scope_block[key] = int(scope[key])
+        if scope_block:
+            patch["scope"] = scope_block
     return patch
 
 

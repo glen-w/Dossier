@@ -52,6 +52,15 @@ pubs = false # one /search per ask; hits are not written into the corpus
 [tailor]
 # name = "Your Name"
 
+# Layout for `dossier tailor --format html|docx|pdf`. The renderer only lays out
+# stored spans; this table sets fonts and the contact line printed under your name.
+# [render]
+# contact = "you@example.org  ·  +00 000 000 000"
+# page = "A4"       # or "LETTER"
+# font_pt = 10
+# margin_mm = 18
+# accent = "#1f4e79"
+
 [identity]
 # Slack ids, the names meetings should treat as you, and which mail
 # folder holds each account. This block stays in the gitignored copy.

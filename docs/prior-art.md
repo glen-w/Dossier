@@ -13,7 +13,7 @@ Take the rule that fits. Leave the product that does not.
 
 **LEANN** ([yichuan-w/LEANN](https://github.com/yichuan-w/LEANN)). Laptop RAG over files, mail, and ChatGPT exports. Retrieval, not a buffet of approved claims.
 
-**RenderCV / JSON Resume.** A way to render a CV later, from cards you have already approved. `tailor --format json-resume` writes that data. No renderer in this repo.
+**RenderCV / JSON Resume.** A way to render a CV later, from cards you have already approved. `tailor --format json-resume` writes that data. `tailor --format html|docx|pdf` is a small built-in layout of those same spans; it is not a template engine.
 
 **data_dumps.** ZIP exports to DuckDB. LinkedIn, ChatGPT, and Slack message text can already live there. Thunderbird tables are metadata only. Dossier reads that warehouse when you point `DATA_DUMPS_WAREHOUSE` at it. It does not ship those loaders.
 

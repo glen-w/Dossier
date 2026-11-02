@@ -64,6 +64,6 @@ Match takes a pasted job spec and lists evidence per requirement. Gaps names emp
 
 ![Referees](images/referees.png)
 
-Tailor and packet stay their own pages. Match can open Tailor with the same posting; Tailor stays off the Match page.
+Tailor picks markdown, HTML, DOCX, or PDF (PDF needs the `render` extra), can append the cited record URIs, and links the file under `data/drafts/` for download. The download route serves only a file directly inside that folder. Tailor and packet stay their own pages. Match can open Tailor with the same posting; Tailor stays off the Match page.
 
 Cancel a running job from the strip at the top. History survives a restart under `$DOSSIER_DATA/jobs/`.

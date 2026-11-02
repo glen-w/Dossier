@@ -1,8 +1,10 @@
 """Tailor drafts."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from pathlib import Path
+
+from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from dossier.config import Config
 from dossier.jobs import RUNNER, LockerBusy
@@ -48,13 +50,42 @@ async def tailor_run(
     posting: str = Form(...),
     kind: str = Form("cv"),
     arrange: str = Form(""),
+    fmt: str = Form("markdown"),
+    with_sources: str = Form(""),
 ) -> RedirectResponse:
     text = posting.strip()
     if not text:
         return RedirectResponse("/tailor?err=Paste+a+posting", status_code=303)
     chosen = kind if kind in {"cv", "letter"} else "cv"
     try:
-        job = _start_tailor(text, chosen, arrange == "1")
+        chosen_fmt = fmt if fmt in {"markdown", "html", "docx", "pdf"} else "markdown"
+        job = _start_tailor(text, chosen, arrange == "1", chosen_fmt, with_sources == "1")
     except LockerBusy:
         return RedirectResponse("/tailor?err=busy", status_code=303)
     return RedirectResponse(f"/tailor?job={job.id}", status_code=303)
+
+
+_MEDIA = {
+    ".html": "text/html; charset=utf-8",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pdf": "application/pdf",
+    ".md": "text/markdown; charset=utf-8",
+}
+
+
+@router.get("/tailor/file")
+async def tailor_file(name: str = "") -> FileResponse:
+    """Download one rendered draft. Only a file directly inside the drafts folder."""
+    cfg = Config.from_env()
+    root = (Path(cfg.data_dir) / "drafts").resolve()
+    if not name or name != Path(name).name or Path(name).suffix.lower() not in _MEDIA:
+        raise HTTPException(status_code=404)
+    target = (root / name).resolve()
+    if target.parent != root or not target.is_file():
+        raise HTTPException(status_code=404)
+    return FileResponse(
+        target,
+        media_type=_MEDIA[target.suffix.lower()],
+        filename=target.name,
+        headers={"X-Content-Type-Options": "nosniff"},
+    )

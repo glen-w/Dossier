@@ -58,6 +58,11 @@ class Config:
     ask_embed: bool = True
     ask_pubs: bool = False
     cv_name: str = ""
+    render_contact: str = ""
+    render_font_pt: int = 10
+    render_margin_mm: int = 18
+    render_page: str = "A4"
+    render_accent: str = "#1f4e79"
     referee_pubs: bool = True
     employer_filter: bool = True
     employer_filter_llm: bool = True
@@ -84,6 +89,7 @@ class Config:
         extract = file_cfg.get("extract") if isinstance(file_cfg.get("extract"), dict) else {}
         run = file_cfg.get("run") if isinstance(file_cfg.get("run"), dict) else {}
         tailor = file_cfg.get("tailor") if isinstance(file_cfg.get("tailor"), dict) else {}
+        render = file_cfg.get("render") if isinstance(file_cfg.get("render"), dict) else {}
         employer = file_cfg.get("employer") if isinstance(file_cfg.get("employer"), dict) else {}
         efforts = file_cfg.get("efforts") if isinstance(file_cfg.get("efforts"), dict) else {}
         scope = file_cfg.get("scope") if isinstance(file_cfg.get("scope"), dict) else {}
@@ -206,6 +212,11 @@ class Config:
             ask_embed=_env_bool("DOSSIER_ASK_EMBED", bool(ask.get("embed", True))),
             ask_pubs=_env_bool("DOSSIER_ASK_PUBS", bool(ask.get("pubs", False))),
             cv_name=_env_str("DOSSIER_CV_NAME", str(tailor.get("name") or "")).strip(),
+            render_contact=str(render.get("contact") or "").strip(),
+            render_font_pt=_bounded_int(render.get("font_pt"), 10, 8, 14),
+            render_margin_mm=_bounded_int(render.get("margin_mm"), 18, 8, 40),
+            render_page="LETTER" if str(render.get("page") or "").upper() == "LETTER" else "A4",
+            render_accent=str(render.get("accent") or "#1f4e79").strip() or "#1f4e79",
             referee_pubs=_env_bool("DOSSIER_REFEREE_PUBS", True),
             employer_filter=_env_bool(
                 "DOSSIER_EMPLOYER_FILTER",
@@ -331,3 +342,12 @@ def _env_float(name: str, default: float) -> float:
     if name not in os.environ or not os.environ.get(name, "").strip():
         return default
     return _as_float(os.environ.get(name), default)
+
+
+def _bounded_int(value: object, default: int, low: int, high: int) -> int:
+    """A config number kept inside a sane range. Anything else is the default."""
+    try:
+        number = int(value)  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return default
+    return max(low, min(high, number))

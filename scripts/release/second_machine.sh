@@ -9,7 +9,7 @@ trap 'rm -rf "$TMP"' EXIT
 export DOSSIER_DATA="$TMP"
 export DOSSIER_LLM_PROVIDER=off
 export DOSSIER_EXTRACT_SPAN_MAX="${DOSSIER_EXTRACT_SPAN_MAX:-320}"
-uv sync --extra dev
+uv sync --extra dev --extra render
 uv run python - <<'PY'
 from pathlib import Path
 import os
@@ -47,5 +47,19 @@ for line in text.splitlines():
     if line.startswith("> "):
         assert len(line[2:]) <= span_max(), line
 print("ok", path)
+
+# Render the same cards and read each file back: only stored spans and labels.
+from dossier.render import render_bytes
+from dossier.tailor import build_doc, select_cards
+
+picked, bare = select_cards(corpus, "A synthetic paper on coastal governance.", limit=4)
+assert picked, "nothing to render"
+doc = build_doc(kind="cv", posting="A synthetic paper on coastal governance.", picked=picked, bare=bare)
+for fmt in ("markdown", "html", "docx"):
+    assert render_bytes(doc, fmt)
+for run in doc.runs():
+    assert run.strip() in doc.texts(), run
 corpus.close()
 PY
+# Golden eval and retrieval metrics: refusals refuse, citations resolve, no model needed.
+uv run dossier eval --retrieval

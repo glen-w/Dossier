@@ -174,6 +174,17 @@ def test_empty_buffet_writes_no_quote(
 def test_letter_keeps_four_matches(corpus: Corpus) -> None:
     from dossier.tailor import LETTER_CAP, select_cards
 
+    corpus.upsert_record(
+        Record(
+            id="r1",
+            source="slack",
+            uri="slack://1",
+            title="note",
+            text="\n".join(
+                f"Drafted the ocean workshop briefing number {index}." for index in range(6)
+            ),
+        )
+    )
     for index in range(6):
         corpus.put_card(
             _card(

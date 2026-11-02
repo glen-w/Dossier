@@ -9,14 +9,19 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import IO
 
 from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED, ClaimCard
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class LockerBusy(RuntimeError):
     """Another process holds the locker write lock."""
+
+
+class LockerSchemaTooNew(RuntimeError):
+    """This locker was written by a newer Dossier than the one running."""
 
 
 def _now() -> str:
@@ -46,7 +51,7 @@ class Corpus:
         self.fts_ok = False
         self.passages_fts_ok = False
         self._batch = False
-        self._lock_fh = None
+        self._lock_fh: IO[str] | None = None
         self._init()
 
     def close(self) -> None:
@@ -189,6 +194,27 @@ class Corpus:
             )
             for r in rows
         ]
+
+    def records_by_uri(self, uris: list[str]) -> dict[str, Record]:
+        """Only the named records. Avoids loading the whole locker for one question."""
+        found: dict[str, Record] = {}
+        for chunk in _chunks(list(dict.fromkeys(uris)), 500):
+            marks = ",".join("?" * len(chunk))
+            rows = self._conn.execute(
+                "SELECT id, source, uri, title, text, table_name FROM records "
+                f"WHERE uri IN ({marks})",
+                chunk,
+            ).fetchall()
+            for r in rows:
+                found[str(r["uri"])] = Record(
+                    id=r["id"],
+                    source=r["source"],
+                    uri=r["uri"],
+                    title=r["title"],
+                    text=r["text"],
+                    table=r["table_name"] or "",
+                )
+        return found
 
     def evidence_by_uri(self, uris: list[str] | None = None) -> dict[str, str]:
         if uris is None:
@@ -647,6 +673,19 @@ class Corpus:
         ).fetchall()
         return [(str(row["record_uri"]), str(row["text"])) for row in rows]
 
+    def passage_rows_for(self, uris: list[str]) -> list[tuple[str, str]]:
+        """Passages of the named records, in the same order as `passage_rows`."""
+        out: list[tuple[str, str]] = []
+        for chunk in _chunks(sorted(set(uris)), 500):
+            marks = ",".join("?" * len(chunk))
+            rows = self._conn.execute(
+                "SELECT record_uri, text FROM passages "
+                f"WHERE record_uri IN ({marks}) ORDER BY record_uri, ordinal",
+                chunk,
+            ).fetchall()
+            out.extend((str(r["record_uri"]), str(r["text"])) for r in rows)
+        return out
+
     def _ensure_passages(self) -> None:
         self._conn.execute(
             """
@@ -815,12 +854,23 @@ class Corpus:
         self._conn.execute("DELETE FROM passage_vec WHERE model != ?", (model,))
         self._conn.commit()
 
-    def passages_missing_vector(self, model: str) -> list[tuple[str, int, str]]:
-        rows = self._conn.execute(
-            """
+    def passages_missing_vector(
+        self,
+        model: str,
+        *,
+        limit: int | None = None,
+        sources: tuple[str, ...] = (),
+    ) -> list[tuple[str, int, str]]:
+        """Passages with no vector for this model, in a stable order, optionally paged."""
+        clauses = ["length(trim(p.text)) > 0"]
+        join = ""
+        if sources:
+            join = "JOIN records r ON r.uri = p.record_uri"
+            clauses.append(f"r.source IN ({','.join('?' * len(sources))})")
+        sql = f"""
             SELECT p.record_uri, p.ordinal, p.text
-            FROM passages p
-            WHERE length(trim(p.text)) > 0
+            FROM passages p {join}
+            WHERE {" AND ".join(clauses)}
               AND NOT EXISTS (
                 SELECT 1 FROM passage_vec v
                 WHERE v.record_uri = p.record_uri
@@ -828,10 +878,43 @@ class Corpus:
                   AND v.model = ?
               )
             ORDER BY p.record_uri, p.ordinal
-            """,
-            (model,),
-        ).fetchall()
+        """
+        # The model placeholder sits after the source placeholders in the statement.
+        ordered = [*sources, model]
+        if limit is not None:
+            sql += " LIMIT ?"
+            ordered.append(max(0, int(limit)))
+        rows = self._conn.execute(sql, ordered).fetchall()
         return [(str(row["record_uri"]), int(row["ordinal"]), str(row["text"])) for row in rows]
+
+    def count_missing_vectors(self, model: str, *, sources: tuple[str, ...] = ()) -> int:
+        clauses = ["length(trim(p.text)) > 0"]
+        join = ""
+        if sources:
+            join = "JOIN records r ON r.uri = p.record_uri"
+            clauses.append(f"r.source IN ({','.join('?' * len(sources))})")
+        row = self._conn.execute(
+            f"""
+            SELECT count(*) FROM passages p {join}
+            WHERE {" AND ".join(clauses)}
+              AND NOT EXISTS (
+                SELECT 1 FROM passage_vec v
+                WHERE v.record_uri = p.record_uri
+                  AND v.ordinal = p.ordinal
+                  AND v.model = ?
+              )
+            """,
+            [*sources, model],
+        ).fetchone()
+        return int(row[0] if row else 0)
+
+    def vector_dim(self, model: str) -> int:
+        """Stored vector size for this model, or 0 when none exist."""
+        row = self._conn.execute(
+            "SELECT dim FROM passage_vec WHERE model = ? AND dim IS NOT NULL LIMIT 1",
+            (model,),
+        ).fetchone()
+        return int(row[0]) if row and row[0] else 0
 
     def upsert_vector(self, uri: str, ordinal: int, model: str, values: list[float]) -> None:
         from dossier.embed import pack_vector
@@ -839,13 +922,14 @@ class Corpus:
         norm = math.sqrt(sum(float(v) * float(v) for v in values)) if values else 0.0
         self._conn.execute(
             """
-            INSERT INTO passage_vec (record_uri, ordinal, model, vector, norm)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO passage_vec (record_uri, ordinal, model, vector, norm, dim)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(record_uri, ordinal, model) DO UPDATE SET
                 vector=excluded.vector,
-                norm=excluded.norm
+                norm=excluded.norm,
+                dim=excluded.dim
             """,
-            (uri, ordinal, model, pack_vector(values), norm),
+            (uri, ordinal, model, pack_vector(values), norm, len(values)),
         )
         self._commit()
 
@@ -855,39 +939,21 @@ class Corpus:
         model: str,
         *,
         limit: int,
+        uris: frozenset[str] | None = None,
     ) -> list[tuple[str, str, float]]:
-        """Best (uri, passage text, cosine) for this model."""
-        from dossier.embed import cosine, unpack_vector
+        """Best (uri, passage text, cosine) per record for this model."""
+        from dossier.vecindex import backend
 
-        if limit < 1 or not vector:
-            return []
-        qnorm = math.sqrt(sum(float(v) * float(v) for v in vector))
-        rows = self._conn.execute(
-            """
-            SELECT v.record_uri, v.vector, v.norm, p.text
-            FROM passage_vec v
-            JOIN passages p
-              ON p.record_uri = v.record_uri AND p.ordinal = v.ordinal
-            WHERE v.model = ?
-            """,
-            (model,),
-        ).fetchall()
-        best: dict[str, tuple[str, float]] = {}
-        for row in rows:
-            stored = unpack_vector(row["vector"])
-            stored_norm = row["norm"]
-            if stored_norm and qnorm:
-                score = cosine(vector, stored) if stored_norm is None else _dot_cosine(
-                    vector, stored, qnorm, float(stored_norm)
-                )
-            else:
-                score = cosine(vector, stored)
-            uri = str(row["record_uri"])
-            prev = best.get(uri)
-            if prev is None or score > prev[1]:
-                best[uri] = (str(row["text"]), score)
-        ranked = sorted(best.items(), key=lambda item: (-item[1][1], item[0]))
-        return [(uri, text, score) for uri, (text, score) in ranked[:limit]]
+        found = backend().nearest(self._conn, vector, model, limit=limit, uris=uris)
+        out: list[tuple[str, str, float]] = []
+        for uri, ordinal, score in found:
+            row = self._conn.execute(
+                "SELECT text FROM passages WHERE record_uri = ? AND ordinal = ?",
+                (uri, ordinal),
+            ).fetchone()
+            if row is not None:
+                out.append((uri, str(row["text"]), score))
+        return out
 
     def _drop_vectors(self, uri: str) -> None:
         row = self._conn.execute(
@@ -1019,12 +1085,40 @@ class Corpus:
                 lengths.append(len(span))
         return lengths
 
+    def schema_version(self) -> int:
+        return int(self._conn.execute("PRAGMA user_version").fetchone()[0])
+
     def _migrate(self) -> None:
+        """Run numbered migrations in order. A locker with records is backed up first."""
         current = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
-        if current < 1:
-            self._migrate_v1()
-            self._conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        if current > SCHEMA_VERSION:
+            raise LockerSchemaTooNew(
+                f"{self.db_path} is schema v{current}; this Dossier reads up to v{SCHEMA_VERSION}. "
+                "Upgrade Dossier instead of opening it."
+            )
+        if current >= SCHEMA_VERSION:
+            return
+        self._backup_before_migrate(current)
+        for version in range(current + 1, SCHEMA_VERSION + 1):
+            getattr(self, f"_migrate_v{version}")()
+            self._conn.execute(f"PRAGMA user_version = {version}")
             self._conn.commit()
+
+    def _backup_before_migrate(self, current: int) -> Path | None:
+        """Copy a locker that already holds records. An empty or new one needs none."""
+        has_records = self._conn.execute("SELECT 1 FROM records LIMIT 1").fetchone()
+        if has_records is None or str(self.db_path) == ":memory:":
+            return None
+        dest = self.db_path.with_name(f"{self.db_path.stem}.pre-v{current}.db")
+        if dest.exists():
+            return dest
+        self._conn.commit()
+        target = sqlite3.connect(dest)
+        try:
+            self._conn.backup(target)
+        finally:
+            target.close()
+        return dest
 
     def _migrate_v1(self) -> None:
         self._conn.execute(
@@ -1065,6 +1159,17 @@ class Corpus:
             except sqlite3.OperationalError:
                 pass
 
+    def _migrate_v2(self) -> None:
+        """Record each vector's dimension so a model change can never mix sizes."""
+        vec_cols = {
+            r[1] for r in self._conn.execute("PRAGMA table_info(passage_vec)").fetchall()
+        }
+        if "dim" not in vec_cols:
+            self._conn.execute("ALTER TABLE passage_vec ADD COLUMN dim INTEGER")
+        self._conn.execute(
+            "UPDATE passage_vec SET dim = length(vector) / 4 WHERE dim IS NULL"
+        )
+
     def _clear_spans_for_uri(self, uri: str) -> None:
         rows = self._conn.execute(
             "SELECT id, extras FROM cards WHERE extras LIKE ?",
@@ -1087,13 +1192,9 @@ class Corpus:
             )
 
 
-def _dot_cosine(
-    left: list[float], right: list[float], left_norm: float, right_norm: float
-) -> float:
-    if not left or len(left) != len(right) or left_norm <= 0 or right_norm <= 0:
-        return 0.0
-    dot = sum(a * b for a, b in zip(left, right, strict=True))
-    return dot / (left_norm * right_norm)
+def _chunks(items: list, size: int):
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
 
 
 def _card_filter(

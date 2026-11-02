@@ -332,6 +332,35 @@ def span_is_usable(claim: str, span: str, *, cap: int | None = None) -> bool:
     return evidence_carries(claim, text)
 
 
+def span_in_text(span: str, text: str) -> bool:
+    """True when the span is still written in the record text (whitespace-insensitive)."""
+    needle = " ".join(span.split())
+    if not needle:
+        return False
+    return needle in " ".join(text.split())
+
+
+def current_span(corpus: object, card: ClaimCard) -> str:
+    """The stored span when it is paste-sized, carries the claim, and is still in its record.
+
+    Empty otherwise. A re-ingest that changed the cited record makes the span stale,
+    so nothing is pasted from it until `defend --refresh` re-spans the card.
+    """
+    span = (card.extras.get("span") or "").strip()
+    if not span or not span_is_usable(card.claim, span):
+        return ""
+    uri = (card.extras.get("span_uri") or "").strip()
+    uris = [uri] if uri else list(card.citations)
+    get_record = getattr(corpus, "get_record", None)
+    if get_record is None:
+        return span
+    for candidate in uris:
+        rec = get_record(candidate)
+        if rec is not None and span_in_text(span, rec.text):
+            return span
+    return ""
+
+
 def adjudicate(
     claim: str,
     citations: list[str],

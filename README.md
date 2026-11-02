@@ -57,6 +57,7 @@ uv run dossier gui
 uv run dossier review
 uv run dossier defend --refresh --dry-run
 uv run dossier tailor --posting ./posting.txt
+uv run dossier tailor --posting ./posting.txt --format pdf   # needs: uv sync --extra render
 uv run dossier gaps
 ```
 
@@ -68,11 +69,11 @@ Records stay on this machine. The only way text leaves is a remote LLM, and that
 
 ## Later
 
-`tailor` writes markdown, or JSON Resume data, from approved spans. A PDF or portal CV is still outside this repo. Own publications are the Zotero collection named in config. Next is a second person installing from this README (`scripts/release/second_machine.sh` is the synthetic form). See [Roadmap](docs/roadmap.md).
+`tailor` writes markdown, HTML, DOCX, PDF, or JSON Resume data from approved spans, and adds no prose. A portal CV is still outside this repo. Own publications are the Zotero collection named in config. Next is a second person installing from this README (`scripts/release/second_machine.sh` is the synthetic form). See [Roadmap](docs/roadmap.md).
 
 ## Docs
 
-- [Changelog](CHANGELOG.md) — 0.4 through 0.10
+- [Changelog](CHANGELOG.md) — 0.4 through 0.11
 - [Status](docs/status.md) — what this version does
 - [Workbench](docs/workbench.md) — loopback GUI, with screenshots
 - [Roadmap](docs/roadmap.md) — 1.0 is second-machine acceptance

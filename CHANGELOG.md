@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.0
+
+Evidence you can paste, and retrieval that scales.
+
+- `tailor`, `packet`, and `match` quote a stored span only while it is still in its cited record. `audit-cards` names a span the record no longer holds.
+- A golden eval of about sixty synthetic cases (refusals, paraphrases, injected text, odd characters) runs against a throwaway locker. Known leniency is printed on every run. `dossier eval --retrieval` reports recall@k and MRR with a deterministic embedder.
+- Property tests for the span cap, the citation rule, and the paste path. Docs-drift tests for commands and environment variables.
+- Store schema v2 with numbered migrations, an automatic copy of a locker with records before it migrates, and a refusal to open a locker from a newer Dossier. Vector size is stored; a model that changes size is refused.
+- `ask` loads only the records and passages full text names, not the whole locker. Vector search streams rows; with `uv sync --extra vec` it runs in C through `sqlite-vec` (`DOSSIER_VEC` picks the backend).
+- `dossier index` is paged and resumable, with `--sources` and `--limit`, and the workbench job can cancel without losing finished pages. `scripts/bench_retrieval.py` times it on a generated locker.
+- `tailor --format html|docx|pdf` and `--with-sources`, from one typed draft. The renderer adds no prose; tests read each file back. PDF needs the `render` extra and uses a bundled DejaVu Sans. The workbench Tailor page picks a format and links the download.
+
 ## 0.10.0
 
 Engineering gates and the carrying-sentence contract.

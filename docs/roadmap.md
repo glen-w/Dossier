@@ -34,11 +34,19 @@ Employer allowlist, ChatGPT export, Slack export, and git history, plus the meet
 
 ### 0.9 — Paste-ready employment kit
 
-`dossier tailor` turns a posting and spanned approved cards into CV or letter markdown, plus a coverage list. `--arrange` may reorder a letter from those spans only. Referees can use a pubs name already in the corpus and print up to two claims they could speak to. Still confirm before listing. Still no PDF renderer and no Twenty writes.
+`dossier tailor` turns a posting and spanned approved cards into CV or letter markdown, plus a coverage list. `--arrange` may reorder a letter from those spans only. Referees can use a pubs name already in the corpus and print up to two claims they could speak to. Still confirm before listing. Still no Twenty writes.
 
 ### 0.10 — Gates, span rule, workbench as 1.0 loop
 
 Engineering gates (interpreter pin, ruff, mypy, CI). A stored span is one paste-sized sentence (`SPAN_MAX`, default 320). `defend --refresh` re-spans; `audit-cards` lists approved cards the new rule would refuse. The loopback workbench covers the daily loop, including prove, referees, and gaps pages, plus streamed cited ask. Notes and `.ics` adapters. `eval`, `export` / `import`, `backup`, `tailor --format json-resume` (data, not a renderer). `scripts/release/second_machine.sh` is the synthetic second-machine path.
+
+### 0.11 — Evidence you can paste, and retrieval that scales
+
+- Paste-time check: `tailor`, `packet`, and `match` quote a stored span only while it is still in its cited record. `audit-cards` names a span the record no longer holds.
+- Golden eval of about sixty synthetic cases, with known leniency printed on every run, plus recall@k and MRR (`eval --retrieval`). Property tests hold the span cap, the citation rule, and the paste path.
+- Numbered store migrations, an automatic copy of a locker with records before any migration, and a refusal to open a locker written by a newer Dossier.
+- Retrieval: full text names candidates and only those records and passages load, vector search streams instead of loading every blob, `sqlite-vec` runs the same scan in C when the extra is installed, and `dossier index` is paged, resumable, and narrowable.
+- Renderer: `tailor --format html|docx|pdf` from one typed draft. Layout only; no prose is added. PDF needs the optional `render` extra.
 
 ## Waves
 
@@ -47,10 +55,10 @@ Engineering gates (interpreter pin, ruff, mypy, CI). A stored span is one paste-
 The workbench loop shipped in 0.10. 1.0 is that loop plus a boring path on a machine that is not this locker:
 
 - Someone else installs from the README, enables only adapters they have, and completes ingest → extract → approve → defend → ask → packet (and optional brief, tailor, or referees). A thin install (no warehouse) is the same path.
-- Acceptance: refusals that should refuse, citations that resolve, every quoted span at or under `SPAN_MAX`, egress notice when cloud is opted in, Twenty read-only when used, no dumps or evidence DB in git.
+- Acceptance: refusals that should refuse, citations that resolve, every quoted span at or under `SPAN_MAX` and still in its record, `dossier eval` passing, egress notice when cloud is opted in, Twenty read-only when used, no dumps or evidence DB in git.
 - `scripts/release/second_machine.sh` is the synthetic form of that path.
 
-Still later: a CV PDF renderer. Office text (PDF via the `office` extra, Word and PowerPoint in the standard library) is capped record text, not a renderer. `sqlite-vec` stays an optional extra; pure Python is the floor.
+Office text (PDF via the `office` extra, Word and PowerPoint in the standard library) is capped record text, not a renderer. `sqlite-vec` and the PDF library stay optional extras; pure Python is the floor.
 
 ## Boundaries that stay
 

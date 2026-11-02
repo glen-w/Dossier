@@ -17,6 +17,7 @@ from dossier.lenses import (
 from dossier.lists import phrase_blocked, phrase_pattern, slack_activity, slack_exclude
 from dossier.seekers.hits import Hit
 from dossier.sources.warehouse import has_table
+from dossier.util import to_int
 
 LONG_TEXT = 400
 HOT_REPLY = 3
@@ -82,7 +83,7 @@ def _in_clause(ids: Sequence[str]) -> tuple[str, list[str]]:
 
 def _year(value: object) -> int:
     try:
-        return int(value) if value is not None else 0
+        return to_int(value)
     except (TypeError, ValueError):
         return 0
 

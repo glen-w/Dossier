@@ -337,7 +337,13 @@ def _loop_next(cfg: Config, corpus: Corpus, reason: str) -> tuple[str, str]:
     )
 
 
-def _start_tailor(posting: str, kind: str, arrange: bool) -> Job:
+def _start_tailor(
+    posting: str,
+    kind: str,
+    arrange: bool,
+    fmt: str = "markdown",
+    with_sources: bool = False,
+) -> Job:
     def run(job: Job) -> dict[str, Any]:
         from dossier.llm import get_client, llm_egress_is_remote
         from dossier.ops import note_egress
@@ -391,7 +397,42 @@ def _start_tailor(posting: str, kind: str, arrange: bool) -> Job:
                 paragraphs=paragraphs,
             )
             path = write_draft(body, Path(cfg.data_dir) / "drafts", prompt_stamp=prompt_stamp)
-            return {"path": str(path), "body": body, "posting": posting, "kind": kind}
+            result: dict[str, Any] = {
+                "path": str(path),
+                "body": body,
+                "posting": posting,
+                "kind": kind,
+                "format": fmt,
+                "file": "",
+                "render_error": "",
+            }
+            if fmt in ("html", "docx", "pdf"):
+                from dossier.render import RenderError, Theme, write_render
+                from dossier.tailor import build_doc
+
+                doc = build_doc(
+                    kind=kind,
+                    posting=posting,
+                    picked=picked,
+                    bare=bare,
+                    name=cfg.cv_name,
+                    subtitle=linkedin_subtitle(corpus),
+                    contact=cfg.render_contact,
+                    paragraphs=paragraphs,
+                    with_sources=with_sources,
+                )
+                theme = Theme(
+                    font_pt=cfg.render_font_pt,
+                    margin_mm=cfg.render_margin_mm,
+                    page=cfg.render_page,
+                    accent=cfg.render_accent,
+                )
+                try:
+                    rendered = write_render(doc, fmt, Path(cfg.data_dir) / "drafts", theme)
+                    result["file"] = rendered.name
+                except RenderError as exc:
+                    result["render_error"] = str(exc)
+            return result
         finally:
             corpus.close()
 
@@ -463,7 +504,9 @@ def _start_index() -> Job:
                     bar.__exit__(None, None, None)
 
             try:
-                count = index_passages(corpus, embedder, on_batch=on_batch)
+                count = index_passages(
+                    corpus, embedder, on_batch=on_batch, should_stop=job.cancel.is_set
+                )
             except (EmbedError, LlmConfigError) as exc:
                 note(f"index: skipped ({exc})")
                 return {"skipped": str(exc), "vectors": 0}

@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Sync
-        run: uv sync --extra dev --extra web
+        run: uv sync --extra dev --extra web --extra vec --extra render --extra office
       - name: FTS5
         run: |
           uv run python -c "import sqlite3; c=sqlite3.connect(':memory:'); c.execute('create virtual table t using fts5(x)')"
@@ -30,3 +30,39 @@ jobs:
         run: python3 scripts/release/check_gitignore.py
       - name: Tests
         run: uv run pytest --cov=src/dossier --cov-report=term-missing -q
+
+  wheel:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - name: Build
+        run: uv build --wheel
+      - name: Install the wheel in a clean environment
+        run: |
+          uv venv /tmp/wheel-env
+          uv pip install --python /tmp/wheel-env/bin/python "$(ls dist/*.whl | tail -1)[web,render,office,vec]"
+      - name: Bundled files ship in the wheel
+        run: |
+          /tmp/wheel-env/bin/python - <<'PY'
+          from importlib.resources import files
+          pkg = files("dossier")
+          for name in ("eval_set.json", "fonts/DejaVuSans.ttf", "fonts/LICENSE-DejaVu.txt"):
+              assert (pkg / name).is_file(), name
+          PY
+      - name: Doctor, golden eval, and a PDF from the installed wheel
+        run: |
+          export DOSSIER_DATA="$(mktemp -d)" DOSSIER_LLM_PROVIDER=off
+          /tmp/wheel-env/bin/dossier doctor
+          /tmp/wheel-env/bin/dossier eval --retrieval
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Audit locked dependencies
+        run: uvx pip-audit --requirement <(uv export --no-hashes --all-extras --no-emit-project 2>/dev/null)

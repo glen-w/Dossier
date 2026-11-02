@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from dossier.referees.rank import Person, Policy
+from dossier.util import to_int
 
 
 def load_people(path: Path) -> list[Person]:
@@ -59,9 +60,9 @@ def _person(row: object) -> Person:
         enrichment_status=str(
             _first(row, "enrichmentStatus", "enrichment_status", default="") or ""
         ),
-        coauthor=int(coauthor or 0),
+        coauthor=to_int(coauthor),
         last_contact_at=str(last) if last else None,
-        timeline_count=int(timeline or 0),
+        timeline_count=to_int(timeline),
     )
 
 

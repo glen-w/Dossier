@@ -30,6 +30,7 @@ uv run dossier reopen --from-audit
 uv run dossier backup
 uv run dossier rebuild-index
 uv run dossier eval
+uv run dossier eval --retrieval
 uv run dossier export --out ./cards.json
 uv run dossier import ./cards.json
 uv run dossier doctor --deep
@@ -38,8 +39,10 @@ uv run dossier packet
 uv run dossier tailor --posting ./posting.txt
 uv run dossier tailor --posting ./posting.txt --kind letter --arrange
 uv run dossier tailor --posting ./posting.txt --format json-resume
+uv run dossier tailor --posting ./posting.txt --format pdf --with-sources
 uv run dossier match --posting ./posting.txt
 uv run dossier index
+uv run dossier index --sources slack --limit 5000
 uv run dossier ask "what did I write about coastal governance?"
 uv run dossier ask --mode exact --source pubs "coastal governance"
 uv run dossier brief
@@ -100,9 +103,16 @@ jobs show the error only. Known `err=` query keys map to short blurbs. The
 CLI stays the scriptable surface. Screenshots: [workbench](workbench.md).
 See [vocab](vocab.md).
 
-`dossier tailor` writes CV or letter markdown under `data/drafts/` from
-approved cards that already have a span. `--format json-resume` writes JSON
-Resume data (not a rendered CV). `--arrange` is letter-only.
+`dossier tailor` writes a CV or letter under `data/drafts/` from approved
+cards that already have a span. The span must still be in its cited record:
+a card whose record changed under it is listed as not included. `--format`
+is `markdown` (default), `html`, `docx`, `pdf`, or `json-resume` (data).
+`html` prints to PDF from any browser, `docx` needs only the standard
+library, and `pdf` needs `uv sync --extra render`. A renderer lays out the
+stored spans and adds no prose. Layout comes from `[render]` in
+`dossier.toml` (page, font size, margin, accent, a contact line under your
+name). `--with-sources` appends the cited record URIs for you to check.
+`--arrange` is letter-only.
 
 `dossier match --posting` writes an ordered evidence list under
 `data/matches/`, one section per requirement. An empty file is an error.
@@ -113,6 +123,17 @@ them off to use `[scope]` and the effort preset in `dossier.toml`. See
 
 `dossier index` embeds passages into `evidence.db` with the local Ollama
 embed model. `ask` uses those vectors when full text is empty or thin.
+Each page of passages is committed, so a stop or a crash keeps what was
+embedded and the next run resumes. `--sources slack,notes` and `--limit N`
+narrow a run. A model that returns a different vector size is refused.
+Nearest-neighbour search streams rows in pure Python. With
+`uv sync --extra vec` the same scan runs in C through `sqlite-vec`;
+`dossier doctor` prints `vector_search: python|sqlite-vec`.
+
+`dossier eval` runs the bundled golden set (refusals, paraphrases, injected
+text, odd characters) against a throwaway locker, never yours. Cases marked
+`known_gap` are printed on every run. `--retrieval` adds recall@k and MRR on a
+generated locker with a deterministic embedder, so it needs no model.
 
 `dossier prove` runs a disposable real-corpus pass into a throwaway data
 directory. It never approves cards. See [prove](prove.md).
@@ -177,6 +198,7 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DOSSIER_ASK_LIMIT` | Max hits shown for `ask` (default `5`) |
 | `DOSSIER_EXTRACT_CHUNK_CHARS` | Fast-model extract chunk size (default `4000`) |
 | `DOSSIER_EXTRACT_MAX_CHUNKS` | Max extract chunks per record (default `4`) |
+| `DOSSIER_VEC` | Vector search backend: `auto` (default; `sqlite-vec` when installed), `python`, or `sqlite-vec` (fail if absent) |
 | `DOSSIER_EXTRACT_SPAN_MAX` | Max characters of a stored carrying sentence (default `320`) |
 | `DOSSIER_MAIL_BLOCKED_ROOTS` | Folder names that must not be walked as a mail tree (default `iddri`). Same as `[mail] blocked_roots` |
 | `DOSSIER_TWENTY_ALLOW_REMOTE` | Off by default. Set `true` to allow a non-loopback Twenty URL for the read-only referee query |

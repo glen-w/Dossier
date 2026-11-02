@@ -12,6 +12,7 @@ from dossier.cards import (
     ClaimCard,
     adjudicate,
     carrying_span,
+    current_span,
     header_values,
     span_is_usable,
     span_max,
@@ -164,7 +165,19 @@ def audit_cards(corpus: Corpus) -> list[tuple[ClaimCard, str]]:
         span = (card.extras.get("span") or "").strip()
         if span and not span_is_usable(card.claim, span):
             found.append((card, "stored span exceeds cap or no longer carries"))
+        elif span and not current_span(corpus, card):
+            found.append((card, "stored span is no longer in the cited record"))
     return found
+
+
+def stale_spans(corpus: Corpus) -> list[ClaimCard]:
+    """Approved cards with a usable stored span that the cited record no longer holds."""
+    stale: list[ClaimCard] = []
+    for card in corpus.cards(STATUS_APPROVED):
+        span = (card.extras.get("span") or "").strip()
+        if span and span_is_usable(card.claim, span) and not current_span(corpus, card):
+            stale.append(card)
+    return stale
 
 
 def gap_report(corpus: Corpus) -> GapReport:
@@ -217,11 +230,7 @@ def gap_report(corpus: Corpus) -> GapReport:
 
 def render_packet(corpus: Corpus) -> str:
     approved = corpus.cards(STATUS_APPROVED)
-    spanned = [
-        card
-        for card in approved
-        if span_is_usable(card.claim, card.extras.get("span") or "")
-    ]
+    spanned = [card for card in approved if current_span(corpus, card)]
     missing = [card for card in approved if card not in spanned]
     lines = ["# Dossier packet", ""]
     for card in spanned:

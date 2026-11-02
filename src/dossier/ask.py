@@ -154,10 +154,25 @@ def collect_hits(
     used = list(tokens) if tokens is not None else expand_tokens(question, lexicon)
     from dossier.scope import in_scope
 
-    records = _filter_records(corpus.records(), source=source, lens=lens, kind=kind)
-    records = [rec for rec in records if in_scope(rec, cfg)]
     passages_on = bool(getattr(cfg, "ask_passages", True))
     fts_on = bool(getattr(cfg, "ask_fts", True))
+    if passages_on and fts_on:
+        quick = _fts_first(
+            corpus,
+            question,
+            cfg,
+            used,
+            limit=limit,
+            source=source,
+            lens=lens,
+            kind=kind,
+            query_vec=query_vec,
+            embed_model=embed_model,
+        )
+        if quick is not None:
+            return quick
+    records = _filter_records(corpus.records(), source=source, lens=lens, kind=kind)
+    records = [rec for rec in records if in_scope(rec, cfg)]
     if not passages_on:
         lexical = retrieve(
             records,
@@ -217,6 +232,72 @@ def collect_hits(
         embed_model=embed_model,
         limit=min(limit, MAX_HITS),
     )
+
+
+def _fts_first(
+    corpus: Corpus,
+    question: str,
+    cfg: object,
+    used: list[str],
+    *,
+    limit: int,
+    source: str | None,
+    lens: str | None,
+    kind: str | None,
+    query_vec: list[float] | None,
+    embed_model: str,
+) -> list[Hit] | None:
+    """Passage hits from full text without loading the whole locker.
+
+    Same ranking as the full scan when full text finds records in scope: only the
+    records and passages full text named are loaded. Returns None when that does not
+    settle the question (no full text, nothing in scope, or vectors may add hits), and
+    the caller runs the full scan.
+    """
+    from dossier.scope import in_scope
+
+    rank = _fts_rank(corpus.search_passages, passage_query(used), limit, True)
+    if not rank:
+        return None
+    named = corpus.records_by_uri(list(rank))
+    visible = [
+        rec
+        for rec in _filter_records(list(named.values()), source=source, lens=lens, kind=kind)
+        if in_scope(rec, cfg)
+    ]
+    if not visible:
+        return None
+    by_uri = {rec.uri: rec for rec in visible}
+    pseudo = [
+        Record(
+            id=f"{uri}#{index}",
+            source=by_uri[uri].source,
+            uri=uri,
+            title=by_uri[uri].title,
+            text=text,
+        )
+        for index, (uri, text) in enumerate(corpus.passage_rows_for(list(by_uri)))
+    ]
+    hits = retrieve(pseudo, question, limit=limit, tokens=used, fts_rank=rank)
+    seen: set[str] = set()
+    unique: list[Hit] = []
+    for hit in hits:
+        if hit.uri in seen or hit.uri not in rank:
+            continue
+        seen.add(hit.uri)
+        unique.append(hit)
+    if not unique:
+        return None
+    vectors_may_help = (
+        query_vec is not None
+        and bool(embed_model)
+        and getattr(cfg, "ask_embed", True)
+        and len(unique) < 2
+        and corpus.vector_count(embed_model) > 0
+    )
+    if vectors_may_help:
+        return None
+    return unique
 
 
 def _source_fallback(
