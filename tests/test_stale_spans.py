@@ -41,7 +41,7 @@ def test_fresh_span_is_current(corpus: Corpus) -> None:
     assert audit_cards(corpus) == []
 
 
-def test_reingest_with_new_text_clears_the_stored_span(corpus: Corpus) -> None:
+def test_reingest_with_new_text_marks_the_card_stale(corpus: Corpus) -> None:
     _seed(corpus)
     corpus.upsert_record(
         Record(
@@ -55,7 +55,8 @@ def test_reingest_with_new_text_clears_the_stored_span(corpus: Corpus) -> None:
     after = corpus.get_card("c1")
     assert after is not None
     assert current_span(corpus, after) == ""
-    assert not (after.extras.get("span") or "")
+    assert after.extras.get("span") == SPAN
+    assert after.extras.get("stale_reason") == "record_changed"
 
 
 def test_drift_that_bypasses_ingest_makes_the_span_stale(corpus: Corpus) -> None:

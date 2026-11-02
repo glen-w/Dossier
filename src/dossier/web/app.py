@@ -71,6 +71,9 @@ def create_app() -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
+    from dossier.jobs import recover_interrupted
+
+    recover_interrupted()
     app.include_router(locker.router)
     app.include_router(review.router)
     app.include_router(ask.router)

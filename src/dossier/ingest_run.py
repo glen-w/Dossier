@@ -28,7 +28,12 @@ def run_ingest_targets(
             bar.status(f"{item.name} · {slug}")
             note(f"ingest {item.name} from {path}")
             n_at_start = len(corpus.records())
-            item.source.load(path, corpus)
+            root = str(path.expanduser().resolve())
+            corpus.begin_walk(item.name, root)
+            try:
+                item.source.load(path, corpus)
+            finally:
+                corpus.finish_walk()
             added = len(corpus.records()) - n_at_start
             bar.tick(sources=idx, added=added)
             if on_source_done is not None:

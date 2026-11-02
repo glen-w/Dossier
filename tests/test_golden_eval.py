@@ -26,8 +26,18 @@ def test_bundled_eval_leaves_the_given_locker_alone(corpus: Corpus) -> None:
     assert corpus.cards() == []
 
 
-def test_known_gaps_are_reported_not_hidden(corpus: Corpus) -> None:
-    report = run_eval(corpus)
+def test_known_gaps_are_reported_not_hidden(corpus: Corpus, tmp_path: Path) -> None:
+    bundled = run_eval(corpus)
+    assert bundled.ok
+    assert not bundled.gaps
+    spec = default_set()
+    spec["cases"] = [
+        {"question": "commanded a lunar base", "refuse": False, "known_gap": True}
+    ]
+    path = tmp_path / "gap.json"
+    path.write_text(json.dumps(spec), encoding="utf-8")
+    report = run_eval(corpus, path=path)
+    assert report.ok
     assert report.gaps
     assert "known gap" in str(report)
 

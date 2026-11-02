@@ -24,7 +24,7 @@ from dossier.llm.client import (
     NullLLMClient,
     select_fast_model,
 )
-from dossier.match import match_posting, write_match
+from dossier.match import match_posting, match_postings, write_match, write_postings
 from dossier.packs import posting_pack, resolve_pack
 from dossier.paths import (
     TomlConfigError,
@@ -178,7 +178,13 @@ def main(argv: list[str] | None = None) -> int:
         "match",
         help="List evidence for each requirement in a job spec",
     )
-    p_match.add_argument("--posting", type=Path, required=True)
+    match_spec = p_match.add_mutually_exclusive_group(required=True)
+    match_spec.add_argument("--posting", type=Path)
+    match_spec.add_argument(
+        "--postings",
+        type=Path,
+        help="Directory of posting files; write gaps that repeat in two or more",
+    )
     _add_scope_flags(p_match)
     p_index = sub.add_parser(
         "index", help="Embed passages into evidence.db with the local model (resumable)"
@@ -216,6 +222,25 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     sub.add_parser("backup", help="Copy evidence.db via the SQLite backup API")
+    p_restore = sub.add_parser(
+        "restore",
+        help="Check a backup. Replace the live locker only with --replace",
+    )
+    p_restore.add_argument("backup", type=Path)
+    p_restore.add_argument(
+        "--replace",
+        action="store_true",
+        help="Copy the live locker aside, then swap in the backup",
+    )
+    sub.add_parser(
+        "drift",
+        help="Report stale cards, duplicate sentences, and unseen full-walk URIs",
+    )
+    p_drop = sub.add_parser(
+        "drop-record",
+        help="Remove one record that no approved card cites",
+    )
+    p_drop.add_argument("uri")
     sub.add_parser("rebuild-index", help="Rebuild FTS tables without opening-time rewrite")
 
     p_eval = sub.add_parser("eval", help="Run the synthetic golden set")
@@ -228,7 +253,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_exp = sub.add_parser("export", help="Write cards, spans, and answers as JSON")
     p_exp.add_argument("--out", type=Path, required=True)
-    p_imp = sub.add_parser("import", help="Load cards and answers from JSON")
+    p_imp = sub.add_parser("import", help="Load cards whose citations are still in the locker")
     p_imp.add_argument("--path", type=Path, required=True)
 
     p_prove = sub.add_parser(
@@ -357,6 +382,12 @@ def main(argv: list[str] | None = None) -> int:
             return _audit_cards(corpus, write_ids=getattr(args, "write_ids", False))
         if args.cmd == "backup":
             return _backup(cfg, corpus)
+        if args.cmd == "restore":
+            return _restore(cfg, corpus, args.backup, replace=bool(args.replace))
+        if args.cmd == "drift":
+            return _drift(cfg, corpus)
+        if args.cmd == "drop-record":
+            return _drop_record(corpus, args.uri)
         if args.cmd == "rebuild-index":
             corpus.rebuild_index()
             print("rebuilt")
@@ -380,8 +411,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "import":
             from dossier.portability import import_locker
 
-            n = import_locker(corpus, args.path)
-            print(f"imported {n}")
+            result = import_locker(corpus, args.path)
+            print(f"imported {result.imported}")
+            if result.skipped:
+                print(f"skipped {result.skipped}", file=sys.stderr)
+                return 1
             return 0
     finally:
         corpus.close()
@@ -1061,8 +1095,69 @@ def _backup(cfg: Config, corpus: Corpus) -> int:
 
     stamp = datetime.now(UTC).strftime("%y%m%d-%H%M%S")
     dest = Path(cfg.data_dir) / "backups" / f"evidence-{stamp}.db"
-    path = corpus.backup(dest)
+    try:
+        path = corpus.backup(dest)
+    except (OSError, RuntimeError) as exc:
+        return fail(str(exc))
     print(path)
+    return 0
+
+
+def _restore(cfg: Config, corpus: Corpus, backup: Path, *, replace: bool) -> int:
+    from dossier.store import read_backup, replace_locker
+
+    del cfg
+    info = read_backup(backup)
+    print(f"backup: {backup}")
+    print(f"schema: v{info.schema}")
+    print(f"records: {info.records}")
+    print(f"cards: {info.cards}")
+    if not info.ok:
+        return fail(info.reason or "backup is not usable")
+    print("integrity: ok")
+    if not replace:
+        print("restore: check only")
+        return 0
+    live = Path(corpus.db_path)
+    pre = live.with_name(f"{live.stem}.pre-restore.db")
+    try:
+        corpus._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        saved = corpus.backup(pre)
+    except (OSError, RuntimeError, sqlite3.Error) as exc:
+        return fail(str(exc))
+    print(f"saved: {saved}")
+    corpus.close()
+    try:
+        replace_locker(live, backup)
+    except (OSError, RuntimeError) as exc:
+        return fail(str(exc))
+    print(f"restored: {live}")
+    return 0
+
+
+def _drift(cfg: Config, corpus: Corpus) -> int:
+    from dossier.drift import write_drift
+
+    path, report = write_drift(corpus, Path(cfg.data_dir) / "drift")
+    print(path)
+    print(
+        f"stale: {len(report.stale)} · "
+        f"duplicates: {len(report.duplicates)} · "
+        f"unseen: {len(report.unseen)}"
+    )
+    return 0
+
+
+def _drop_record(corpus: Corpus, uri: str) -> int:
+    citing = corpus.approved_citing(uri)
+    if citing:
+        print(f"approved card cites {uri}", file=sys.stderr)
+        for card in citing:
+            print(card.id, file=sys.stderr)
+        return 1
+    if not corpus.drop_record(uri):
+        return fail(f"no record {uri}")
+    print(f"dropped {uri}")
     return 0
 
 
@@ -1093,6 +1188,23 @@ def _match(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
+    embedder = _query_embedder(cfg, corpus)
+    folder = getattr(args, "postings", None)
+    if folder is not None:
+        try:
+            repeated, used, total = match_postings(corpus, folder, cfg, embedder=embedder)
+        except (OSError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        path = write_postings(
+            repeated,
+            Path(cfg.data_dir) / "matches",
+            used=used,
+            total=total,
+        )
+        print(path)
+        print(f"postings: {used} of {total} · repeated gaps: {len(repeated)}")
+        return 0
     try:
         posting = args.posting.read_text(encoding="utf-8")
     except OSError as exc:
@@ -1105,7 +1217,7 @@ def _match(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
         corpus,
         posting,
         cfg,
-        embedder=_query_embedder(cfg, corpus),
+        embedder=embedder,
     )
     path = write_match(report, Path(cfg.data_dir) / "matches")
     evidenced = sum(1 for item in report.requirements if item.evidence)
@@ -1400,6 +1512,12 @@ def _doctor_deep(corpus: Corpus) -> None:
     from dossier.show import stale_spans
 
     print(f"stale_spans: {len(stale_spans(corpus))}")
+    marked = sum(
+        1
+        for card in corpus.cards(STATUS_APPROVED)
+        if card.extras.get("stale_reason")
+    )
+    print(f"stale_marked: {marked}")
     print(f"schema: v{corpus.schema_version()}")
 
 

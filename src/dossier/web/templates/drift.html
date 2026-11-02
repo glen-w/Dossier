@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('drift') }}</h1>
+<p class="lede">{{ blurbs.drift }} This page does not ingest, approve, or delete.</p>
+<p class="meta">stale {{ report.stale|length }} · duplicates {{ report.duplicates|length }} · unseen {{ report.unseen|length }}</p>
+{% if report.stale %}
+<div class="card">
+  <h3>Stale cards</h3>
+  <ul>
+  {% for card_id, claim, reason in report.stale %}
+    <li><a href="/review?view=queue&status=approved&q={{ card_id }}">{{ claim }}</a> <span class="meta">{{ reason }}</span></li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% if report.duplicates %}
+<div class="card">
+  <h3>Duplicate sentences</h3>
+  <ul>
+  {% for text, uris in report.duplicates %}
+    <li>{{ text }}
+      <ul>
+      {% for uri in uris %}
+        <li class="meta">{{ uri }}</li>
+      {% endfor %}
+      </ul>
+    </li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% if report.unseen %}
+<div class="card">
+  <h3>Unseen on the last full walk</h3>
+  <ul>
+  {% for source, root, uri in report.unseen %}
+    <li class="meta">{{ source }} {{ uri }}</li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

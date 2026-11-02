@@ -39,7 +39,7 @@ Drafts, the human gate (`buffet`, `approve`, `refuse`, `reopen`, `review`), defe
 
 ## Locker schema
 
-`evidence.db` carries a schema version. `Corpus` runs numbered migrations in order on open and, when the locker already holds records, copies it to `evidence.pre-v<N>.db` first. A locker from a newer Dossier is refused. Behaviour: [status](status.md).
+`evidence.db` carries a schema version (v3). Each record stores a SHA-256 of its text. `Corpus` runs numbered migrations in order on open and, when the locker already holds records, copies it to `evidence.pre-v<N>.db` first. A locker from a newer Dossier is refused. A text change marks citing cards stale and does not approve them. Behaviour: [status](status.md).
 
 ## Rendering a draft
 
@@ -55,4 +55,4 @@ Drafts, the human gate (`buffet`, `approve`, `refuse`, `reopen`, `review`), defe
 
 ## Roadmap
 
-Versioned waves; 0.10 shipped the workbench loop and the paste-sized span rule, and 0.11 the paste-time span check, scalable retrieval, and the renderer. Next is 1.0 second-machine acceptance: [roadmap](roadmap.md).
+Versioned waves; 0.11 shipped the paste-time span check, and 0.12 (wave 1.1) notices when a record's text changes. 1.0 remains second-machine acceptance. Later waves stay in [roadmap](roadmap.md).

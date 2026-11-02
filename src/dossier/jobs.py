@@ -62,6 +62,7 @@ class Job:
             self.events.append(ev)
             self._cond.notify_all()
             self._persist(ev)
+            self._write_status()
             return ev
 
     def _persist(self, ev: JobEvent) -> None:
@@ -74,6 +75,17 @@ class Job:
             path = folder / f"{self.id}.jsonl"
             with path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(ev.as_dict(), ensure_ascii=False) + "\n")
+        except OSError:
+            return
+
+    def _write_status(self) -> None:
+        raw = os.environ.get("DOSSIER_DATA", "").strip()
+        if not raw:
+            return
+        folder = Path(raw) / "jobs"
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / f"{self.id}.status").write_text(self.status + "\n", encoding="utf-8")
         except OSError:
             return
 
@@ -133,6 +145,7 @@ class JobRunner:
             if self._job is not None and self._job.status in {"queued", "running"}:
                 raise LockerBusy("locker busy")
             job = Job(id=uuid.uuid4().hex[:12], kind=kind, seed=dict(seed or {}))
+            job._write_status()
             self._job = job
             self._thread = threading.Thread(
                 target=self._run,
@@ -195,6 +208,36 @@ class JobRunner:
                 self._history = ([job] + self._history)[:8]
 
 
+def recover_interrupted(root: Path | None = None) -> list[str]:
+    """Mark a status file left at queued or running as interrupted. Do not steal a live lock."""
+    if root is None:
+        raw = os.environ.get("DOSSIER_DATA", "").strip()
+        if not raw:
+            INTERRUPTED.clear()
+            return []
+        root = Path(raw)
+    folder = root / "jobs"
+    if not folder.is_dir():
+        INTERRUPTED.clear()
+        return []
+    found: list[str] = []
+    for path in sorted(folder.glob("*.status")):
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if text not in {"queued", "running"}:
+            continue
+        try:
+            path.write_text("interrupted\n", encoding="utf-8")
+        except OSError:
+            continue
+        found.append(path.stem)
+    INTERRUPTED.clear()
+    INTERRUPTED.extend(found)
+    return found
+
+
 def _scrub(message: str) -> str:
     """Drop home-directory prefixes from errors shown in the UI."""
     home = str(Path.home())
@@ -203,3 +246,4 @@ def _scrub(message: str) -> str:
 
 # Process-wide runner for the workbench.
 RUNNER = JobRunner()
+INTERRUPTED: list[str] = []

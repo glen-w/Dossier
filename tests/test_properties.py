@@ -17,6 +17,7 @@ from dossier.cards import (
     carrying_span,
     content_tokens,
     current_span,
+    evidence_carries,
     span_in_text,
     span_max,
 )
@@ -148,6 +149,14 @@ def test_everything_pasted_is_a_current_span_under_the_cap(
                 assert line in spans
     finally:
         corpus.close()
+
+
+@given(extra=st.sampled_from(["lunar", "everest", "quantum", "reactor"]))
+@settings(max_examples=8, deadline=None)
+def test_an_unsupported_specific_word_is_refused(extra: str) -> None:
+    evidence = "Quinn wrote a synthetic paper on coastal governance."
+    assert evidence_carries("synthetic paper on coastal governance", evidence)
+    assert not evidence_carries(f"synthetic paper on coastal governance {extra}", evidence)
 
 
 @given(value=st.one_of(st.none(), st.integers(), st.floats(allow_nan=False, allow_infinity=False),

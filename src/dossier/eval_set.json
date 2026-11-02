@@ -264,13 +264,11 @@
     },
     {
       "question": "coastal governance on lunar bases",
-      "refuse": true,
-      "known_gap": true
+      "refuse": true
     },
     {
       "question": "kelp restoration of Everest",
-      "refuse": true,
-      "known_gap": true
+      "refuse": true
     },
     {
       "question": "paper",

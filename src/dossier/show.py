@@ -87,8 +87,12 @@ def store_span(corpus: Corpus, card: ClaimCard, *, dry_run: bool = False) -> boo
     sentence, span_uri = _first_span(corpus, card)
     extras = dict(card.extras)
     if sentence:
+        previous = (extras.get("span") or "").strip()
+        if previous and previous != sentence:
+            extras["span_prev"] = previous
         extras["span"] = sentence
         extras["span_uri"] = span_uri
+        extras.pop("stale_reason", None)
         if not dry_run:
             corpus.put_card(replace(card, extras=extras))
         return True

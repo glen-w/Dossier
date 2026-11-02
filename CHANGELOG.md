@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.0
+
+The locker notices when evidence moves.
+
+- A question or claim is carried only when every specific word is in the evidence. Generic words may still overlap in part. The bundled golden set no longer treats a mixed question as a known gap.
+- Schema v3 stores `text_hash` and `text_changed_at`. Changing a record's text marks citing cards `stale_reason=record_changed` without changing status or dropping the span. `defend` keeps the previous span in `span_prev` and clears the mark when it stores a new one.
+- `dossier drift` lists stale cards, exact duplicate sentences, and URIs a full walk missed. `dossier drop-record` removes one record only when no approved card cites it.
+- `backup` checks integrity and counts. `restore` is check-only unless `--replace`. `import` skips a card the locker cannot still carry and does not replay answers.
+- `match --postings` writes requirements that are gaps in two or more of up to 20 files.
+- A workbench job left running is marked interrupted on the next start. The drift page only reads.
+
 ## 0.11.0
 
 Evidence you can paste, and retrieval that scales.

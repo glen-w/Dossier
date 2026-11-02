@@ -28,6 +28,10 @@ uv run dossier defend --refresh --dry-run
 uv run dossier audit-cards
 uv run dossier reopen --from-audit
 uv run dossier backup
+uv run dossier restore ./backup.db
+uv run dossier restore ./backup.db --replace
+uv run dossier drift
+uv run dossier drop-record <uri>
 uv run dossier rebuild-index
 uv run dossier eval
 uv run dossier eval --retrieval
@@ -41,6 +45,7 @@ uv run dossier tailor --posting ./posting.txt --kind letter --arrange
 uv run dossier tailor --posting ./posting.txt --format json-resume
 uv run dossier tailor --posting ./posting.txt --format pdf --with-sources
 uv run dossier match --posting ./posting.txt
+uv run dossier match --postings ./postings
 uv run dossier index
 uv run dossier index --sources slack --limit 5000
 uv run dossier ask "what did I write about coastal governance?"
@@ -116,10 +121,25 @@ name). `--with-sources` appends the cited record URIs for you to check.
 
 `dossier match --posting` writes an ordered evidence list under
 `data/matches/`, one section per requirement. An empty file is an error.
-It does not approve a card. `--sources`, `--year-from`, `--year-to`, and
-`--effort` narrow that command. Ask and brief take the same flags. Leave
-them off to use `[scope]` and the effort preset in `dossier.toml`. See
+`dossier match --postings` reads up to 20 text files in a directory and
+writes the requirements that are gaps in two or more of them. It does not
+approve a card. `--sources`, `--year-from`, `--year-to`, and `--effort`
+narrow that command. Ask and brief take the same flags. Leave them off to
+use `[scope]` and the effort preset in `dossier.toml`. See
 [status](status.md).
+
+`dossier drift` writes `data/drift/` with stale approved cards, exact
+duplicate sentences, and URIs a full walk (`employer`, `notes`,
+`applications`, `git`, `ics`) saw last time and missed this time. Sampled
+seekers are not listed as missing. `dossier drop-record` removes one record
+only when no approved card cites it.
+
+`dossier backup` copies the locker and checks the copy. `dossier restore`
+checks a backup and prints its counts. `--replace` copies the live locker
+to `evidence.pre-restore.db`, then swaps in the backup. A backup from a
+newer Dossier is refused. `dossier import` skips a card whose citation is
+missing or whose stored span is no longer in that record, and does not
+replay exported answers.
 
 `dossier index` embeds passages into `evidence.db` with the local Ollama
 embed model. `ask` uses those vectors when full text is empty or thin.
@@ -132,7 +152,9 @@ Nearest-neighbour search streams rows in pure Python. With
 
 `dossier eval` runs the bundled golden set (refusals, paraphrases, injected
 text, odd characters) against a throwaway locker, never yours. Cases marked
-`known_gap` are printed on every run. `--retrieval` adds recall@k and MRR on a
+`known_gap` are printed on every run. The bundled set has none: a question
+that adds a specific word the record does not contain is a refusal.
+`--retrieval` adds recall@k and MRR on a
 generated locker with a deterministic embedder, so it needs no model.
 
 `dossier prove` runs a disposable real-corpus pass into a throwaway data

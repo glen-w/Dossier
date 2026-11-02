@@ -34,6 +34,7 @@ Use these words in the GUI and in new docs. Prefer the locked term over a synony
 | **Review** | The human gate on the workbench: approve, refuse, reopen, defend. The CLI list command stays `buffet`. |
 | **Span / defend** | The one sentence that carries the claim; `defend` stores it on the card. |
 | **Packet** | Markdown of spanned approved cards under `data/packets/`. |
+| **Drift** | Stale cards, duplicate sentences, and full-walk URIs the last ingest missed. It does not delete or approve. |
 
 ## Answers and employment kit
 

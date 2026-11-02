@@ -43,6 +43,7 @@ from dossier.store import Corpus
 from dossier.ui import note, stage
 
 REQ_CAP = 20
+POSTINGS_CAP = 20
 PER_REQUIREMENT = 5
 SOURCE_CAP = 2
 GAP_BROAD = "requirement is too broad"
@@ -194,6 +195,58 @@ def match_posting(
         note(f"{index}/{total} {requirement.text[:80]}")
         rows.append(_match_one(corpus, requirement, cfg, embedder, cards))
     return MatchReport(tuple(rows))
+
+
+def match_postings(
+    corpus: Corpus,
+    directory: Path,
+    cfg: object,
+    *,
+    embedder: object | None = None,
+) -> tuple[dict[str, list[str]], int, int]:
+    """Requirements that are gaps in two or more posting files. Cap is 20 files."""
+    folder = Path(directory)
+    if not folder.is_dir():
+        raise ValueError("postings path is not a directory")
+    files = [
+        path
+        for path in sorted(folder.iterdir())
+        if path.is_file()
+        and not path.name.startswith(".")
+        and path.suffix.lower() in {".txt", ".md", ".markdown"}
+    ]
+    if not files:
+        raise ValueError("no posting files")
+    chosen = files[:POSTINGS_CAP]
+    gaps: dict[str, list[str]] = {}
+    for path in chosen:
+        text = path.read_text(encoding="utf-8")
+        report = match_posting(corpus, text, cfg, embedder=embedder)
+        for requirement in report.requirements:
+            if not requirement.gap:
+                continue
+            gaps.setdefault(requirement.text, []).append(path.name)
+    repeated = {text: names for text, names in gaps.items() if len(names) >= 2}
+    return repeated, len(chosen), len(files)
+
+
+def write_postings(repeated: dict[str, list[str]], directory: Path, *, used: int, total: int) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%y%m%d-%H%M%S")
+    path = directory / f"{stamp}-postings.md"
+    if path.exists():
+        stamp = datetime.now(UTC).strftime("%y%m%d-%H%M%S-%f")
+        path = directory / f"{stamp}-postings.md"
+    lines = ["# Repeated gaps", "", f"postings: {used} of {total}", ""]
+    if not repeated:
+        lines.append("None.")
+    for text, names in repeated.items():
+        lines.append(f"- {text}")
+        for name in names:
+            lines.append(f"  - {name}")
+    lines.append("")
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
 
 
 def write_match(report: MatchReport, directory: Path) -> Path:

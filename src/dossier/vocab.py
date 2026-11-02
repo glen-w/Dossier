@@ -8,7 +8,7 @@ from __future__ import annotations
 # Primary nav. Rooms are layout groups; every key is still its own URL.
 NAV_ROOMS = (
     ("Prepare", ("locker", "sources", "extract", "index")),
-    ("Decide", ("review", "gaps")),
+    ("Decide", ("review", "gaps", "drift")),
     ("Use", ("ask", "match", "tailor", "packet", "brief", "run", "prove", "referees")),
     ("Settings", ("settings",)),
 )
@@ -48,6 +48,7 @@ LABELS = {
     "settings": "Settings",
     "referees": "Referees",
     "gaps": "Gaps",
+    "drift": "Drift",
 }
 
 BLURBS = {
@@ -60,6 +61,7 @@ BLURBS = {
     "tailor": "CV or letter markdown from spanned approved cards.",
     "packet": "Markdown of spanned approved cards.",
     "gaps": "Empty lenses, unspanned cards, and records still waiting on extract.",
+    "drift": "Stale cards, duplicate sentences, and full-walk URIs the last ingest did not see.",
     "settings": "Common knobs. Phrase lists and the rest of the file stay in the gitignored dossier.toml.",
     "effort": "How hard the model should try: light, balanced, or high. Balanced uses a fast model for extract and the answer model for ask. Light drafts without a model. High uses the answer model for both.",
     "profile": "A named overlay of tunable knobs. Not identity.",

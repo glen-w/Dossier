@@ -66,6 +66,25 @@ async def match_run(
         return RedirectResponse(f"/match?err={_q(str(exc))}", status_code=303)
     return RedirectResponse(f"/match?job={job.id}", status_code=303)
 
+@router.get("/drift", response_class=HTMLResponse)
+async def drift_page(request: Request) -> HTMLResponse:
+    from dossier.drift import collect_drift, render_drift
+
+    cfg, corpus = _open()
+    try:
+        report = collect_drift(corpus)
+        return _page(
+            request,
+            "drift.html",
+            "drift",
+            cfg=cfg,
+            report=report,
+            body=render_drift(report),
+        )
+    finally:
+        corpus.close()
+
+
 @router.get("/gaps", response_class=HTMLResponse)
 async def gaps_page(request: Request) -> HTMLResponse:
     from dossier.show import gap_report

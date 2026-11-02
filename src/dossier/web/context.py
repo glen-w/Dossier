@@ -16,7 +16,7 @@ from dossier.config import Config
 from dossier.extract import ExtractProgress, extract_corpus
 from dossier.ingest_run import run_ingest_targets
 from dossier.interview import conduct
-from dossier.jobs import RUNNER, Job, JobCancelled
+from dossier.jobs import INTERRUPTED, RUNNER, Job, JobCancelled
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
 from dossier.llm.client import (
@@ -72,6 +72,7 @@ def _page(
         "csrf_token": getattr(request.state, "csrf_token", "")
         or request.cookies.get(CSRF_COOKIE)
         or "",
+        "interrupted": list(INTERRUPTED),
     }
     base.update(ctx)
     return TEMPLATES.TemplateResponse(request, template, base)

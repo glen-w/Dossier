@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>{{ label('locker') }}</h1>
+{% if interrupted %}
+<p class="err">Interrupted jobs: {{ interrupted | join(', ') }}</p>
+{% endif %}
 {% if snap.next %}
 <div class="hero">
   <p class="lede hero-line">{{ snap.next }}</p>

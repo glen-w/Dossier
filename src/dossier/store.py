@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import sqlite3
@@ -13,7 +14,8 @@ from typing import IO
 
 from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED, ClaimCard
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+FULL_WALK = frozenset({"employer", "notes", "applications", "git", "ics"})
 
 
 class LockerBusy(RuntimeError):
@@ -26,6 +28,84 @@ class LockerSchemaTooNew(RuntimeError):
 
 def _now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
+
+
+def text_hash(text: str) -> str:
+    """SHA-256 of the stored record text. Provenance, not a secret."""
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class BackupInfo:
+    ok: bool
+    schema: int
+    records: int
+    cards: int
+    reason: str = ""
+
+
+def read_backup(path: Path) -> BackupInfo:
+    """Integrity, schema, and counts. Does not migrate or replace a locker."""
+    path = Path(path)
+    if not path.is_file():
+        return BackupInfo(False, 0, 0, 0, "backup is missing")
+    try:
+        conn = sqlite3.connect(path)
+    except sqlite3.Error as exc:
+        return BackupInfo(False, 0, 0, 0, str(exc))
+    try:
+        row = conn.execute("PRAGMA integrity_check").fetchone()
+        if not row or str(row[0]) != "ok":
+            return BackupInfo(False, 0, 0, 0, "integrity check failed")
+        schema = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if schema > SCHEMA_VERSION:
+            return BackupInfo(
+                False,
+                schema,
+                0,
+                0,
+                f"backup is schema v{schema}; this Dossier reads up to v{SCHEMA_VERSION}",
+            )
+        names = {
+            item[0]
+            for item in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+        if "records" not in names or "cards" not in names:
+            return BackupInfo(False, schema, 0, 0, "backup has no locker tables")
+        records = int(conn.execute("SELECT count(*) FROM records").fetchone()[0])
+        cards = int(conn.execute("SELECT count(*) FROM cards").fetchone()[0])
+        return BackupInfo(True, schema, records, cards, "")
+    except sqlite3.Error as exc:
+        return BackupInfo(False, 0, 0, 0, str(exc))
+    finally:
+        conn.close()
+
+
+def replace_locker(live: Path, backup: Path) -> None:
+    """Swap a closed locker for a checked backup. Removes a leftover WAL."""
+    live = Path(live)
+    info = read_backup(backup)
+    if not info.ok:
+        raise RuntimeError(info.reason or "backup is not usable")
+    tmp = live.with_name(live.name + ".incoming")
+    src = sqlite3.connect(backup)
+    dst = sqlite3.connect(tmp)
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
+    checked = read_backup(tmp)
+    if not checked.ok:
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(checked.reason or "restored copy failed the integrity check")
+    for suffix in ("-wal", "-shm"):
+        extra = Path(str(live) + suffix)
+        if extra.exists():
+            extra.unlink()
+    tmp.replace(live)
 
 
 @dataclass(frozen=True)
@@ -52,15 +132,22 @@ class Corpus:
         self.passages_fts_ok = False
         self._batch = False
         self._lock_fh: IO[str] | None = None
+        self._walk: tuple[str, str] | None = None
+        self._seen: set[str] = set()
+        self._closed = False
         self._init()
 
     def close(self) -> None:
-        if self._lock_fh is not None:
+        if self._closed:
+            return
+        self._closed = True
+        fh = self._lock_fh
+        self._lock_fh = None
+        if fh is not None:
             try:
-                self._lock_fh.close()
+                fh.close()
             except OSError:
                 pass
-            self._lock_fh = None
         self._conn.close()
 
     def __enter__(self) -> Corpus:
@@ -121,8 +208,9 @@ class Corpus:
         self._migrate()
 
     def upsert_record(self, record: Record) -> None:
+        self._note_seen(record.source, record.uri)
         prior = self._conn.execute(
-            "SELECT title, text, table_name FROM records WHERE uri = ?",
+            "SELECT title, text, table_name, text_changed_at FROM records WHERE uri = ?",
             (record.uri,),
         ).fetchone()
         if (
@@ -132,15 +220,26 @@ class Corpus:
             and (prior["table_name"] or "") == (record.table or "")
         ):
             return
+        now = _now()
+        text_changed = prior is not None and prior["text"] != record.text
+        if prior is None or text_changed:
+            changed_at = now
+        else:
+            changed_at = prior["text_changed_at"] or now
         self._conn.execute(
             """
-            INSERT INTO records (id, source, uri, title, text, table_name, ingested_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO records (
+                id, source, uri, title, text, table_name, ingested_at,
+                text_hash, text_changed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(uri) DO UPDATE SET
                 title=excluded.title,
                 text=excluded.text,
                 table_name=excluded.table_name,
-                ingested_at=excluded.ingested_at
+                ingested_at=excluded.ingested_at,
+                text_hash=excluded.text_hash,
+                text_changed_at=excluded.text_changed_at
             """,
             (
                 record.id,
@@ -149,13 +248,104 @@ class Corpus:
                 record.title,
                 record.text,
                 record.table,
-                _now(),
+                now,
+                text_hash(record.text),
+                changed_at,
             ),
         )
         self._index_record(record)
         self._replace_passages(record)
-        self._clear_spans_for_uri(record.uri)
+        if text_changed:
+            self._mark_stale_for_uri(record.uri)
         self._commit()
+
+    def begin_walk(self, source: str, root: str) -> None:
+        """Remember URIs a full-walk adapter upserts for this root."""
+        if source not in FULL_WALK:
+            self._walk = None
+            self._seen = set()
+            return
+        self._walk = (source, root)
+        self._seen = set()
+
+    def finish_walk(self) -> list[str]:
+        """Store this walk's URIs. Return URIs the previous walk of this root saw and this one did not."""
+        if not self._walk:
+            return []
+        source, root = self._walk
+        seen = set(self._seen)
+        self._walk = None
+        self._seen = set()
+        prior = {
+            str(row[0])
+            for row in self._conn.execute(
+                "SELECT uri FROM ingest_seen WHERE source = ? AND root = ?",
+                (source, root),
+            )
+        }
+        unseen = sorted(prior - seen)
+        self._conn.execute(
+            "DELETE FROM ingest_seen WHERE source = ? AND root = ?",
+            (source, root),
+        )
+        self._conn.execute(
+            "DELETE FROM ingest_unseen WHERE source = ? AND root = ?",
+            (source, root),
+        )
+        for uri in sorted(seen):
+            self._conn.execute(
+                "INSERT INTO ingest_seen (source, root, uri) VALUES (?, ?, ?)",
+                (source, root, uri),
+            )
+        for uri in unseen:
+            self._conn.execute(
+                "INSERT INTO ingest_unseen (source, root, uri) VALUES (?, ?, ?)",
+                (source, root, uri),
+            )
+        self._commit()
+        return unseen
+
+    def unseen_rows(self) -> list[tuple[str, str, str]]:
+        rows = self._conn.execute(
+            "SELECT source, root, uri FROM ingest_unseen ORDER BY source, uri"
+        ).fetchall()
+        return [(str(row["source"]), str(row["root"]), str(row["uri"])) for row in rows]
+
+    def approved_citing(self, uri: str) -> list[ClaimCard]:
+        found: list[ClaimCard] = []
+        for card in self.cards(STATUS_APPROVED):
+            if uri in card.citations or card.extras.get("span_uri") == uri:
+                found.append(card)
+        return found
+
+    def drop_record(self, uri: str) -> bool:
+        """Remove one record and its passages. Caller must refuse an approved citation."""
+        if self.get_record(uri) is None:
+            return False
+        self._conn.execute("DELETE FROM records WHERE uri = ?", (uri,))
+        if self.fts_ok:
+            mapped = self._conn.execute(
+                "SELECT fts_rowid FROM records_fts_map WHERE uri = ?",
+                (uri,),
+            ).fetchone()
+            if mapped is not None:
+                self._conn.execute(
+                    "DELETE FROM records_fts WHERE rowid = ?",
+                    (mapped["fts_rowid"],),
+                )
+                self._conn.execute("DELETE FROM records_fts_map WHERE uri = ?", (uri,))
+        self._conn.execute("DELETE FROM passages WHERE record_uri = ?", (uri,))
+        if self.passages_fts_ok:
+            self._delete_passage_fts(uri)
+        self._drop_vectors(uri)
+        self._conn.execute("DELETE FROM ingest_seen WHERE uri = ?", (uri,))
+        self._conn.execute("DELETE FROM ingest_unseen WHERE uri = ?", (uri,))
+        self._commit()
+        return True
+
+    def _note_seen(self, source: str, uri: str) -> None:
+        if self._walk and self._walk[0] == source:
+            self._seen.add(uri)
 
     def get_record(self, uri: str) -> Record | None:
         row = self._conn.execute(
@@ -1060,6 +1250,12 @@ class Corpus:
             self._conn.backup(target)
         finally:
             target.close()
+        live_records = int(self._conn.execute("SELECT count(*) FROM records").fetchone()[0])
+        live_cards = int(self._conn.execute("SELECT count(*) FROM cards").fetchone()[0])
+        info = read_backup(dest)
+        if not info.ok or info.records != live_records or info.cards != live_cards:
+            dest.unlink(missing_ok=True)
+            raise RuntimeError(info.reason or "backup counts do not match the live locker")
         return dest
 
     def integrity_ok(self) -> bool:
@@ -1170,22 +1366,65 @@ class Corpus:
             "UPDATE passage_vec SET dim = length(vector) / 4 WHERE dim IS NULL"
         )
 
-    def _clear_spans_for_uri(self, uri: str) -> None:
+    def _migrate_v3(self) -> None:
+        """Hash record text and remember which full-walk URIs the last ingest saw."""
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(records)").fetchall()}
+        if "text_hash" not in cols:
+            self._conn.execute("ALTER TABLE records ADD COLUMN text_hash TEXT")
+        if "text_changed_at" not in cols:
+            self._conn.execute("ALTER TABLE records ADD COLUMN text_changed_at TEXT")
+        self._conn.execute(
+            "UPDATE records SET text_changed_at = ingested_at WHERE text_changed_at IS NULL"
+        )
         rows = self._conn.execute(
-            "SELECT id, extras FROM cards WHERE extras LIKE ?",
-            ('%"span"%',),
+            "SELECT uri, text FROM records WHERE text_hash IS NULL"
         ).fetchall()
         for row in rows:
+            self._conn.execute(
+                "UPDATE records SET text_hash = ? WHERE uri = ?",
+                (text_hash(row["text"] or ""), row["uri"]),
+            )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ingest_seen (
+                source TEXT NOT NULL,
+                root TEXT NOT NULL,
+                uri TEXT NOT NULL,
+                PRIMARY KEY (source, root, uri)
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ingest_unseen (
+                source TEXT NOT NULL,
+                root TEXT NOT NULL,
+                uri TEXT NOT NULL,
+                PRIMARY KEY (source, root, uri)
+            )
+            """
+        )
+
+    def _mark_stale_for_uri(self, uri: str) -> None:
+        """Keep the stored span and flag cards that cite a record whose text changed."""
+        rows = self._conn.execute("SELECT id, citations, extras FROM cards").fetchall()
+        for row in rows:
+            try:
+                citations = json.loads(row["citations"] or "[]")
+            except json.JSONDecodeError:
+                citations = []
             try:
                 extras = json.loads(row["extras"] or "{}")
             except json.JSONDecodeError:
-                continue
+                extras = {}
             if not isinstance(extras, dict):
+                extras = {}
+            cites = [str(item) for item in citations] if isinstance(citations, list) else []
+            if uri not in cites and str(extras.get("span_uri") or "") != uri:
                 continue
-            if extras.get("span_uri") != uri and uri not in str(extras.get("span_uri") or ""):
+            if extras.get("stale_reason") == "record_changed":
                 continue
-            extras.pop("span", None)
-            extras.pop("span_uri", None)
+            extras["stale_reason"] = "record_changed"
             self._conn.execute(
                 "UPDATE cards SET extras = ? WHERE id = ?",
                 (json.dumps(extras), row["id"]),

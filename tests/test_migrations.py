@@ -81,6 +81,61 @@ def test_locker_from_a_newer_dossier_is_refused(tmp_path: Path) -> None:
     assert _version(path) == SCHEMA_VERSION + 5
 
 
+def test_v2_locker_gains_a_text_hash(tmp_path: Path) -> None:
+    path = tmp_path / "evidence.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(
+        """
+        CREATE TABLE records (
+            id TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            uri TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            text TEXT NOT NULL,
+            table_name TEXT,
+            ingested_at TEXT NOT NULL
+        );
+        CREATE TABLE cards (
+            id TEXT PRIMARY KEY,
+            claim TEXT NOT NULL,
+            citations TEXT NOT NULL,
+            source TEXT NOT NULL,
+            record_id TEXT,
+            status TEXT NOT NULL,
+            reason TEXT,
+            created_at TEXT NOT NULL,
+            extras TEXT
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO records VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            "r1",
+            "slack",
+            "slack://1",
+            "Note",
+            "Quinn wrote a paper.",
+            "",
+            "2020-01-01T00:00:00+00:00",
+        ),
+    )
+    conn.execute("PRAGMA user_version = 2")
+    conn.commit()
+    conn.close()
+    store = Corpus(path)
+    try:
+        assert store.schema_version() == SCHEMA_VERSION
+        row = store._conn.execute(
+            "SELECT text_hash, text_changed_at FROM records"
+        ).fetchone()
+        assert row["text_hash"]
+        assert row["text_changed_at"] == "2020-01-01T00:00:00+00:00"
+    finally:
+        store.close()
+    assert (tmp_path / "evidence.pre-v2.db").is_file()
+
+
 def test_gitignore_covers_the_backup_name() -> None:
     root = Path(__file__).resolve().parents[1]
     lines = (root / ".gitignore").read_text(encoding="utf-8").splitlines()

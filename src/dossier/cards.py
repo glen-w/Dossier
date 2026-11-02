@@ -91,8 +91,36 @@ GENERIC_TOKENS = frozenset(
         "text",
         "year",
         "years",
+        "experience",
+        "leading",
+        "knowledge",
+        "ability",
+        "proven",
+        "responsible",
     }
 )
+
+
+def token_covered(token: str, blob: set[str]) -> bool:
+    """True when the evidence has this word, or the same word with one letter changed.
+
+    `write` covers `wrote`. `drafting` covers `drafted`. An extra noun such as `lunar` still does not.
+    """
+    if token in blob:
+        return True
+    for other in blob:
+        if len(other) == len(token) and sum(
+            left != right for left, right in zip(token, other, strict=True)
+        ) == 1:
+            return True
+        shared = 0
+        for left, right in zip(token, other, strict=False):
+            if left != right:
+                break
+            shared += 1
+        if shared >= 5:
+            return True
+    return False
 
 _ABBREV = frozenset(
     {
@@ -299,8 +327,12 @@ def evidence_carries(claim: str, evidence: str) -> bool:
     """True when evidence text can carry the claim without an LLM.
 
     Match whole words. A token inside a longer word does not count.
-    A claim with no content words is refused. Short claims need about
-    half their tokens, including one specific (non-generic) token.
+    A claim with no content words is refused. Short claims still need
+    about half their tokens. Every specific (non-generic) token must be
+    covered by the evidence, including a one-letter difference such as
+    write and wrote. One supported word does not carry an extra noun
+    the record never uses. Generic tokens, including requirement cues
+    such as experience and knowledge, may still overlap in part.
     """
     if not evidence.strip():
         return False
@@ -318,7 +350,7 @@ def evidence_carries(claim: str, evidence: str) -> bool:
         need = max(3, math.ceil(len(tokens) * 0.4))
     if hits < need:
         return False
-    if specific and not any(token in blob for token in specific):
+    if specific and not all(token_covered(token, blob) for token in specific):
         return False
     return True
 

@@ -29,12 +29,27 @@ def test_export_import_round_trip(corpus: Corpus, tmp_path: Path) -> None:
     dest = tmp_path / "locker.json"
     export_locker(corpus, dest)
     other = Corpus(tmp_path / "other.db")
-    n = import_locker(other, dest)
-    assert n == 1
+    other.upsert_record(
+        Record(
+            id="r1",
+            source="slack",
+            uri="slack://1",
+            title="Note",
+            text="Quinn wrote a synthetic paper on coastal governance.",
+        )
+    )
+    result = import_locker(other, dest)
+    assert result.imported == 1
+    assert result.skipped == 0
     loaded = other.get_card("c1")
     assert loaded is not None
     assert loaded.extras["span"].startswith("Quinn wrote")
+    empty = Corpus(tmp_path / "empty.db")
+    skipped = import_locker(empty, dest)
+    assert skipped.imported == 0
+    assert skipped.skipped == 1
     other.close()
+    empty.close()
 
 
 def test_cli_eval_and_packet(tmp_path: Path, monkeypatch, capsys) -> None:

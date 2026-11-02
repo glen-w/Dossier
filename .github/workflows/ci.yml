@@ -58,6 +58,8 @@ jobs:
           export DOSSIER_DATA="$(mktemp -d)" DOSSIER_LLM_PROVIDER=off
           /tmp/wheel-env/bin/dossier doctor
           /tmp/wheel-env/bin/dossier eval --retrieval
+      - name: Second machine
+        run: bash scripts/release/second_machine.sh
 
   audit:
     runs-on: ubuntu-latest
