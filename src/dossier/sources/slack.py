@@ -6,8 +6,8 @@ from pathlib import Path
 
 from dossier.fetch.slack import fetch_slack_body
 from dossier.fetch.snippet import record_from_hit
-from dossier.seekers.quota import apply_quotas
 from dossier.seekers.hits import merge_hits
+from dossier.seekers.quota import apply_quotas
 from dossier.seekers.slack import hunt_slack, resolve_slack_user_ids
 from dossier.sources.slack_export import is_slack_export, load_slack_export
 from dossier.sources.warehouse import connect_readonly, has_table, resolve_warehouse

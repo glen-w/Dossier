@@ -63,7 +63,7 @@ def merge_hits(hits: list[Hit]) -> list[Hit]:
             skills=tuple(dict.fromkeys((*prev.skills, *hit.skills))),
             score=max(prev.score, hit.score),
             hunts=tuple(dict.fromkeys((*prev.hunts, *hit.hunts))),
-            fetch_body=prev.fetch_body and hit.fetch_body,
+            fetch_body=prev.fetch_body or hit.fetch_body,
             channel_id=prev.channel_id or hit.channel_id,
             ts=prev.ts or hit.ts,
             account_key=prev.account_key or hit.account_key,

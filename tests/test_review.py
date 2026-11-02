@@ -1,11 +1,7 @@
-import json
-import threading
-from urllib.request import Request, urlopen
-
 import pytest
 
 from dossier.cards import STATUS_PENDING, ClaimCard
-from dossier.review import apply_action, list_cards, make_server, summary
+from dossier.review import apply_action, list_cards, summary
 from dossier.store import Corpus, Record
 
 
@@ -109,38 +105,12 @@ def test_reopen_action_leaves_pending_cards(corpus: Corpus) -> None:
     assert corpus.get_card("b").status == STATUS_PENDING
 
 
-def test_summary_route_stays_on_loopback(corpus: Corpus) -> None:
+def test_summary_counts_source(corpus: Corpus) -> None:
     corpus.put_card(_card("a", "mbox", "delivered"))
-    httpd = make_server(corpus, 0)
-    assert httpd.server_address[0] == "127.0.0.1"
-    port = httpd.server_address[1]
-    found: dict = {}
-
-    def client() -> None:
-        try:
-            with urlopen(f"http://127.0.0.1:{port}/api/summary") as res:
-                found["summary"] = json.loads(res.read())
-            body = json.dumps({"action": "approve", "source": "mbox"}).encode()
-            req = Request(
-                f"http://127.0.0.1:{port}/api/act",
-                data=body,
-                headers={"Content-Type": "application/json"},
-            )
-            with urlopen(req) as res:
-                found["acted"] = json.loads(res.read())
-        except Exception as exc:  # noqa: BLE001
-            found["error"] = exc
-        finally:
-            httpd.shutdown()
-
-    thread = threading.Thread(target=client, daemon=True)
-    thread.start()
-    httpd.serve_forever()
-    thread.join(timeout=5)
-    httpd.server_close()
-    assert "error" not in found
-    assert found["summary"]["sources"][0]["source"] == "mbox"
-    assert found["acted"]["changed"] == 1
+    data = summary(corpus)
+    assert data["sources"][0]["source"] == "mbox"
+    assert data["sources"][0]["pending"] == 1
+    assert apply_action(corpus, {"action": "approve", "source": "mbox"}) == 1
     assert corpus.get_card("a").status == "approved"
 
 

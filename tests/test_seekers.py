@@ -124,4 +124,4 @@ def test_merge_hits_unions_hunts_and_keeps_max_score() -> None:
     assert "t" in hit.hunts and "other" in hit.hunts
     assert "delivered" in hit.lenses
     assert "contributions" in hit.lenses
-    assert hit.fetch_body is False
+    assert hit.fetch_body is True

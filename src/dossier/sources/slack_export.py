@@ -8,9 +8,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dossier.fetch.snippet import record_from_hit
-from dossier.lists import phrase_blocked, slack_exclude
 from dossier.identity import configured_slack_user_ids, resolve_speaker_names
-from dossier.lenses import infer_kind, infer_lenses, infer_org, infer_skills, primary_lens
+from dossier.lenses import (
+    infer_kind,
+    infer_lenses,
+    infer_org,
+    infer_skills,
+    primary_lens,
+)
+from dossier.lists import phrase_blocked, slack_exclude
 from dossier.seekers.hits import Hit, merge_hits
 from dossier.seekers.quota import apply_quotas
 from dossier.store import Corpus

@@ -312,10 +312,20 @@ def _append(base: list[str], extra: list[str]) -> list[str]:
 
 
 def _stitch(parts: list[Answer]) -> Answer:
-    texts = [part.text for part in parts if part.text]
+    kept = [part for part in parts if part.text and not part.refused]
+    if not kept:
+        return _partial(parts)
+    texts = [part.text for part in kept]
+    citations = _citations(kept)
+    joined = "\n\n".join(texts)
+    cited = "\n".join(part.text for part in kept)
+    from dossier.cards import evidence_carries
+
+    if not evidence_carries(joined, cited):
+        return _partial(kept)
     return Answer(
-        text="\n\n".join(texts),
-        citations=_citations(parts),
+        text=joined,
+        citations=citations,
         refused=False,
         reason="",
         route="exact",

@@ -1,8 +1,20 @@
 from pathlib import Path
 
-from dossier.cards import STATUS_APPROVED, STATUS_PENDING, ClaimCard, carrying_span, evidence_carries
+from dossier.cards import (
+    STATUS_APPROVED,
+    STATUS_PENDING,
+    ClaimCard,
+    carrying_span,
+    evidence_carries,
+)
 from dossier.cli import main
-from dossier.show import defend_cards, find_span, gap_report, render_packet, write_packet
+from dossier.show import (
+    defend_cards,
+    find_span,
+    gap_report,
+    render_packet,
+    write_packet,
+)
 from dossier.store import Corpus, Record
 
 

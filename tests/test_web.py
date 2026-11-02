@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from dossier.cards import STATUS_APPROVED, ClaimCard, STATUS_PENDING, card_id
+from dossier.cards import STATUS_APPROVED, STATUS_PENDING, ClaimCard, card_id
 from dossier.store import Corpus, Record
 
 pytest.importorskip("fastapi")
@@ -247,7 +247,7 @@ def test_review_defend_and_result_pages(client) -> None:
 def test_job_sse_fake(client) -> None:
     test_client, _ = client
 
-    def work(job):  # noqa: ANN001
+    def work(job):
         from dossier.ui import note, stage
 
         stage("demo", "one step")
@@ -426,7 +426,7 @@ def test_match_refuses_while_the_locker_is_busy(client) -> None:
     started = threading.Event()
     release = threading.Event()
 
-    def work(job):  # noqa: ANN001
+    def work(job):
         started.set()
         release.wait(2)
         return {"ok": 1}
@@ -647,11 +647,11 @@ def test_sources_shows_ingest_summary_after_job(client, monkeypatch) -> None:
 def test_ask_surfaces_job_error(client, monkeypatch) -> None:
     test_client, _ = client
 
-    def boom(job):  # noqa: ANN001
+    def boom(job):
         raise RuntimeError("synthetic ask failure")
 
     monkeypatch.setattr(
-        "dossier.web.app._start_ask",
+        "dossier.web.routers.ask._start_ask",
         lambda *a, **k: RUNNER.start("ask", boom),
     )
     resp = test_client.post(
@@ -919,7 +919,7 @@ def test_review_hides_actions_while_the_locker_is_busy(client) -> None:
     started = threading.Event()
     release = threading.Event()
 
-    def work(job):  # noqa: ANN001
+    def work(job):
         started.set()
         release.wait(2)
         return {"ok": 1}

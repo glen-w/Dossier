@@ -14,10 +14,10 @@ from pathlib import Path
 from typing import Any
 
 from dossier.ask import (
+    _GENERIC,
     COSINE_QUOTE,
     MAX_HITS,
     Hit,
-    _GENERIC,
     _fuse,
     _vector_hits,
     collect_hits,
@@ -30,6 +30,7 @@ from dossier.cards import (
     carrying_span,
     content_token_set,
     content_tokens,
+    evidence_carries,
     header_values,
     sentences,
 )
@@ -301,10 +302,10 @@ def _row_from_hit(
         route = "passage"
         shown = " ".join(quote.split())
     elif hit.cosine >= COSINE_QUOTE:
-        route = "neighbor"
         shown = _short_quote(hit.text)
-        if not shown:
+        if not shown or not evidence_carries(requirement, shown):
             return None
+        route = "neighbor"
     else:
         return None
     card = cards.get(hit.uri)

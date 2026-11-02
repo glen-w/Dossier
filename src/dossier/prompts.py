@@ -132,7 +132,13 @@ def render(
     record: bool = True,
 ) -> str:
     body = prompt.user_template
+    cleaned: dict[str, str] = {}
     for key, value in slots.items():
+        text = str(value).replace("@@", "")
+        if key in {"RECORDS", "TEXT", "RECORD"}:
+            text = f"<<record>>\n{text}\n<</record>>"
+        cleaned[key] = text
+    for key, value in cleaned.items():
         body = body.replace(f"@@{key}@@", value)
     system = prompt.system_prompt.strip()
     text = f"{system}\n\n{body}" if system else body

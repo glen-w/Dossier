@@ -27,7 +27,7 @@ def test_builtin_render_matches_previous_strings(tmp_path: Path, monkeypatch) ->
     expected = (
         EXTRACT_PROMPT.replace("@@URI@@", "file://a")
         .replace("@@TITLE@@", "T")
-        .replace("@@TEXT@@", "body")
+        .replace("@@TEXT@@", "<<record>>\nbody\n<</record>>")
     )
     assert rendered == expected
     seeker = resolve("extract_seeker", tmp_path)

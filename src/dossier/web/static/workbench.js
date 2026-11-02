@@ -12,6 +12,26 @@
       } catch (e) {
         return;
       }
+      if (data.kind === "answer") {
+        var stream = document.getElementById("ask-stream");
+        if (stream) {
+          stream.hidden = false;
+          var q = stream.querySelector("[data-ask-q]");
+          var t = stream.querySelector("[data-ask-text]");
+          var c = stream.querySelector("[data-ask-cite]");
+          if (q) q.textContent = data.question || "";
+          if (t) t.textContent = data.refused ? ("Refused" + (data.reason ? ": " + data.reason : "")) : (data.text || "");
+          if (c) {
+            c.innerHTML = "";
+            (data.citations || []).forEach(function (uri) {
+              var li = document.createElement("li");
+              li.className = "meta";
+              li.textContent = uri;
+              c.appendChild(li);
+            });
+          }
+        }
+      }
       if (data.kind === "eof") {
         src.close();
         if (data.status === "done" || data.status === "error") {
@@ -108,6 +128,18 @@
     var root = document.body;
     var jobId = root.getAttribute("data-job-id");
     if (jobId) connectJob(jobId);
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    var token = meta ? meta.getAttribute("content") : "";
+    if (token) {
+      document.querySelectorAll("form[method='post'], form[method='POST']").forEach(function (form) {
+        if (form.querySelector("input[name=csrf_token]")) return;
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "csrf_token";
+        input.value = token;
+        form.appendChild(input);
+      });
+    }
   });
 })();
 

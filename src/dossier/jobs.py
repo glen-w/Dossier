@@ -2,22 +2,28 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
 import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from dossier import ui as ui_mod
-
 
 log = logging.getLogger("dossier.jobs")
 
 
 class LockerBusy(RuntimeError):
     """Raised when a second job tries to start while one is running."""
+
+
+class JobCancelled(RuntimeError):
+    """Cooperative cancel: a progress callback saw the cancel event."""
 
 
 @dataclass
@@ -47,6 +53,7 @@ class Job:
     events: list[JobEvent] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     finished_at: float | None = None
+    cancel: threading.Event = field(default_factory=threading.Event, repr=False)
     _cond: threading.Condition = field(default_factory=threading.Condition, repr=False)
 
     def push(self, kind: str, **payload: Any) -> JobEvent:
@@ -54,7 +61,21 @@ class Job:
             ev = JobEvent(index=len(self.events), kind=kind, payload=payload)
             self.events.append(ev)
             self._cond.notify_all()
+            self._persist(ev)
             return ev
+
+    def _persist(self, ev: JobEvent) -> None:
+        raw = os.environ.get("DOSSIER_DATA", "").strip()
+        if not raw:
+            return
+        folder = Path(raw) / "jobs"
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            path = folder / f"{self.id}.jsonl"
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(ev.as_dict(), ensure_ascii=False) + "\n")
+        except OSError:
+            return
 
     def events_after(self, index: int) -> list[JobEvent]:
         with self._cond:
@@ -131,29 +152,53 @@ class JobRunner:
                     return item
         return None
 
+    def cancel(self, job_id: str) -> bool:
+        job = self.get(job_id)
+        if job is None or job.status not in {"queued", "running"}:
+            return False
+        job.cancel.set()
+        job.push("status", status="cancelling")
+        return True
+
     def _run(self, job: Job, fn: Callable[[Job], Any]) -> None:
         job.status = "running"
         job.push("status", status="running")
 
         def sink(event: dict[str, Any]) -> None:
+            if job.cancel.is_set():
+                raise JobCancelled("cancelled")
             kind = str(event.pop("kind", "progress"))
             job.push(kind, **event)
 
         token = ui_mod.set_progress_sink(sink)
         try:
+            if job.cancel.is_set():
+                raise JobCancelled("cancelled")
             job.result = fn(job)
+            if job.cancel.is_set():
+                raise JobCancelled("cancelled")
             job.status = "done"
             job.push("status", status="done")
-        except Exception as exc:  # noqa: BLE001 — surface to the workbench
+        except JobCancelled:
             job.status = "error"
-            job.error = str(exc)
+            job.error = "cancelled"
+            job.push("status", status="error", error="cancelled")
+        except Exception as extra:
+            job.status = "error"
+            job.error = _scrub(str(extra))
             log.exception("job %s failed", job.kind)
-            job.push("status", status="error", error=str(exc))
+            job.push("status", status="error", error=job.error)
         finally:
             ui_mod.set_progress_sink(token)
             job.finished_at = time.time()
             with self._lock:
                 self._history = ([job] + self._history)[:8]
+
+
+def _scrub(message: str) -> str:
+    """Drop home-directory prefixes from errors shown in the UI."""
+    home = str(Path.home())
+    return message.replace(home, "~")
 
 
 # Process-wide runner for the workbench.

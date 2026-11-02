@@ -15,7 +15,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, TextIO
 
-
 _RESET = "\033[0m"
 _ProgressSink = Callable[[dict[str, Any]], None]
 _progress_sink: _ProgressSink | None = None
@@ -27,7 +26,7 @@ _YELLOW = "\033[33m"
 _MAGENTA = "\033[35m"
 _BLUE = "\033[34m"
 
-_ACTIVE: "BottomBar | None" = None
+_ACTIVE: BottomBar | None = None
 _ACTIVE_STACK: list[BottomBar] = []
 
 
@@ -48,7 +47,7 @@ def _emit(kind: str, **payload: Any) -> None:
     event = {"kind": kind, **payload}
     try:
         _progress_sink(event)
-    except Exception:  # noqa: BLE001 — never break CLI on a bad sink
+    except Exception:  # never break CLI on a bad sink
         pass
 
 
@@ -270,11 +269,11 @@ class Progress:
 
     def _format_line(self) -> str:
         total = max(self.total, 1) if self.total > 0 else max(self.done, 1)
-        done = self.done if self.total > 0 else self.done
+        done = self.done
         frac = 1.0 if self.total == 0 and self.done > 0 else min(1.0, done / total)
         if self.total > 0 and self.done >= self.total:
             frac = 1.0
-        filled = int(round(self.width * frac))
+        filled = round(self.width * frac)
         empty = max(0, self.width - filled)
         if self._colour:
             bar = (

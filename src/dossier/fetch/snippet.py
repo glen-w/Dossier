@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from dossier.seekers.hits import Hit
 from dossier.store import Record
+from dossier.text import TEXT_CAP
 from dossier.util import record_id
-
-TEXT_CAP = 8000
 
 
 def format_snippet(hit: Hit, body: str) -> str:

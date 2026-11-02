@@ -19,7 +19,7 @@ adapters you enable
             → data/matches when you match a job spec (evidence per requirement)
 ```
 
-Ask reads records already in the corpus, then the passage vectors in that same file when full text is thin. The order — approved card, quote, hops, one completion — and when a neighbor is quoted live in [status](status.md).
+Ask reads records already in the corpus, then the passage vectors in that same file when full text is thin. A quoted span is one paste-sized sentence (`SPAN_MAX`, default 320). A cosine neighbor must still carry the question. The order — approved card, quote, hops, one completion — lives in [status](status.md).
 
 The locker is a host process: `uv run dossier` on the machine that holds the folders, the SQLite file, and Ollama on loopback. There is no image. See [install](install.md). Shared product words (locker, source, extract, card, ask, effort, profile) live in [vocab](vocab.md).
 
@@ -39,7 +39,7 @@ Drafts, the human gate (`buffet`, `approve`, `refuse`, `reopen`, `review`), defe
 
 ## Wired adapters
 
-`pubs`, `chatgpt`, `linkedin`, `applications`, `transcripts`, `slack`, `mbox`, `meetings`, `employer`, `git`. Behaviour and limits: [status](status.md).
+`pubs`, `chatgpt`, `linkedin`, `applications`, `transcripts`, `slack`, `mbox`, `meetings`, `employer`, `git`, `notes`, `ics`. Behaviour and limits: [status](status.md).
 
 ## Referee shortlist
 
@@ -47,4 +47,4 @@ Drafts, the human gate (`buffet`, `approve`, `refuse`, `reopen`, `review`), defe
 
 ## Roadmap
 
-Versioned waves; 0.9 ships tailor from spanned approved cards. Next is 0.9→1.0 user testing: [roadmap](roadmap.md).
+Versioned waves; 0.10 ships the workbench loop and the paste-sized span rule. Next is 1.0 second-machine acceptance: [roadmap](roadmap.md).

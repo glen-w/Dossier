@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED, ClaimCard
+
+SCHEMA_VERSION = 1
+
+
+class LockerBusy(RuntimeError):
+    """Another process holds the locker write lock."""
 
 
 def _now() -> str:
@@ -37,9 +45,17 @@ class Corpus:
         self._conn.execute("PRAGMA busy_timeout = 5000")
         self.fts_ok = False
         self.passages_fts_ok = False
+        self._batch = False
+        self._lock_fh = None
         self._init()
 
     def close(self) -> None:
+        if self._lock_fh is not None:
+            try:
+                self._lock_fh.close()
+            except OSError:
+                pass
+            self._lock_fh = None
         self._conn.close()
 
     def __enter__(self) -> Corpus:
@@ -97,6 +113,7 @@ class Corpus:
         self._ensure_fts()
         self._ensure_passages()
         self._ensure_vectors()
+        self._migrate()
 
     def upsert_record(self, record: Record) -> None:
         prior = self._conn.execute(
@@ -132,7 +149,8 @@ class Corpus:
         )
         self._index_record(record)
         self._replace_passages(record)
-        self._conn.commit()
+        self._clear_spans_for_uri(record.uri)
+        self._commit()
 
     def get_record(self, uri: str) -> Record | None:
         row = self._conn.execute(
@@ -172,8 +190,17 @@ class Corpus:
             for r in rows
         ]
 
-    def evidence_by_uri(self) -> dict[str, str]:
-        return {r.uri: r.text for r in self.records()}
+    def evidence_by_uri(self, uris: list[str] | None = None) -> dict[str, str]:
+        if uris is None:
+            return {r.uri: r.text for r in self.records()}
+        if not uris:
+            return {}
+        placeholders = ",".join("?" * len(uris))
+        rows = self._conn.execute(
+            f"SELECT uri, text FROM records WHERE uri IN ({placeholders})",
+            list(uris),
+        ).fetchall()
+        return {str(row["uri"]): str(row["text"]) for row in rows}
 
     def put_card(self, card: ClaimCard) -> None:
         self._conn.execute(
@@ -533,6 +560,11 @@ class Corpus:
                 self._conn.execute("DROP TABLE records_fts")
                 self._conn.execute("DROP TABLE IF EXISTS records_fts_map")
                 self._conn.commit()
+                self._rebuild_after_schema = True
+            else:
+                self._rebuild_after_schema = False
+        else:
+            self._rebuild_after_schema = False
         try:
             self._conn.execute(
                 """
@@ -569,26 +601,12 @@ class Corpus:
                 )
                 """
             )
-        n_fts = self._conn.execute("SELECT count(*) FROM records_fts").fetchone()[0]
-        n_rec = self._conn.execute("SELECT count(*) FROM records").fetchone()[0]
-        if n_fts != n_rec:
-            self._conn.execute("DELETE FROM records_fts")
-            self._conn.execute("DELETE FROM records_fts_map")
-            rows = self._conn.execute(
-                "SELECT uri, title, text FROM records"
-            ).fetchall()
-            for row in rows:
-                self._conn.execute(
-                    "INSERT INTO records_fts (uri, title, text) VALUES (?, ?, ?)",
-                    (row["uri"], row["title"], row["text"]),
-                )
-                self._conn.execute(
-                    "INSERT INTO records_fts_map (uri, fts_rowid) VALUES (?, ?)",
-                    (row["uri"], self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]),
-                )
-            self._conn.commit()
+        if getattr(self, "_rebuild_after_schema", False):
+            self.rebuild_index()
+            self._rebuild_after_schema = False
             return
         n_map = self._conn.execute("SELECT count(*) FROM records_fts_map").fetchone()[0]
+        n_fts = self._conn.execute("SELECT count(*) FROM records_fts").fetchone()[0]
         if n_map == n_fts:
             return
         self._conn.execute("DELETE FROM records_fts_map")
@@ -779,6 +797,7 @@ class Corpus:
                 ordinal INTEGER NOT NULL,
                 model TEXT NOT NULL,
                 vector BLOB NOT NULL,
+                norm REAL,
                 PRIMARY KEY (record_uri, ordinal, model)
             )
             """
@@ -817,16 +836,18 @@ class Corpus:
     def upsert_vector(self, uri: str, ordinal: int, model: str, values: list[float]) -> None:
         from dossier.embed import pack_vector
 
+        norm = math.sqrt(sum(float(v) * float(v) for v in values)) if values else 0.0
         self._conn.execute(
             """
-            INSERT INTO passage_vec (record_uri, ordinal, model, vector)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO passage_vec (record_uri, ordinal, model, vector, norm)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(record_uri, ordinal, model) DO UPDATE SET
-                vector=excluded.vector
+                vector=excluded.vector,
+                norm=excluded.norm
             """,
-            (uri, ordinal, model, pack_vector(values)),
+            (uri, ordinal, model, pack_vector(values), norm),
         )
-        self._conn.commit()
+        self._commit()
 
     def nearest_passages(
         self,
@@ -840,9 +861,10 @@ class Corpus:
 
         if limit < 1 or not vector:
             return []
+        qnorm = math.sqrt(sum(float(v) * float(v) for v in vector))
         rows = self._conn.execute(
             """
-            SELECT v.record_uri, v.vector, p.text
+            SELECT v.record_uri, v.vector, v.norm, p.text
             FROM passage_vec v
             JOIN passages p
               ON p.record_uri = v.record_uri AND p.ordinal = v.ordinal
@@ -852,7 +874,14 @@ class Corpus:
         ).fetchall()
         best: dict[str, tuple[str, float]] = {}
         for row in rows:
-            score = cosine(vector, unpack_vector(row["vector"]))
+            stored = unpack_vector(row["vector"])
+            stored_norm = row["norm"]
+            if stored_norm and qnorm:
+                score = cosine(vector, stored) if stored_norm is None else _dot_cosine(
+                    vector, stored, qnorm, float(stored_norm)
+                )
+            else:
+                score = cosine(vector, stored)
             uri = str(row["record_uri"])
             prev = best.get(uri)
             if prev is None or score > prev[1]:
@@ -896,6 +925,175 @@ class Corpus:
                 self._conn.execute("SELECT last_insert_rowid()").fetchone()[0],
             ),
         )
+
+    def _commit(self) -> None:
+        if not self._batch:
+            self._conn.commit()
+
+    @contextmanager
+    def batch(self, size: int = 500):
+        """Hold one transaction until the block exits. `size` is documentation."""
+        del size
+        prior = self._batch
+        self._batch = True
+        try:
+            yield self
+            self._conn.commit()
+        finally:
+            self._batch = prior
+
+    def acquire_lock(self, *, wait: float = 5.0) -> None:
+        """Exclusive sidecar lock so CLI and a web job do not write together."""
+        del wait
+        path = Path(str(self.db_path) + ".lock")
+        fh = path.open("a+")
+        try:
+            import fcntl
+
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            holder = ""
+            try:
+                holder = path.read_text(encoding="utf-8").strip()
+            except OSError:
+                holder = ""
+            fh.close()
+            who = holder or str(path)
+            raise LockerBusy(f"locker held by {who}") from exc
+        import os
+
+        fh.seek(0)
+        fh.truncate()
+        fh.write(f"pid {os.getpid()}\n")
+        fh.flush()
+        self._lock_fh = fh
+
+    def rebuild_index(self) -> None:
+        """Rebuild FTS tables. Explicit; opening the locker no longer does this."""
+        if not self.fts_ok:
+            return
+        self._conn.execute("DELETE FROM records_fts")
+        self._conn.execute("DELETE FROM records_fts_map")
+        rows = self._conn.execute("SELECT uri, title, text FROM records").fetchall()
+        for row in rows:
+            self._conn.execute(
+                "INSERT INTO records_fts (uri, title, text) VALUES (?, ?, ?)",
+                (row["uri"], row["title"], row["text"]),
+            )
+            self._conn.execute(
+                "INSERT INTO records_fts_map (uri, fts_rowid) VALUES (?, ?)",
+                (row["uri"], self._conn.execute("SELECT last_insert_rowid()").fetchone()[0]),
+            )
+        self._conn.commit()
+
+    def backup(self, dest: Path) -> Path:
+        dest = Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        target = sqlite3.connect(dest)
+        try:
+            self._conn.backup(target)
+        finally:
+            target.close()
+        return dest
+
+    def integrity_ok(self) -> bool:
+        row = self._conn.execute("PRAGMA integrity_check").fetchone()
+        return bool(row) and str(row[0]) == "ok"
+
+    def fts_parity(self) -> tuple[int, int]:
+        n_rec = int(self._conn.execute("SELECT count(*) FROM records").fetchone()[0])
+        if not self.fts_ok:
+            return n_rec, -1
+        n_fts = int(self._conn.execute("SELECT count(*) FROM records_fts").fetchone()[0])
+        return n_rec, n_fts
+
+    def span_lengths(self, *, cap: int | None = None) -> list[int]:
+        from dossier.cards import span_max
+
+        limit = span_max() if cap is None else cap
+        del limit
+        lengths: list[int] = []
+        for card in self.cards():
+            span = (card.extras.get("span") or "").strip()
+            if span:
+                lengths.append(len(span))
+        return lengths
+
+    def _migrate(self) -> None:
+        current = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
+        if current < 1:
+            self._migrate_v1()
+            self._conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            self._conn.commit()
+
+    def _migrate_v1(self) -> None:
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS records_source ON records (source)"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS cards_record_id ON cards (record_id)"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS passage_vec_model ON passage_vec (model)"
+        )
+        vec_cols = {
+            r[1] for r in self._conn.execute("PRAGMA table_info(passage_vec)").fetchall()
+        }
+        if "norm" not in vec_cols:
+            try:
+                self._conn.execute("ALTER TABLE passage_vec ADD COLUMN norm REAL")
+            except sqlite3.OperationalError:
+                pass
+        card_cols = {
+            r[1] for r in self._conn.execute("PRAGMA table_info(cards)").fetchall()
+        }
+        if "lens" not in card_cols:
+            try:
+                self._conn.execute(
+                    "ALTER TABLE cards ADD COLUMN lens TEXT "
+                    "GENERATED ALWAYS AS "
+                    "(lower(trim(COALESCE(json_extract(extras, '$.lens'), '')))) VIRTUAL"
+                )
+                self._conn.execute(
+                    "ALTER TABLE cards ADD COLUMN kind TEXT "
+                    "GENERATED ALWAYS AS "
+                    "(lower(trim(COALESCE(json_extract(extras, '$.kind'), '')))) VIRTUAL"
+                )
+                self._conn.execute(
+                    "CREATE INDEX IF NOT EXISTS cards_status_lens ON cards (status, lens)"
+                )
+            except sqlite3.OperationalError:
+                pass
+
+    def _clear_spans_for_uri(self, uri: str) -> None:
+        rows = self._conn.execute(
+            "SELECT id, extras FROM cards WHERE extras LIKE ?",
+            ('%"span"%',),
+        ).fetchall()
+        for row in rows:
+            try:
+                extras = json.loads(row["extras"] or "{}")
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(extras, dict):
+                continue
+            if extras.get("span_uri") != uri and uri not in str(extras.get("span_uri") or ""):
+                continue
+            extras.pop("span", None)
+            extras.pop("span_uri", None)
+            self._conn.execute(
+                "UPDATE cards SET extras = ? WHERE id = ?",
+                (json.dumps(extras), row["id"]),
+            )
+
+
+def _dot_cosine(
+    left: list[float], right: list[float], left_norm: float, right_norm: float
+) -> float:
+    if not left or len(left) != len(right) or left_norm <= 0 or right_norm <= 0:
+        return 0.0
+    dot = sum(a * b for a, b in zip(left, right, strict=True))
+    return dot / (left_norm * right_norm)
 
 
 def _card_filter(

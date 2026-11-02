@@ -17,7 +17,7 @@ Default is provider `ollama` at `http://127.0.0.1:11434` with `allow_remote = fa
 Loopback calls that are not that exception:
 
 - Pubs search defaults to `http://127.0.0.1:8012` and `ask.pubs` is off. A non-loopback pubs URL is not contacted.
-- `dossier referees` reads Twenty only when both `DOSSIER_TWENTY_API_URL` and `DOSSIER_TWENTY_API_KEY` are set. The request is a fixed people query, not your corpus. It does not write Twenty.
+- `dossier referees` reads Twenty only when both `DOSSIER_TWENTY_API_URL` and `DOSSIER_TWENTY_API_KEY` are set. The URL must be loopback, or `DOSSIER_TWENTY_ALLOW_REMOTE=true`. The request is a fixed people query, not your corpus. It does not write Twenty. The workbench prints the same egress notice when that remote read is allowed.
 
 Before every push, run `python3 scripts/release/check_gitignore.py`. It fails if `.gitignore` drops a personal-data pattern or if a corpus, export, or secret is already tracked. Do not push when it fails.
 
@@ -25,7 +25,7 @@ Also off git: dumps, DuckDB, LanceDB, `.env`, mbox, PDFs, office exports, and lo
 
 - No Twenty writes (Tasks, Opportunities, Notes, last-contacted).
 - No auto-attach of a referee name to an application.
-- No walk of a blocked mail tree; no Sent Mail as a folder walker; no re-embed of a Zotero library you did not name.
+- No walk of a blocked mail tree (`[mail] blocked_roots` or `DOSSIER_MAIL_BLOCKED_ROOTS`, default `iddri`); no Sent Mail as a folder walker; no re-embed of a Zotero library you did not name.
 - No plugin directory or entry-point scan.
 - No Docker image for the locker. It installs on the host with `uv`.
 - Meeting transcripts stay in the TranscriptX library. Ingest copies your turns into `evidence.db` only.

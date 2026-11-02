@@ -23,7 +23,7 @@ def normalize_effort(raw: str | None) -> str:
     return DEFAULT_EFFORT
 
 
-def apply_effort(cfg: "Config", effort: str | None = None) -> "Config":
+def apply_effort(cfg: Config, effort: str | None = None) -> Config:
     """Return a copy of *cfg* with effort overlays applied.
 
     ``balanced`` leaves loaded ask/extract knobs, timeout, and context cap
@@ -66,7 +66,7 @@ def apply_effort(cfg: "Config", effort: str | None = None) -> "Config":
     return replace(updated, llm_model=model, fast_model=fast)
 
 
-def _effort_field(cfg: "Config", name: str, key: str) -> str:
+def _effort_field(cfg: Config, name: str, key: str) -> str:
     field = {
         ("light", "model"): "effort_model_light",
         ("balanced", "model"): "effort_model_balanced",
@@ -78,7 +78,7 @@ def _effort_field(cfg: "Config", name: str, key: str) -> str:
     return str(getattr(cfg, field, "") or "").strip()
 
 
-def effort_model_tags(cfg: "Config") -> tuple[str, ...]:
+def effort_model_tags(cfg: Config) -> tuple[str, ...]:
     """Tags this effort will call. Light drafts and quotes, so the list is empty."""
     if not getattr(cfg, "llm_enabled", True) or normalize_effort(cfg.effort) == "light":
         return ()

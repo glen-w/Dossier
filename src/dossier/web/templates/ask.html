@@ -1,9 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>{{ label('ask') }}</h1>
-<p class="lede">{{ blurbs.ask }} One exchange for now; room for a transcript later.</p>
+<p class="lede">{{ blurbs.ask }} The answer streams on this page when the job finishes.</p>
+
+<div id="ask-stream" class="card citation" hidden>
+  <h3 data-ask-q></h3>
+  <p class="reading" data-ask-text></p>
+  <ul class="cite" data-ask-cite></ul>
+</div>
 
 <form method="post" action="/ask/run">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <label class="field">Question
     <textarea name="question" required placeholder="What did I deliver on coastal governance?">{{ question_text }}</textarea>
   </label>

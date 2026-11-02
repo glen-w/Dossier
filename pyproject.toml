@@ -1,11 +1,19 @@
 [project]
 name = "dossier"
-version = "0.9.0"
+dynamic = ["version"]
 description = "Local-first work-evidence locker and RAG"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Dossier contributors" }]
 requires-python = ">=3.11"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Private :: Do Not Upload",
+]
 dependencies = [
     "httpx>=0.27",
     "duckdb>=1.1",
@@ -21,7 +29,16 @@ web = [
     "python-multipart>=0.0.9",
     "sse-starlette>=2.0",
 ]
-dev = ["pytest>=8", "httpx>=0.27"]
+vec = ["sqlite-vec>=0.1"]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+    "pytest-cov>=5",
+    "hypothesis>=6",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pre-commit>=4",
+]
 docs = [
     "sphinx>=7.0.0",
     "myst-parser>=2.0.0",
@@ -34,9 +51,15 @@ docs = [
 [project.scripts]
 dossier = "dossier.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/glen-w/Dossier"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/dossier/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dossier"]
@@ -44,3 +67,62 @@ packages = ["src/dossier"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["dossier"]
+omit = ["*/web/static/*"]
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "BLE", "TRY", "RUF"]
+ignore = [
+    "E501",
+    "E402",
+    "TRY003",
+    "TRY004",
+    "TRY300",
+    "TRY301",
+    "RUF005",
+    "RUF012",
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    "SIM103",
+    "SIM105",
+    "SIM108",
+    "SIM117",
+    "B905",
+    "BLE001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["BLE001", "TRY002", "B008"]
+"scripts/**" = ["BLE001"]
+"src/dossier/web/app.py" = ["B008"]
+"src/dossier/web/routers/**" = ["B008"]
+"src/dossier/fetch/mbox.py" = ["SIM118"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = false
+disable_error_code = [
+    "import-untyped",
+    "attr-defined",
+    "union-attr",
+    "arg-type",
+    "call-overload",
+    "no-redef",
+    "index",
+    "assignment",
+    "return-value",
+]
+packages = ["dossier"]

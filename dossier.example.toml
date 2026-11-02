@@ -76,6 +76,8 @@ pubs = false # one /search per ask; hits are not written into the corpus
 # signals = ["promotion"]
 # signals_off = ["signup"]
 # closed_off = ["trash"]
+# Folder names that must not be walked as a Thunderbird tree.
+# blocked_roots = ["iddri"]
 
 [names]
 # File and subject words, shared by mail, Slack, and employer lists.
@@ -96,10 +98,12 @@ pubs = false # one /search per ask; hits are not written into the corpus
 
 [meetings]
 # exclude skips a directory name. solo is the kinds kept when you are the only speaker.
+# orgs are names tagged on meeting titles (REN21, IDDRI, Oceana).
 # exclude = ["holding"]
 # exclude_off = ["metadata"]
 # solo = ["briefing"]
 # solo_off = ["slides"]
+# orgs_off = ["Oceana"]
 
 [employer]
 # paths = ["/absolute/path/to/one/employer/folder"]
@@ -130,6 +134,7 @@ filter_llm_calls = 4 # own cap; does not spend DOSSIER_LLM_MAX_CALLS
 llm = true
 chunk_chars = 4000 # max chars per LLM extract window
 max_chunks = 4 # cap LLM calls per record
+span_max = 320 # paste-sized carrying sentence cap
 
 [run]
 adapters = [] # empty: every detected adapter

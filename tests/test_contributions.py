@@ -14,6 +14,8 @@ def test_registry_is_an_explicit_list() -> None:
         "meetings",
         "employer",
         "git",
+        "notes",
+        "ics",
     ]
     assert len({c.name for c in CONTRIBUTIONS}) == len(CONTRIBUTIONS)
 

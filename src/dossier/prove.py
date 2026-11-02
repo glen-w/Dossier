@@ -8,7 +8,7 @@ import sqlite3
 import sys
 import tempfile
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dossier.brief import run_pack, write_brief
@@ -68,7 +68,7 @@ def run_prove(
     with_llm: bool = False,
     include_pubs: bool = False,
 ) -> int:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     if data is not None and not str(data).strip():
         data = None
     root = data or Path(tempfile.mkdtemp(prefix=f"dossier-prove-{stamp}-"))

@@ -7,7 +7,6 @@ import pytest
 from dossier.identity import activity_folder, noise_folder
 from dossier.lenses import is_noise_name
 
-
 _LIST_ENV = (
     "DOSSIER_MAIL_EXCLUDE",
     "DOSSIER_MAIL_EXCLUDE_OFF",

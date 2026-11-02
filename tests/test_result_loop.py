@@ -5,7 +5,14 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
-from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED, ClaimCard, adjudicate, card_id
+from dossier.cards import (
+    STATUS_APPROVED,
+    STATUS_PENDING,
+    STATUS_REFUSED,
+    ClaimCard,
+    adjudicate,
+    card_id,
+)
 from dossier.config import Config
 from dossier.match import match_posting
 from dossier.nextstep import next_step

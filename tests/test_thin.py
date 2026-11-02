@@ -8,7 +8,14 @@ import pytest
 from dossier.cards import STATUS_PENDING
 from dossier.extract import extract_corpus
 from dossier.llm.client import NullLLMClient
-from dossier.paths import employer_paths, git_paths, git_user, pubs_collection, pubs_seed, pubs_top_k
+from dossier.paths import (
+    employer_paths,
+    git_paths,
+    git_user,
+    pubs_collection,
+    pubs_seed,
+    pubs_top_k,
+)
 from dossier.sources.chatgpt import ChatGPTSource
 from dossier.sources.employer import EmployerSource
 from dossier.sources.git import GitSource

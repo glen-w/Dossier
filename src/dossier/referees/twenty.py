@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 
 import httpx
 
+from dossier.llm.validate import EGRESS_NOTICE, host_is_local
 from dossier.referees.rank import Person
 
 _FIELD = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -56,6 +58,19 @@ def referee_query() -> str:
 
 
 def fetch_people(url: str, key: str, *, client: httpx.Client | None = None) -> list[Person]:
+    if client is None:
+        allow = os.environ.get("DOSSIER_TWENTY_ALLOW_REMOTE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if not host_is_local(url) and not allow:
+            raise RuntimeError(
+                "Twenty URL is not loopback. Set DOSSIER_TWENTY_ALLOW_REMOTE=true to opt in."
+            )
+        if not host_is_local(url):
+            print(EGRESS_NOTICE, file=sys.stderr)
     endpoint = _graphql_url(url)
     headers = {"Authorization": f"Bearer {key}"}
     own_client = client is None

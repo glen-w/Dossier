@@ -54,9 +54,8 @@ def test_vector_neighbor_quotes_a_span_without_shared_tokens(corpus: Corpus) -> 
         limit=5,
         embedder=asker,
     )
-    assert not result.refused
-    assert "coastal governance briefing" in result.text
-    assert result.citations == ["file://employer/note.md"]
+    assert result.refused
+    assert result.reason == "no direct span"
     assert asker.calls == 1
 
 

@@ -34,8 +34,22 @@ def merge_toml_patch(current: dict[str, Any], patch: dict[str, Any]) -> dict[str
 
 
 def write_toml_dict(path: Path, data: dict[str, Any]) -> None:
+    import os
+    import tempfile
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(_dump_toml(data), encoding="utf-8")
+    payload = _dump_toml(data)
+    fd, tmp = tempfile.mkstemp(prefix=".dossier.toml.", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def common_settings_patch(

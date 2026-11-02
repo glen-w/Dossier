@@ -5,15 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from dossier.cards import (
+    GENERIC_TOKENS,
     STATUS_APPROVED,
     carrying_span,
     content_token_set,
     content_tokens,
     evidence_carries,
     header_values,
-    sentences,
 )
-from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError, ctx_tokens_for
+from dossier.llm.client import (
+    CompletionRequest,
+    LLMClient,
+    LLMClientError,
+    ctx_tokens_for,
+)
 from dossier.prompts import ASK_BODY, active_prompt, render
 from dossier.store import Corpus, Record
 
@@ -24,28 +29,7 @@ COSINE_NEIGHBOR = 0.34
 COSINE_QUOTE = 0.82
 _RRF_K = 60
 ASK_MODES = ("exact", "auto", "rich")
-# Words that show up in almost any export. Sharing one of them is not an answer.
-_GENERIC = frozenset(
-    {
-        "held",
-        "work",
-        "deliver",
-        "delivered",
-        "record",
-        "records",
-        "show",
-        "shown",
-        "recorded",
-        "publish",
-        "published",
-        "role",
-        "roles",
-        "skill",
-        "skills",
-        "contribution",
-        "contributions",
-    }
-)
+_GENERIC = GENERIC_TOKENS
 _TRIGGERS: dict[str, tuple[str, ...]] = {
     "delivered": ("report", "paper", "chapter", "workshop"),
     "skills": ("teaching", "editing"),
@@ -287,10 +271,15 @@ def approved_answer(corpus: Corpus, question: str, cfg: object | None = None) ->
             best_score = score
     if best is None:
         return None
-    evidence = corpus.evidence_by_uri()
+    evidence = corpus.evidence_by_uri(best.citations)
+    chunks: list[str] = []
     for uri in best.citations:
-        if not (evidence.get(uri) or "").strip():
+        body = (evidence.get(uri) or "").strip()
+        if not body:
             return None
+        chunks.append(body)
+    if not evidence_carries(best.claim, "\n".join(chunks)):
+        return None
     return Answer(
         text=best.claim,
         citations=list(best.citations),
@@ -479,19 +468,11 @@ def _needs_many(hits: list[Hit]) -> bool:
 def _exact(question: str, hits: list[Hit]) -> Answer:
     top = hits[0]
     span = carrying_span(question, top.text)
-    if not span and top.cosine >= COSINE_QUOTE:
-        span = _paraphrase_span(top.text)
     if not span:
         return Answer(text="", citations=[], refused=True, reason="no direct span")
+    if not evidence_carries(question, span):
+        return Answer(text="", citations=[], refused=True, reason="no direct span")
     return Answer(text=span[:240], citations=[top.uri], refused=False, reason="")
-
-
-def _paraphrase_span(text: str) -> str:
-    """Nearest-neighbor quote. Used only when cosine already cleared the bar."""
-    for sentence in sentences(text):
-        if content_tokens(sentence):
-            return sentence
-    return ""
 
 
 def _with_vectors(

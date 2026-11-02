@@ -1,0 +1,15 @@
+[
+  {
+    "question": "synthetic paper on coastal governance",
+    "refuse": false,
+    "citations": ["eval://coastal"]
+  },
+  {
+    "question": "",
+    "refuse": true
+  },
+  {
+    "question": "commanded a lunar base",
+    "refuse": true
+  }
+]

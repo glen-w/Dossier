@@ -10,7 +10,12 @@ from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
-from dossier.identity import account_dir, is_blocked_mail_root, noise_folder, skip_folder
+from dossier.identity import (
+    account_dir,
+    is_blocked_mail_root,
+    noise_folder,
+    skip_folder,
+)
 
 DEFAULT_MAX_BYTES = 200 * 1024 * 1024
 TEXT_CAP = 8000
@@ -187,7 +192,7 @@ def fetch_mbox_body(
     try:
         for key in box.keys():
             try:
-                msg = box[key]
+                msg = box.get(key)
             except Exception:
                 continue
             if msg is None:
@@ -210,7 +215,7 @@ def parse_headers(mbox_path: Path) -> list[dict]:
     try:
         for key in box.keys():
             try:
-                msg = box[key]
+                msg = box.get(key)
             except Exception:
                 continue
             if msg is None:

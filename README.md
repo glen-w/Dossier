@@ -14,6 +14,13 @@
 
 Exports, mail, and PDFs stay on your machine. They are not part of this git tree.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="docs/images/locker.png">
+    <img src="docs/images/loop.gif" alt="Workbench loop: locker, then review, then ask" width="720">
+  </picture>
+</p>
+
 ## Locker and ask
 
 Ingest an adapter you have. Records land in `data/evidence.db`. Extract drafts a card when the text already carries the sentence, then may ask a local model for the rest. Approve is the human gate. `dossier ask` quotes a cited span, or refuses. `dossier index` can add a passage-vector neighbor when full text misses. What the commands do is in [Status](docs/status.md). The pipeline shape is in [Architecture](docs/architecture.md).
@@ -41,18 +48,19 @@ uv run dossier doctor
 
 ```text
 uv run dossier ingest --adapter employer /path/you/listed
-uv run dossier ingest --adapter git /path/to/repo
+uv run dossier ingest --adapter notes ./notes
+uv run dossier ingest --adapter ics ./talks.ics
 uv run dossier index
 uv run dossier ask "what did I write about coastal governance?"
 uv run dossier match --posting ./posting.txt
-uv run dossier review
 uv run dossier gui
-uv run dossier defend
+uv run dossier review
+uv run dossier defend --refresh --dry-run
 uv run dossier tailor --posting ./posting.txt
 uv run dossier gaps
 ```
 
-The full command list and environment knobs are in [CLI](docs/cli.md). Copy `dossier.example.toml` to `data/dossier.toml` when you want file defaults. Environment variables win. `dossier gui` is the optional loopback workbench (`uv sync --extra web`). The install path without that extra stays the CLI plus `dossier review`.
+The full command list and environment knobs are in [CLI](docs/cli.md). Copy `dossier.example.toml` to `data/dossier.toml` when you want file defaults. Environment variables win. `dossier gui` and `dossier review` need the `[web]` extra (`uv sync --extra web`). Screenshots of that loop: [Workbench](docs/workbench.md).
 
 ## Privacy
 
@@ -60,13 +68,14 @@ Records stay on this machine. The only way text leaves is a remote LLM, and that
 
 ## Later
 
-`tailor` writes markdown from approved spans. A PDF or portal CV is still outside this repo. Own publications are the Zotero collection named in config. Next is a second person installing from this README. See [Roadmap](docs/roadmap.md).
+`tailor` writes markdown, or JSON Resume data, from approved spans. A PDF or portal CV is still outside this repo. Own publications are the Zotero collection named in config. Next is a second person installing from this README (`scripts/release/second_machine.sh` is the synthetic form). See [Roadmap](docs/roadmap.md).
 
 ## Docs
 
-- [Changelog](CHANGELOG.md) — 0.4 through 0.9
+- [Changelog](CHANGELOG.md) — 0.4 through 0.10
 - [Status](docs/status.md) — what this version does
-- [Roadmap](docs/roadmap.md) — user testing after 0.9
+- [Workbench](docs/workbench.md) — loopback GUI, with screenshots
+- [Roadmap](docs/roadmap.md) — 1.0 is second-machine acceptance
 - [Architecture](docs/architecture.md) — pipeline and where an adapter plugs in
 - [Seekers](docs/seekers.md) — mail, Slack, meetings
 - [Prior art](docs/prior-art.md) — what this borrows

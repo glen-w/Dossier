@@ -53,7 +53,7 @@ Read a TranscriptX library (`DOSSIER_TRANSCRIPTX`, else `TRANSCRIPTX_TRANSCRIPTS
 
 Identity: `DOSSIER_SPEAKER_NAMES` (comma-separated display names), or `[identity] speaker_names` in the gitignored toml. When both are empty, no speaker is you and meetings ingest stays empty; `dossier doctor` warns when meetings detect. A `SPEAKER_00` → `SPEAKER_00` self-map is not a name. Ignored speakers are skipped. A segment may name the diarized id (`SPEAKER_00`, `0`) or the display name.
 
-A meeting is kept when you are a named speaker and someone else spoke, or you are the only speaker and the filename is an event (workshop, webinar, teaching, slides). Solo notes are skipped. Conflicted copies and `__inbox` duplicates of a file already in the library are skipped. The stored text is your turns, capped, plus the other named people. Their speech stays in the library.
+A meeting is kept when you are a named speaker and someone else spoke, or you are the only speaker and the filename is an event (workshop, webinar, teaching, slides). Solo notes are skipped. Conflicted copies and `__inbox` duplicates of a file already in the library are skipped. The stored text is your turns, capped, plus the other named people. Their speech stays in the library. Org tags (REN21, IDDRI, Oceana) come from `[meetings] orgs` in `dossier.toml`; turn a name off to stop tagging it.
 
 ## Quotas
 

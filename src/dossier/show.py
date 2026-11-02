@@ -10,8 +10,11 @@ from dossier.cards import (
     STATUS_APPROVED,
     STATUS_PENDING,
     ClaimCard,
+    adjudicate,
     carrying_span,
     header_values,
+    span_is_usable,
+    span_max,
 )
 from dossier.lenses import LENSES
 from dossier.store import Corpus
@@ -76,7 +79,7 @@ def find_span(
     return best
 
 
-def store_span(corpus: Corpus, card: ClaimCard) -> bool:
+def store_span(corpus: Corpus, card: ClaimCard, *, dry_run: bool = False) -> bool:
     """Store the carrying sentence. Status stays put. False when none exists."""
     if card.status not in _OPEN:
         return False
@@ -85,24 +88,34 @@ def store_span(corpus: Corpus, card: ClaimCard) -> bool:
     if sentence:
         extras["span"] = sentence
         extras["span_uri"] = span_uri
-        corpus.put_card(replace(card, extras=extras))
+        if not dry_run:
+            corpus.put_card(replace(card, extras=extras))
         return True
     extras.pop("span", None)
     extras.pop("span_uri", None)
-    if extras != dict(card.extras):
+    if extras != dict(card.extras) and not dry_run:
         corpus.put_card(replace(card, extras=extras))
     return False
 
 
-def defend_cards(corpus: Corpus) -> tuple[list[ClaimCard], list[ClaimCard]]:
+def defend_cards(
+    corpus: Corpus,
+    *,
+    source: str | None = None,
+    dry_run: bool = False,
+) -> tuple[list[ClaimCard], list[ClaimCard]]:
     """Store span extras on pending and approved cards. Status stays put."""
     spanned: list[ClaimCard] = []
     unspanned: list[ClaimCard] = []
     for card in corpus.cards():
         if card.status not in _OPEN:
             continue
-        if store_span(corpus, card):
-            updated = corpus.get_card(card.id)
+        if source and card.source != source:
+            continue
+        if store_span(corpus, card, dry_run=dry_run):
+            updated = corpus.get_card(card.id) if not dry_run else replace(
+                card, extras={**card.extras, **_preview_span(corpus, card)}
+            )
             spanned.append(updated if updated is not None else card)
             continue
         extras = dict(card.extras)
@@ -110,6 +123,48 @@ def defend_cards(corpus: Corpus) -> tuple[list[ClaimCard], list[ClaimCard]]:
         extras.pop("span_uri", None)
         unspanned.append(replace(card, extras=extras))
     return spanned, unspanned
+
+
+def _preview_span(corpus: Corpus, card: ClaimCard) -> dict[str, str]:
+    sentence, uri = _first_span(corpus, card)
+    if not sentence:
+        return {}
+    return {"span": sentence, "span_uri": uri}
+
+
+def span_histogram(cards: list[ClaimCard]) -> dict[str, int]:
+    """Bucket stored span lengths for defend --refresh."""
+    buckets = {"0-80": 0, "81-160": 0, "161-320": 0, "321-800": 0, "801+": 0}
+    cap = span_max()
+    del cap
+    for card in cards:
+        n = len((card.extras.get("span") or "").strip())
+        if n <= 80:
+            buckets["0-80"] += 1
+        elif n <= 160:
+            buckets["81-160"] += 1
+        elif n <= 320:
+            buckets["161-320"] += 1
+        elif n <= 800:
+            buckets["321-800"] += 1
+        else:
+            buckets["801+"] += 1
+    return buckets
+
+
+def audit_cards(corpus: Corpus) -> list[tuple[ClaimCard, str]]:
+    """Approved cards whose claim would now be refused, or whose span is unusable."""
+    found: list[tuple[ClaimCard, str]] = []
+    for card in corpus.cards(STATUS_APPROVED):
+        evidence = corpus.evidence_by_uri(card.citations)
+        status, reason = adjudicate(card.claim, card.citations, evidence)
+        if status != STATUS_PENDING:
+            found.append((card, reason or "evidence will not carry this claim"))
+            continue
+        span = (card.extras.get("span") or "").strip()
+        if span and not span_is_usable(card.claim, span):
+            found.append((card, "stored span exceeds cap or no longer carries"))
+    return found
 
 
 def gap_report(corpus: Corpus) -> GapReport:
@@ -162,7 +217,11 @@ def gap_report(corpus: Corpus) -> GapReport:
 
 def render_packet(corpus: Corpus) -> str:
     approved = corpus.cards(STATUS_APPROVED)
-    spanned = [card for card in approved if (card.extras.get("span") or "").strip()]
+    spanned = [
+        card
+        for card in approved
+        if span_is_usable(card.claim, card.extras.get("span") or "")
+    ]
     missing = [card for card in approved if card not in spanned]
     lines = ["# Dossier packet", ""]
     for card in spanned:

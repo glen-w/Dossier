@@ -11,11 +11,12 @@ from dossier.office import INVENTORY_MARK, OFFICE_SUFFIXES, extract_office
 from dossier.paths import employer_paths
 from dossier.sources.employer_filter import FilterStats, select_files
 from dossier.store import Corpus, Record
+from dossier.text import TEXT_CAP_OFFICE, with_lens_kind
 from dossier.ui import Progress, note, trunc, warn
 from dossier.util import record_id
 
 TEXT_SUFFIXES = {".txt", ".md", ".html", ".htm", ".json", ".tex", ".csv"}
-TEXT_CAP = 20_000
+TEXT_CAP = TEXT_CAP_OFFICE
 
 
 class EmployerSource:
@@ -120,7 +121,7 @@ class EmployerSource:
                         source="employer",
                         uri=uri,
                         title=title,
-                        text=text,
+                        text=with_lens_kind(text, "delivered", kind),
                         table="employer.files",
                     )
                 )

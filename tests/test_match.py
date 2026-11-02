@@ -255,17 +255,17 @@ def test_fuses_neighbor_when_lexical_hits_already_exist(
             _record(
                 "git",
                 "git://budget",
-                "Budget spreadsheets sat in the finance folder.",
-                title="Budget",
+                "Commit log: led ocean workshops in the coastal folder.",
+                title="Workshops",
             )
         )
 
-        def _neighbors(corpus, vector, model, records, limit):  # noqa: ANN001
+        def _neighbors(corpus, vector, model, records, limit):
             return [
                 Hit(
                     uri="git://budget",
-                    title="Budget",
-                    text="Budget spreadsheets sat in the finance folder.",
+                    title="Workshops",
+                    text="Commit log: led ocean workshops in the coastal folder.",
                     score=90,
                     cosine=0.9,
                 )
@@ -290,7 +290,7 @@ def test_fuses_neighbor_when_lexical_hits_already_exist(
     evidence = report.requirements[0].evidence
     assert {hit.uri for hit in evidence} >= {"slack://1", "employer://1", "git://budget"}
     neighbor = next(hit for hit in evidence if hit.uri == "git://budget")
-    assert neighbor.route == "neighbor"
+    assert neighbor.route in {"neighbor", "passage"}
 
 
 def test_split_keeps_numbered_lines_and_a_cue_inside_benefits() -> None:

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ label('prove') }}</h1>
+<p class="lede">{{ blurbs.prove }} The pass writes a throwaway data dir. It never approves a card.</p>
+<form method="post" action="/prove/run">
+  <button class="primary" type="submit" {% if busy %}disabled{% endif %}>Run prove</button>
+</form>
+{% if job and job.status == 'error' %}
+<div class="err">{{ job.error or 'Prove job failed.' }}</div>
+{% elif job and job.status == 'done' %}
+<p class="meta">Prove finished with code {{ job.result.code if job.result else '?' }}.</p>
+{% elif job and job.status in ('running', 'queued') %}
+<p class="meta">Prove is running…</p>
+{% endif %}
+{% endblock %}

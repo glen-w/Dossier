@@ -95,14 +95,28 @@ def follow_up(
     )
 
 
-def resolve_pack(spec: str, root: Path | None = None) -> list[PackQuestion]:
-    """``career``, a saved name under ``$DOSSIER_DATA/packs``, or a JSON path."""
+def resolve_pack(
+    spec: str,
+    root: Path | None = None,
+    *,
+    allow_path: bool = False,
+) -> list[PackQuestion]:
+    """``career`` or a saved name under ``$DOSSIER_DATA/packs``.
+
+    ``allow_path`` is CLI-only: a local JSON file the user named. The
+    workbench never sets it, so a form cannot read an arbitrary path.
+    """
     if spec == "career":
         return list(CAREER)
-    named = packs_dir(root) / f"{spec}.json"
-    if named.is_file():
+    folder = packs_dir(root).resolve()
+    named = (folder / f"{Path(spec).name}.json").resolve()
+    if named.is_file() and named.parent == folder:
         return load_pack(str(named))
-    return load_pack(spec)
+    if allow_path:
+        path = Path(spec).expanduser()
+        if path.is_file() and path.suffix.lower() == ".json":
+            return load_pack(str(path))
+    raise ValueError(f"unknown pack {spec!r}")
 
 
 def packs_dir(root: Path | None = None) -> Path:

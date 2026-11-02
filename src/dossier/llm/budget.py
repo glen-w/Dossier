@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from dossier.llm.client import CompletionRequest, LLMClient, LLMClientError
@@ -13,6 +14,7 @@ class CallBudget:
     def __init__(self, max_calls: int) -> None:
         self.max_calls = max(0, max_calls)
         self.calls = 0
+        self._lock = threading.Lock()
 
     @property
     def remaining(self) -> bool:
@@ -40,6 +42,7 @@ class _BudgetClient:
         return self._inner.complete_json(request)
 
     def _take(self) -> None:
-        if self._budget.max_calls and self._budget.calls >= self._budget.max_calls:
-            raise LLMClientError("model call budget spent")
-        self._budget.calls += 1
+        with self._budget._lock:
+            if self._budget.max_calls and self._budget.calls >= self._budget.max_calls:
+                raise LLMClientError("model call budget spent")
+            self._budget.calls += 1

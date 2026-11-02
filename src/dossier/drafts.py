@@ -11,6 +11,8 @@ from dossier.cards import (
     adjudicate,
     card_id,
     evidence_carries,
+    sentences,
+    span_max,
 )
 from dossier.store import Corpus, Record
 
@@ -136,9 +138,15 @@ def _headers(text: str) -> dict[str, str]:
 
 
 def _first_body(text: str) -> str:
+    """First paste-sized line, else the first sentence under the cap."""
+    cap = span_max()
     for line in text.splitlines():
         stripped = line.strip()
         if not stripped or _HEADER.match(stripped):
             continue
-        return stripped
+        if len(stripped) <= cap:
+            return stripped
+        for sentence in sentences(stripped, cap=cap):
+            if sentence:
+                return sentence
     return ""

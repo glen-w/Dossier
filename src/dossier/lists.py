@@ -256,6 +256,7 @@ DEFAULT_MEETINGS_DIRS = (
     ".whispermlx-missing",
 )
 DEFAULT_MEETINGS_SOLO = ("workshop", "webinar", "teaching", "side_event", "slides")
+DEFAULT_MEETING_ORGS = ("REN21", "IDDRI", "Oceana")
 DEFAULT_APPLICATION_FILES = (".ds_store", "thumbs.db")
 
 
@@ -350,6 +351,13 @@ PHRASE_LISTS: tuple[PhraseList, ...] = (
         "Solo kinds",
         "Kept when you are the only speaker.",
         DEFAULT_MEETINGS_SOLO,
+    ),
+    PhraseList(
+        "meetings",
+        "orgs",
+        "Org tokens",
+        "Names matched in meeting titles. Turn one off to stop tagging it.",
+        DEFAULT_MEETING_ORGS,
     ),
     PhraseList(
         "employer",
@@ -522,6 +530,10 @@ def meetings_dirs() -> frozenset[str]:
 
 def meetings_solo() -> frozenset[str]:
     return _exact(terms("meetings", "solo", DEFAULT_MEETINGS_SOLO))
+
+
+def meetings_orgs() -> frozenset[str]:
+    return _exact(terms("meetings", "orgs", DEFAULT_MEETING_ORGS))
 
 
 def application_files() -> frozenset[str]:

@@ -45,7 +45,7 @@ class ApplicationsSource:
         seen = 0
         capped = False
         for child in sorted(root.rglob("*")):
-            if not child.is_file():
+            if child.is_symlink() or not child.is_file():
                 continue
             rel_path = child.relative_to(root)
             if any(

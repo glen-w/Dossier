@@ -13,7 +13,7 @@ EMPLOYER_POINTS = 10
 JOB_POINTS_CAP = 3
 _TOKEN = re.compile(r"[a-z0-9]+")
 _STOP = frozenset(
-    "a an the of and or to for in on with from by at as is are was were be this that".split()
+    ["a", "an", "the", "of", "and", "or", "to", "for", "in", "on", "with", "from", "by", "at", "as", "is", "are", "was", "were", "be", "this", "that"]
 )
 
 

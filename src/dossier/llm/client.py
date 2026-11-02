@@ -11,6 +11,7 @@ import httpx
 
 from dossier.llm.validate import (
     LlmExtraMissingError,
+    reject_litellm_ollama_model,
     validate_llm_api_base,
     validate_ollama_url,
 )
@@ -205,6 +206,7 @@ def get_client_impl(cfg) -> LLMClient:
     if not cfg.llm_enabled:
         return NullLLMClient()
     if cfg.llm_provider == "litellm":
+        reject_litellm_ollama_model(str(getattr(cfg, "llm_model", "") or ""))
         return LiteLLMClient(api_base=cfg.llm_api_base or None)
     return OllamaClient(base_url=cfg.llm_base_url, allow_remote=cfg.llm_allow_remote)
 
@@ -250,6 +252,13 @@ def _parse_json_object(text: str) -> dict[str, Any]:
     text = text.strip()
     if not text:
         raise LLMClientError("empty JSON response")
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:

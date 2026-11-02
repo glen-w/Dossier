@@ -9,7 +9,7 @@ from __future__ import annotations
 NAV_ROOMS = (
     ("Prepare", ("locker", "sources", "extract", "index")),
     ("Decide", ("review", "gaps")),
-    ("Use", ("ask", "match", "tailor", "packet", "brief", "run")),
+    ("Use", ("ask", "match", "tailor", "packet", "brief", "run", "prove", "referees")),
     ("Settings", ("settings",)),
 )
 
@@ -46,6 +46,8 @@ LABELS = {
     "identity": "Identity",
     "prompt": "Prompt",
     "settings": "Settings",
+    "referees": "Referees",
+    "gaps": "Gaps",
 }
 
 BLURBS = {
@@ -65,6 +67,8 @@ BLURBS = {
     "prompt": "A versioned template for extract, ask, or tailor. A pack is a list of questions, not a prompt.",
     "pack": "A list of questions for a brief. Not a prompt.",
     "egress": "Text leaves the machine only when a remote LLM is opted in.",
+    "prove": "Disposable real-corpus pass. Never approves.",
+    "referees": "Read-only shortlist. Confirm before listing. Never writes Twenty.",
     "locker_busy": "The locker is busy with another job.",
 }
 

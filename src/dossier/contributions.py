@@ -10,12 +10,14 @@ from dataclasses import dataclass
 
 from dossier.sources.applications import ApplicationsSource
 from dossier.sources.base import Source
+from dossier.sources.calendar import CalendarSource
 from dossier.sources.chatgpt import ChatGPTSource
 from dossier.sources.employer import EmployerSource
 from dossier.sources.git import GitSource
 from dossier.sources.linkedin import LinkedInSource
 from dossier.sources.mbox import MboxSource
 from dossier.sources.meetings import MeetingsSource
+from dossier.sources.notes import NotesSource
 from dossier.sources.pubs import PubsSource
 from dossier.sources.slack import SlackSource
 from dossier.sources.transcripts import TranscriptsSource
@@ -38,6 +40,8 @@ CONTRIBUTIONS: list[Contribution] = [
     Contribution("meetings", MeetingsSource()),
     Contribution("employer", EmployerSource()),
     Contribution("git", GitSource()),
+    Contribution("notes", NotesSource()),
+    Contribution("ics", CalendarSource()),
 ]
 
 

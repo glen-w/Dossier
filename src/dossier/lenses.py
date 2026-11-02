@@ -151,9 +151,12 @@ def primary_lens(lenses: tuple[str, ...]) -> str:
 
 
 def infer_org(*, source: str, account_key: str = "", channel: str = "") -> str:
-    if source == "slack" or channel:
+    from dossier.lists import meetings_orgs
+
+    allowed = meetings_orgs()
+    if (source == "slack" or channel) and "ren21" in allowed:
         return "REN21"
     key = (account_key or "").lower()
-    if "sciencespo" in key or "iddri" in key:
+    if ("sciencespo" in key or "iddri" in key) and "iddri" in allowed:
         return "IDDRI"
     return ""

@@ -129,6 +129,8 @@ def test_upsert_skips_unchanged_record(corpus) -> None:
 
 
 def test_upsert_fts_map_keeps_search(corpus) -> None:
+    if not corpus.fts_ok:
+        pytest.skip("sqlite build has no fts5")
     corpus.upsert_record(
         Record(
             id="a",
@@ -194,44 +196,8 @@ def test_upsert_rebuilds_passages(corpus) -> None:
 
 
 def test_passage_fts_delete_leaves_other_records(corpus) -> None:
-    corpus.upsert_record(
-        Record(
-            id="a",
-            source="pubs",
-            uri="zotero://fixture/a",
-            title="Alpha",
-            text="Alpha token about kelp.",
-        )
-    )
-    corpus.upsert_record(
-        Record(
-            id="b",
-            source="pubs",
-            uri="zotero://fixture/b",
-            title="Beta",
-            text="Beta token about ships.",
-        )
-    )
-    corpus.upsert_record(
-        Record(
-            id="a",
-            source="pubs",
-            uri="zotero://fixture/a",
-            title="Alpha",
-            text="Revised token about kelp.",
-        )
-    )
-    ships = corpus.search_passages("ships", limit=5)
-    assert ships is not None
-    assert ships[0][0] == "zotero://fixture/b"
-    revised = corpus.search_passages("Revised", limit=5)
-    assert revised is not None
-    assert revised[0][0] == "zotero://fixture/a"
-    gone = corpus.search_passages("Alpha", limit=5)
-    assert gone == []
-
-
-def test_passage_fts_delete_leaves_other_records(corpus) -> None:
+    if not corpus.passages_fts_ok:
+        pytest.skip("sqlite build has no fts5")
     corpus.upsert_record(
         Record(
             id="a",

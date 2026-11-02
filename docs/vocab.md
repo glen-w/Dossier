@@ -41,13 +41,15 @@ Use these words in the GUI and in new docs. Prefer the locked term over a synony
 | --- | --- |
 | **Ask** | One cited answer from the locker, or a refusal. |
 | **Match** | Ordered evidence for each requirement in a pasted job spec, under `data/matches/`. |
-| **Chat** | Later multi-turn ask. Wave 1 of the workbench does not use this word. |
+| **Chat** | Streamed cited ask on the workbench ask page. Follow-up is another question on that page. |
 | **Pack** | A list of questions for a brief. Not a prompt. |
 | **Brief** | Answers to a pack, under `data/briefs/`. |
 | **Tailor** | Posting-shaped CV or letter under `data/drafts/`. |
 | **Prove** | Disposable corpus pass; never approves. |
 | **Run** | Ingest, extract, then brief on the real locker. |
-| **Job** | One workbench background task (ingest, ask, …). The strip polls only while busy; errors and result counts show on the page. |
+| **Job** | One workbench background task (ingest, ask, …). The strip polls only while busy; Cancel cooperates with progress callbacks. History lives under `$DOSSIER_DATA/jobs/`. Errors and result counts show on the page. |
+| **Eval** | Synthetic golden set (`dossier eval`). Reports refusal precision and citation validity. |
+| **Backup** | Consistent copy of `evidence.db` via the SQLite backup API. |
 
 ## Config surface
 

@@ -116,9 +116,20 @@ def account_dir(mail_root: Path, account_key: str) -> Path:
     return mail_root
 
 
+def blocked_mail_roots() -> tuple[str, ...]:
+    """Folder names that must not be walked. ``[mail] blocked_roots`` or env."""
+    raw = os.environ.get("DOSSIER_MAIL_BLOCKED_ROOTS", "").strip()
+    if raw:
+        return tuple(part.strip().lower() for part in raw.split(",") if part.strip())
+    names = tuple(n.lower() for n in _toml_list("mail", "blocked_roots"))
+    if names:
+        return names
+    return ("iddri",)
+
+
 def is_blocked_mail_root(path: Path) -> bool:
     """True for a full Thunderbird tree that must not be walked or parsed."""
-    if path.name.lower() != "iddri":
+    if path.name.lower() not in blocked_mail_roots():
         return False
     return (path / "[Gmail].sbd" / "Sent Mail").exists() or (path / "INBOX").exists()
 

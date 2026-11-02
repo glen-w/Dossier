@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dossier.fetch.mbox import build_mbox_index, fetch_mbox_body, is_mbox_file, mbox_max_bytes
+from dossier.fetch.mbox import (
+    build_mbox_index,
+    fetch_mbox_body,
+    is_mbox_file,
+    mbox_max_bytes,
+)
 from dossier.fetch.snippet import record_from_hit
 from dossier.identity import is_blocked_mail_root
 from dossier.paths import mail_root, warehouse_db

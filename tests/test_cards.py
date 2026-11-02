@@ -3,7 +3,11 @@ from dossier.cards import (
     STATUS_REFUSED,
     ProposedClaim,
     adjudicate,
+    carrying_span,
     evidence_carries,
+    sentences,
+    span_is_usable,
+    span_max,
 )
 from dossier.extract import lock_claims
 from dossier.store import Record
@@ -88,3 +92,30 @@ def test_lock_claims_drops_near_duplicate_wording() -> None:
     )
     assert len(cards) == 1
     assert cards[0].status == STATUS_PENDING
+
+
+def test_empty_content_tokens_are_refused() -> None:
+    status, reason = adjudicate("a", ["doc://1"], {"doc://1": "a is a letter."})
+    assert status == STATUS_REFUSED
+    assert "content" in reason
+    assert not evidence_carries("a", "aaaa aaaa aaaa aaaa")
+
+
+def test_sentences_split_on_newlines_and_drop_over_cap() -> None:
+    long_line = "word " * 200
+    parts = sentences(f"Short claim lives here.\n{long_line}")
+    assert "Short claim lives here." in parts
+    assert all(len(part) <= span_max() for part in parts)
+
+
+def test_body_without_punctuation_does_not_become_the_file() -> None:
+    body = "\n".join(["alpha beta gamma delta"] * 40)
+    span = carrying_span("alpha beta gamma delta", body)
+    assert span
+    assert len(span) <= span_max()
+    assert span_is_usable("alpha beta gamma delta", span)
+
+
+def test_giant_first_line_is_not_a_span() -> None:
+    line = "Coastal governance " + ("kelp " * 400)
+    assert carrying_span("coastal governance kelp", line) == ""

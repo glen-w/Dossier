@@ -8,11 +8,11 @@ from pathlib import Path
 from dossier.lists import excluded
 from dossier.paths import git_user
 from dossier.store import Corpus, Record
+from dossier.text import with_lens_kind
 from dossier.util import record_id
 
 GIT_LIMIT = 400
 FILE_CAP = 40
-TEXT_CAP = 8000
 
 
 class GitSource:
@@ -47,7 +47,7 @@ class GitSource:
                     source="git",
                     uri=uri,
                     title=subject[:160],
-                    text=body[:TEXT_CAP],
+                    text=with_lens_kind(body, "delivered", "commit"),
                     table="git.log",
                 )
             )

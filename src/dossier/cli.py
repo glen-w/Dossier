@@ -11,33 +11,42 @@ from pathlib import Path
 
 from dossier.ask import ASK_MODES
 from dossier.brief import run_pack, write_brief
-from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED
+from dossier.cards import STATUS_APPROVED, STATUS_PENDING, STATUS_REFUSED, span_max
 from dossier.config import Config
-from dossier.contributions import CONTRIBUTIONS, contribution
+from dossier.contributions import CONTRIBUTIONS
 from dossier.extract import ExtractProgress, extract_corpus
 from dossier.ingest_run import run_ingest_targets
 from dossier.interview import conduct
-from dossier.llm import EGRESS_NOTICE, egress_status, get_client, llm_egress_is_remote
+from dossier.llm import egress_status, get_client, llm_egress_is_remote
 from dossier.llm.budget import CallBudget
-from dossier.llm.client import LLMClient, LLMClientError, NullLLMClient, select_fast_model
+from dossier.llm.client import (
+    LLMClient,
+    NullLLMClient,
+    select_fast_model,
+)
 from dossier.match import match_posting, write_match
 from dossier.packs import posting_pack, resolve_pack
-from dossier.prove import DEFAULT_ADAPTERS, run_prove
-from dossier.show import defend_cards, find_span, gap_report, write_packet
 from dossier.paths import (
     TomlConfigError,
-    evidence_db,
     employer_paths,
+    evidence_db,
     git_paths,
     git_user,
     pubs_collection,
 )
+from dossier.prove import DEFAULT_ADAPTERS, run_prove
+from dossier.show import defend_cards, find_span, gap_report, write_packet
 from dossier.sources.pubs import optional_pubs_hits
 from dossier.store import Corpus
-from dossier.ui import Progress, HUES, note, ok, paint, stage, trunc
+from dossier.ui import HUES, Progress, note, ok, paint, stage, trunc
 
 _YELLOW = "\033[33m"
 _RESET = "\033[0m"
+
+
+def fail(message: str, code: int = 2) -> int:
+    print(f"FAIL: {message}", file=sys.stderr)
+    return code
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -50,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     p_ing = sub.add_parser("ingest", help="Load one adapter into the local corpus")
     p_ing.add_argument(
         "--adapter",
-        help="pubs, chatgpt, linkedin, applications, transcripts, slack, mbox, meetings, employer, git",
+        help="pubs, chatgpt, linkedin, applications, transcripts, slack, mbox, meetings, employer, git, notes, ics",
     )
     p_ing.add_argument("path", nargs="?", type=Path, help="Override the default path")
 
@@ -123,9 +132,20 @@ def main(argv: list[str] | None = None) -> int:
     p_span.add_argument("--uri", help="Limit the search to one record URI")
     p_span.add_argument("--source", help="Limit the search to one adapter name")
 
-    sub.add_parser(
+    p_def = sub.add_parser(
         "defend",
         help="Store the carrying sentence on pending and approved cards",
+    )
+    p_def.add_argument("--source", help="Limit to one adapter name")
+    p_def.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Recompute spans under the current span rule",
+    )
+    p_def.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the histogram and unspanned count without writing",
     )
     sub.add_parser(
         "gaps",
@@ -138,6 +158,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_tailor.add_argument("--posting", type=Path, required=True)
     p_tailor.add_argument("--kind", choices=("cv", "letter"), default="cv")
+    p_tailor.add_argument(
+        "--format",
+        choices=("markdown", "json-resume"),
+        default="markdown",
+        dest="fmt",
+    )
     p_tailor.add_argument(
         "--arrange",
         action="store_true",
@@ -152,6 +178,39 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("index", help="Embed passages into evidence.db with the local model")
 
     p_doc = sub.add_parser("doctor", help="Print local readiness without writing")
+    p_doc.add_argument(
+        "--deep",
+        action="store_true",
+        help="Integrity check, span histogram, FTS parity, orphan cards",
+    )
+
+    p_audit = sub.add_parser(
+        "audit-cards",
+        help="List approved cards whose claim would now be refused",
+    )
+    p_audit.add_argument(
+        "--from-audit",
+        action="store_true",
+        dest="write_ids",
+        help="Print card ids one per line for reopen --from-audit",
+    )
+
+    p_reopen.add_argument(
+        "--from-audit",
+        action="store_true",
+        help="Reopen every card listed by audit-cards",
+    )
+
+    sub.add_parser("backup", help="Copy evidence.db via the SQLite backup API")
+    sub.add_parser("rebuild-index", help="Rebuild FTS tables without opening-time rewrite")
+
+    p_eval = sub.add_parser("eval", help="Run the synthetic golden set")
+    p_eval.add_argument("--path", type=Path, help="JSON golden set (default: bundled)")
+
+    p_exp = sub.add_parser("export", help="Write cards, spans, and answers as JSON")
+    p_exp.add_argument("--out", type=Path, required=True)
+    p_imp = sub.add_parser("import", help="Load cards and answers from JSON")
+    p_imp.add_argument("--path", type=Path, required=True)
 
     p_prove = sub.add_parser(
         "prove",
@@ -220,10 +279,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cfg = Config.from_env()
     except TomlConfigError as exc:
-        print(f"FAIL: {exc}", file=sys.stderr)
-        return 2
+        return fail(str(exc))
     if args.cmd == "doctor":
-        return _doctor(cfg)
+        return _doctor(cfg, deep=getattr(args, "deep", False))
     if args.cmd == "gui":
         return _gui(args)
     if args.cmd == "review":
@@ -252,7 +310,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "span":
             return _span(args, corpus)
         if args.cmd == "defend":
-            return _defend(corpus)
+            return _defend(
+                corpus,
+                source=getattr(args, "source", None),
+                dry_run=getattr(args, "dry_run", False),
+            )
         if args.cmd == "gaps":
             return _gaps(corpus)
         if args.cmd == "packet":
@@ -263,47 +325,49 @@ def main(argv: list[str] | None = None) -> int:
             return _match(args, cfg, corpus)
         if args.cmd == "index":
             return _index(cfg, corpus)
+        if args.cmd == "audit-cards":
+            return _audit_cards(corpus, write_ids=getattr(args, "write_ids", False))
+        if args.cmd == "backup":
+            return _backup(cfg, corpus)
+        if args.cmd == "rebuild-index":
+            corpus.rebuild_index()
+            print("rebuilt")
+            return 0
+        if args.cmd == "eval":
+            from dossier.eval import run_eval
+
+            report = run_eval(corpus, path=getattr(args, "path", None))
+            print(report)
+            return 0 if report.ok else 1
+        if args.cmd == "export":
+            from dossier.portability import export_locker
+
+            path = export_locker(corpus, args.out)
+            print(path)
+            return 0
+        if args.cmd == "import":
+            from dossier.portability import import_locker
+
+            n = import_locker(corpus, args.path)
+            print(f"imported {n}")
+            return 0
     finally:
         corpus.close()
     return 2
 
 
 def _ingest(args: argparse.Namespace, corpus: Corpus) -> int:
-    if args.adapter:
-        item = contribution(args.adapter)
-        if item is None:
-            print(f"unknown adapter {args.adapter!r}", file=sys.stderr)
+    from dossier.ops import ingest
+
+    try:
+        ingest(corpus, adapter=args.adapter, path=args.path)
+    except ValueError as extra:
+        msg = str(extra)
+        if msg.startswith("unknown adapter"):
             print("known:", ", ".join(c.name for c in CONTRIBUTIONS), file=sys.stderr)
-            return 2
-        path = args.path or _default_path(item.name)
-        if path is None:
-            print(f"{item.name}: no path", file=sys.stderr)
-            return 2
-        targets = [(item, path)]
-        if args.path is None:
-            for extra in _extra_paths(item.name):
-                if item.source.detect(extra):
-                    targets.append((item, extra))
-    elif args.path:
-        matches = [c for c in CONTRIBUTIONS if c.source.detect(args.path)]
-        if not matches:
-            print(f"no adapter owns {args.path}", file=sys.stderr)
-            return 2
-        targets = [(m, args.path) for m in matches]
-    else:
-        targets = []
-        for item in CONTRIBUTIONS:
-            default = _default_path(item.name)
-            if default is not None and item.source.detect(default):
-                targets.append((item, default))
-            for extra_path in _extra_paths(item.name):
-                if item.source.detect(extra_path):
-                    targets.append((item, extra_path))
-        if not targets:
-            print("nothing to ingest (no default source detected)", file=sys.stderr)
-            return 1
-    stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
-    run_ingest_targets(targets, corpus)
+        return fail(msg)
+    except FileNotFoundError as extra:
+        return fail(str(extra), 1)
     return 0
 
 
@@ -672,6 +736,16 @@ def _refuse(args: argparse.Namespace, corpus: Corpus) -> int:
 
 
 def _reopen(args: argparse.Namespace, corpus: Corpus) -> int:
+    if getattr(args, "from_audit", False):
+        from dossier.show import audit_cards
+
+        ids = [card.id for card, _reason in audit_cards(corpus)]
+        if not ids:
+            print("reopened 0")
+            return 0
+        n = corpus.reopen_filtered(ids=tuple(ids))
+        print(f"reopened {n}")
+        return 0
     return _gate(args, corpus, action="reopen")
 
 
@@ -754,7 +828,12 @@ def _add_scope_flags(parser: argparse.ArgumentParser) -> None:
 
 
 def _with_request_scope(args: argparse.Namespace, cfg: Config) -> Config:
-    from dossier.scope import RequestScope, apply_request_scope, parse_year, sources_for_request
+    from dossier.scope import (
+        RequestScope,
+        apply_request_scope,
+        parse_year,
+        sources_for_request,
+    )
 
     sources = cfg.scope_sources
     raw_sources = getattr(args, "sources", None)
@@ -808,7 +887,7 @@ def _brief(
     try:
         with Progress(len(questions), label="brief") as bar:
 
-            def on_progress(done: int, total: int, item, result) -> None:  # noqa: ANN001
+            def on_progress(done: int, total: int, item, result) -> None:
                 nonlocal cited, refused
                 bar.set_total(total)
                 if result.refused:
@@ -850,7 +929,7 @@ def _pack_questions(args: argparse.Namespace, cfg: Config) -> list:
         if posting is None:
             raise ValueError("posting pack needs --posting or DOSSIER_RUN_POSTING")
         return posting_pack(posting.read_text(encoding="utf-8"))
-    return resolve_pack(pack)
+    return resolve_pack(pack, Path(cfg.data_dir), allow_path=True)
 
 
 def _run(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
@@ -901,15 +980,57 @@ def _span(args: argparse.Namespace, corpus: Corpus) -> int:
     return 0
 
 
-def _defend(corpus: Corpus) -> int:
-    spanned, unspanned = defend_cards(corpus)
+def _defend(
+    corpus: Corpus,
+    *,
+    source: str | None = None,
+    dry_run: bool = False,
+) -> int:
+    from dossier.show import span_histogram
+
+    spanned, unspanned = defend_cards(corpus, source=source, dry_run=dry_run)
     if not spanned and not unspanned:
         print("no cards")
         return 0
+    hist = span_histogram(spanned)
+    print(
+        "histogram "
+        + " ".join(f"{bucket}={count}" for bucket, count in hist.items())
+    )
+    print(f"spanned={len(spanned)} unspanned={len(unspanned)} cap={span_max()}")
+    if dry_run:
+        print("dry-run: not written")
     for card in spanned:
         print(f"spanned {card.id}  {card.claim}")
     for card in unspanned:
         print(f"unspanned {card.id}  {card.claim}")
+    return 0
+
+
+def _audit_cards(corpus: Corpus, *, write_ids: bool) -> int:
+    from dossier.show import audit_cards
+
+    rows = audit_cards(corpus)
+    if write_ids:
+        for card, _reason in rows:
+            print(card.id)
+        return 0
+    if not rows:
+        print("audit: 0")
+        return 0
+    print(f"audit: {len(rows)}")
+    for card, reason in rows:
+        print(f"{card.id}  {reason}  {card.claim}")
+    return 0
+
+
+def _backup(cfg: Config, corpus: Corpus) -> int:
+    from datetime import UTC, datetime
+
+    stamp = datetime.now(UTC).strftime("%y%m%d-%H%M%S")
+    dest = Path(cfg.data_dir) / "backups" / f"evidence-{stamp}.db"
+    path = corpus.backup(dest)
+    print(path)
     return 0
 
 
@@ -1014,6 +1135,22 @@ def _tailor(args: argparse.Namespace, cfg: Config, corpus: Corpus) -> int:
             print("arrange refused; kept the selected spans", file=sys.stderr)
     else:
         prompt_stamp = "prompts: none"
+    if getattr(args, "fmt", "markdown") == "json-resume":
+        from dossier.tailor import render_json_resume
+
+        text = render_json_resume(
+            picked=picked,
+            name=cfg.cv_name,
+            subtitle=linkedin_subtitle(corpus),
+        )
+        dest = Path(cfg.data_dir) / "drafts"
+        dest.mkdir(parents=True, exist_ok=True)
+        from datetime import UTC, datetime
+
+        path = dest / f"{datetime.now(UTC).strftime('%y%m%d-%H%M%S')}.json"
+        path.write_text(text, encoding="utf-8")
+        print(path)
+        return 0
     text = render_draft(
         kind=args.kind,
         posting=posting,
@@ -1037,7 +1174,7 @@ def _packet(cfg: Config, corpus: Corpus) -> int:
     return 0
 
 
-def _doctor(cfg: Config) -> int:
+def _doctor(cfg: Config, *, deep: bool = False) -> int:
     from dossier.identity import (
         configured_slack_user_ids,
         is_sent_metadata_uri,
@@ -1088,12 +1225,22 @@ def _doctor(cfg: Config) -> int:
         print(f"vectors: {corpus.vector_count(cfg.embed_model)}")
         print(f"ask.pubs: {'yes' if cfg.ask_pubs else 'no'}")
         print(f"pubs_url: {cfg.pubs_url}")
+        from dossier.cards import span_is_usable
+
+        approved = corpus.cards(STATUS_APPROVED)
         spanned = sum(
+            1 for card in approved if span_is_usable(card.claim, card.extras.get("span") or "")
+        )
+        over = sum(
             1
-            for card in corpus.cards(STATUS_APPROVED)
+            for card in approved
             if (card.extras.get("span") or "").strip()
+            and not span_is_usable(card.claim, card.extras.get("span") or "")
         )
         print(f"tailor: {spanned}")
+        print(f"span_max: {span_max()}")
+        if over:
+            print(f"warn: {over} stored spans exceed cap or no longer carry")
         if spanned == 0:
             print("tailor: approve and defend before tailor will quote")
         collection = pubs_collection()
@@ -1144,9 +1291,28 @@ def _doctor(cfg: Config) -> int:
 
         for line in readiness_notes(cfg, corpus):
             print(f"note: {line}")
+        if deep:
+            _doctor_deep(corpus)
     finally:
         corpus.close()
     return 0
+
+
+def _doctor_deep(corpus: Corpus) -> None:
+    from dossier.show import span_histogram
+
+    print(f"integrity: {'ok' if corpus.integrity_ok() else 'FAIL'}")
+    n_rec, n_fts = corpus.fts_parity()
+    print(f"fts_parity: records={n_rec} fts={n_fts}")
+    hist = span_histogram(corpus.cards())
+    print("span_histogram " + " ".join(f"{k}={v}" for k, v in hist.items()))
+    cited = set()
+    for card in corpus.cards():
+        cited.update(card.citations)
+        if card.record_id and corpus.get_card(card.id) is None:
+            print(f"orphan_card {card.id}")
+    missing = [uri for uri in cited if corpus.get_record(uri) is None]
+    print(f"orphan_citations: {len(missing)}")
 
 
 def _client_for_mode(cfg: Config, mode: str) -> tuple[LLMClient, int | None]:

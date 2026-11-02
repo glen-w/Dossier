@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,6 +12,7 @@ from dossier.cards import (
     ClaimCard,
     content_token_set,
     header_values,
+    span_is_usable,
 )
 from dossier.lenses import infer_skills, kinds_mentioned
 from dossier.llm.client import (
@@ -46,7 +48,7 @@ def select_cards(corpus: Corpus, posting: str, *, limit: int) -> tuple[list[Pick
     bare: list[ClaimCard] = []
     for card in corpus.cards(STATUS_APPROVED):
         span = (card.extras.get("span") or "").strip()
-        if not span:
+        if not span or not span_is_usable(card.claim, span):
             bare.append(card)
             continue
         lens, kind = _lens_kind(corpus, card)
@@ -99,6 +101,30 @@ def render_draft(
         lines.append("")
     lines.extend(_coverage(posting, picked))
     return "\n".join(lines).rstrip() + "\n"
+
+
+def render_json_resume(
+    *,
+    picked: list[Picked],
+    name: str = "",
+    subtitle: str = "",
+) -> str:
+    """JSON Resume data. Not a PDF. Spans stay quotes under the cap."""
+    payload = {
+        "basics": {
+            "name": name.strip(),
+            "label": subtitle.strip(),
+        },
+        "work": [
+            {
+                "name": item.lens or item.card.source,
+                "position": item.kind,
+                "summary": (item.card.extras.get("span") or "").strip(),
+            }
+            for item in picked
+        ],
+    }
+    return json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
 
 
 def write_draft(text: str, directory: Path, *, prompt_stamp: str = "prompts: none") -> Path:

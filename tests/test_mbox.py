@@ -54,6 +54,7 @@ def test_gloda_warehouse_skips_noise_and_does_not_open_sent_mail(
     tmp_path: Path, corpus: Corpus, monkeypatch
 ) -> None:
     import duckdb
+
     from dossier.fetch.mbox import fetch_mbox_body
 
     mail = tmp_path / "email"

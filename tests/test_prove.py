@@ -12,7 +12,6 @@ from dossier.sources.pubs import HttpPubsRetriever, PubsSource
 from dossier.store import Corpus
 
 
-
 def test_http_retriever_maps_search_hits(monkeypatch) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/search":

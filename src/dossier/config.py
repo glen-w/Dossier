@@ -11,7 +11,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dossier.effort import DEFAULT_EFFORT, apply_effort, normalize_effort
-from dossier.paths import TomlConfigError, data_dir, pubs_url, read_toml_dict, warehouse_db
+from dossier.paths import (
+    data_dir,
+    pubs_url,
+    read_toml_dict,
+    warehouse_db,
+)
 
 ASK_MODES = ("exact", "auto", "rich")
 DECOMPOSE_MODES = ("off", "auto", "on")

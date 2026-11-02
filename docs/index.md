@@ -23,6 +23,7 @@ The product page and this guide share one sticky header. Build both with
 
 install
 cli
+workbench
 prove
 adapters
 ```

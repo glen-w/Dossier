@@ -36,23 +36,21 @@ Employer allowlist, ChatGPT export, Slack export, and git history, plus the meet
 
 `dossier tailor` turns a posting and spanned approved cards into CV or letter markdown, plus a coverage list. `--arrange` may reorder a letter from those spans only. Referees can use a pubs name already in the corpus and print up to two claims they could speak to. Still confirm before listing. Still no PDF renderer and no Twenty writes.
 
+### 0.10 — Gates, span rule, workbench as 1.0 loop
+
+Engineering gates (interpreter pin, ruff, mypy, CI). A stored span is one paste-sized sentence (`SPAN_MAX`, default 320). `defend --refresh` re-spans; `audit-cards` lists approved cards the new rule would refuse. The loopback workbench covers the daily loop, including prove, referees, and gaps pages, plus streamed cited ask. Notes and `.ics` adapters. `eval`, `export` / `import`, `backup`, `tailor --format json-resume` (data, not a renderer). `scripts/release/second_machine.sh` is the synthetic second-machine path.
+
 ## Waves
 
-### 0.9 → 1.0 — User testing
+### 1.0 — Second machine
 
-Find what breaks on a machine that is not the one that grew this locker, and not synthetic fixtures. Match lists evidence for each requirement in a pasted job spec (`dossier match` and the workbench Match page). Tailor stays off that page. There is still no PDF.
+The workbench loop shipped in 0.10. 1.0 is that loop plus a boring path on a machine that is not this locker:
 
-- Someone else installs from the README, enables only adapters they have, and completes ingest → extract → approve → ask → packet (and optional brief, tailor, or referees). A thin install (no warehouse) is the same path.
-- Acceptance checklist: refusals that should refuse, citations that resolve, egress notice when cloud is opted in, Twenty read-only when used, no dumps or evidence DB in git.
-- Docs and `doctor` messages fixed for every footgun found; features deferred, not patched in as drive-bys.
-- Career inventory covers years across the locker (seeker year floor, employer career folders at read time), not only the three newest files per kind.
-- **1.0** means that path is boring enough to call done — not that every Later idea below has shipped.
+- Someone else installs from the README, enables only adapters they have, and completes ingest → extract → approve → defend → ask → packet (and optional brief, tailor, or referees). A thin install (no warehouse) is the same path.
+- Acceptance: refusals that should refuse, citations that resolve, every quoted span at or under `SPAN_MAX`, egress notice when cloud is opted in, Twenty read-only when used, no dumps or evidence DB in git.
+- `scripts/release/second_machine.sh` is the synthetic form of that path.
 
-### After 1.0 — Workbench
-
-The loopback workbench (`dossier gui`, `[web]` extra) covers the daily loop: locker, ingest, extract, review (including the carrying sentence and defend), ask, match, tailor, packet, gaps, index, brief, and run, plus effort, saved profiles, a prompt catalogue, and editable question packs. Nav is grouped into Prepare, Decide, Use, and Settings; every page keeps its URL. The locker leads with the next step. Review can be a one-card queue on the same approve, refuse, reopen, and defend actions. Match shows a coverage rail and can open Tailor with the same posting; Tailor stays off the Match page. Ask, match, and tailor keep the submitted text when the job finishes. `dossier review` opens that same review page. Failed jobs surface the error only; tracebacks stay in the server log. Vocabulary is in [vocab](vocab.md). The scriptable path stays the CLI.
-
-Still later: prove and referees as pages, then cited chat streamed on the same ask path. A CV PDF renderer stays out. Office text (PDF via the `office` extra, Word and PowerPoint in the standard library) is capped record text, not a renderer.
+Still later: a CV PDF renderer. Office text (PDF via the `office` extra, Word and PowerPoint in the standard library) is capped record text, not a renderer. `sqlite-vec` stays an optional extra; pure Python is the floor.
 
 ## Boundaries that stay
 

@@ -249,10 +249,7 @@ def _parent(rel: str) -> str:
 
 
 def _under(parent: str, drops: set[str]) -> bool:
-    for drop in drops:
-        if parent == drop or parent.startswith(drop + "/"):
-            return True
-    return False
+    return any(parent == drop or parent.startswith(drop + "/") for drop in drops)
 
 
 def _llm_drop(

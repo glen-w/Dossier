@@ -8,7 +8,6 @@ from dossier.referees.rank import Person, note_pubs_coauthors, rank
 from dossier.store import Corpus, Record
 from dossier.tailor import arrange_letter
 
-
 POSTING = "We need a workshop and a paper on ocean methods."
 
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.0
+
+Engineering gates and the carrying-sentence contract.
+
+- Interpreter pin (`.python-version` 3.13), ruff, mypy, coverage, CI, and pre-commit.
+- A stored span is one paste-sized sentence (`SPAN_MAX`, default 320). A claim with no content words is refused. `defend --refresh` re-spans under the new rule; `audit-cards` lists approved cards that would now be refused.
+- Workbench CSRF, security headers, atomic config writes, pack-path allowlist, and a body size cap.
+- Store schema version, batch writes, a single-writer lock, and `dossier backup`.
+- Shared `ops` implementations for CLI and workbench. Notes and calendar adapters. `dossier eval`, `export`/`import`, and a second-machine acceptance script. Prove, referees, and gaps are workbench pages; ask streams the cited answer.
+
 ## 0.9.0
 
 `dossier tailor` writes CV or letter markdown from approved cards that
@@ -8,6 +18,11 @@ card. `--arrange` may reuse those spans for a letter and drops any other
 sentence. Referee lines can note a pubs coauthor already in the corpus and up
 to two claims they could speak to. Every line still says to confirm before
 listing. Nothing is attached to an application.
+
+The loopback workbench (`dossier gui`) covers locker, ingest, extract, review,
+ask, match, tailor, packet, gaps, index, brief, and run, plus effort, saved
+profiles, a prompt catalogue, phrase lists, and question packs. Ask, match,
+and brief take `--sources`, `--year-from`, `--year-to`, and `--effort`.
 
 ## 0.8.0
 
@@ -32,7 +47,7 @@ Live pubs ingest remains gated on the collection name and ~353-item scope.
 
 ## 0.5.0
 
-`span`, `defend`, `gaps`, and `packet` show the sentence that carries a claim. `defend` stores that sentence on the card and does not change its status. A sentence must carry the claim on its own; words spread across two sentences can still pass the whole-record check. Extract prompts no longer break when record text contains braces. Opening the corpus no longer rebuilds passages for empty records.
+`span`, `defend`, `gaps`, and `packet` show the sentence that carries a claim. `defend` stores the carrying sentence on the card and does not change its status. A sentence must carry the claim on its own; words spread across two sentences can still pass the whole-record check. Extract prompts no longer break when record text contains braces. Opening the corpus no longer rebuilds passages for empty records.
 
 ## 0.4.0
 

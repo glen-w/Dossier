@@ -23,8 +23,8 @@ from dossier.llm.validate import (
 )
 
 __all__ = [
-    "CompletionRequest",
     "EGRESS_NOTICE",
+    "CompletionRequest",
     "LLMClient",
     "LLMClientError",
     "LiteLLMClient",
@@ -33,9 +33,9 @@ __all__ = [
     "NullLLMClient",
     "OllamaClient",
     "ctx_tokens_for",
+    "egress_status",
     "get_client",
     "get_client_impl",
-    "egress_status",
     "llm_egress_is_remote",
     "reject_litellm_ollama_model",
 ]

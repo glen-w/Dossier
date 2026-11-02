@@ -1,0 +1,19 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.13
+    hooks:
+      - id: ruff
+        args: [--fix]
+  - repo: local
+    hooks:
+      - id: check-gitignore
+        name: check gitignore shape
+        entry: python3 scripts/release/check_gitignore.py
+        language: system
+        pass_filenames: false
+      - id: pytest
+        name: pytest
+        entry: uv run pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true

@@ -16,6 +16,12 @@
     {% else %}Running…{% endif %}
   </div>
   <div class="meta" data-job-meta></div>
+  {% if job.status in ('running', 'queued') %}
+  <form method="post" action="/api/jobs/{{ job.id }}/cancel" style="display:inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">Cancel</button>
+  </form>
+  {% endif %}
   {% else %}
   <span data-job-line>No job running.</span>
   <span class="meta" data-job-meta>One job at a time — the locker has a single writer.</span>

@@ -13,6 +13,13 @@ from dossier.identity import (
     noise_folder,
     skip_folder,
 )
+from dossier.lenses import (
+    infer_kind,
+    infer_lenses,
+    infer_org,
+    infer_skills,
+    primary_lens,
+)
 from dossier.lists import (
     mail_activity,
     mail_exclude,
@@ -21,7 +28,6 @@ from dossier.lists import (
     phrase_pattern,
     seek_closed,
 )
-from dossier.lenses import infer_kind, infer_lenses, infer_org, infer_skills, primary_lens
 from dossier.seekers.hits import Hit
 from dossier.sources.warehouse import has_table
 
@@ -273,7 +279,12 @@ def _sent_docs_elsewhere(conn: duckdb.DuckDBPyConnection, has_signals: bool) -> 
 
 def hunt_mbox_folder(root: Path, *, max_bytes: int, max_files: int | None = None) -> list[Hit]:
     """Thin-install path: score headers in a small exported folder. Never a blocked tree."""
-    from dossier.fetch.mbox import iter_mbox_files, mbox_max_files, mbox_openable, parse_headers
+    from dossier.fetch.mbox import (
+        iter_mbox_files,
+        mbox_max_files,
+        mbox_openable,
+        parse_headers,
+    )
 
     file_cap = mbox_max_files() if max_files is None else max_files
     hits: list[Hit] = []

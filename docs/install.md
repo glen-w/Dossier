@@ -7,9 +7,12 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/) on the machine that h
 
 ```text
 uv sync --extra dev
-uv sync --extra web   # optional workbench (dossier gui)
+uv sync --extra web     # workbench (dossier gui / review)
+uv sync --extra office  # PDF text (Word and PowerPoint use the standard library)
+uv sync --extra vec     # optional sqlite-vec; pure Python stays the default
 uv run dossier --help
 uv run dossier doctor
+uv run dossier doctor --deep
 ```
 
 ## Full text (FTS5)
@@ -26,12 +29,14 @@ overlap is the fallback when this interpreter was built without the module.
 - `embed_model:` and `vectors:` — passage vectors from `dossier index`
 - `employer_paths:` and `git_paths:` — how many folders you listed
 - `tailor:` — how many spanned approved cards a posting draft can quote. What that draft contains is in [status](status.md).
-- Warnings when Slack or meetings detect but identity is empty, when a pubs collection is set but `rows=0`, or when mbox records cite hard-closed folders (`mbox_sent_metadata`)
+- Warnings when Slack or meetings detect but identity is empty, when a pubs collection is set but `rows=0`, when a stored span exceeds `SPAN_MAX`, or when mbox records cite hard-closed folders (`mbox_sent_metadata`)
+- `--deep` — integrity check, span-length histogram, FTS parity, orphan cards
 
 Invalid `$DOSSIER_DATA/dossier.toml` fails the process with exit code 2 (`FAIL:` on stderr) instead of silently using empty config.
 
-Prefer an interpreter that reports `fts5: yes`. On this Mac the stock
-`uv` venv may report `fts5: no` while Homebrew Python 3.13 reports yes:
+Prefer an interpreter that reports `fts5: yes`. `.python-version` pins 3.13.
+On this Mac the stock `uv` CPython build may report `fts5: no` while Homebrew
+Python 3.13 reports yes. Point uv at that interpreter once:
 
 ```text
 UV_PYTHON=/opt/homebrew/opt/python@3.13/bin/python3.13 uv sync --extra dev

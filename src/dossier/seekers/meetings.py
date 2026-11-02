@@ -8,10 +8,10 @@ from pathlib import Path
 
 from dossier.identity import resolve_speaker_names
 from dossier.lenses import infer_kind, infer_lenses, infer_skills, primary_lens
-from dossier.lists import meetings_dirs, meetings_solo
+from dossier.lists import meetings_dirs, meetings_orgs, meetings_solo
 from dossier.seekers.hits import Hit
+from dossier.text import TEXT_CAP
 
-TEXT_CAP = 8000
 PREVIEW_CAP = 240
 MAX_BYTES = 8_000_000
 PAIR_CAP = 2000
@@ -20,11 +20,11 @@ _CONTRIB_RE = re.compile(
     r"facilitat\w*|wrote|written|led|lead\w*|chair\w*|present\w*)\b",
     re.I,
 )
-_ORG_RE = (
-    ("REN21", re.compile(r"\bren21\b|\bgsr\b|\bgfr\b", re.I)),
-    ("IDDRI", re.compile(r"\biddri\b|\bsciencespo\b", re.I)),
-    ("Oceana", re.compile(r"\boceana\b", re.I)),
-)
+_ORG_RE = {
+    "REN21": re.compile(r"\bren21\b|\bgsr\b|\bgfr\b", re.I),
+    "IDDRI": re.compile(r"\biddri\b|\bsciencespo\b", re.I),
+    "Oceana": re.compile(r"\boceana\b", re.I),
+}
 
 
 def hunt_meetings(root: Path, names: tuple[str, ...] | None = None) -> list[Hit]:
@@ -318,8 +318,9 @@ def _year(stem: str, doc: dict) -> int:
 
 
 def _org(blob: str) -> str:
-    for name, pattern in _ORG_RE:
-        if pattern.search(blob):
+    allowed = meetings_orgs()
+    for name, pattern in _ORG_RE.items():
+        if name.casefold() in allowed and pattern.search(blob):
             return name
     return ""
 

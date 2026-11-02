@@ -267,10 +267,10 @@ class LazyClient:
     def check_config(self, model: str) -> tuple[bool, str]:
         return True, "ok"
 
-    def complete(self, request):  # noqa: ANN001
+    def complete(self, request):
         return self._client().complete(request)
 
-    def complete_json(self, request):  # noqa: ANN001
+    def complete_json(self, request):
         return self._client().complete_json(request)
 
     def _client(self) -> LLMClient:
@@ -317,6 +317,109 @@ def query_embedder(cfg: Config, corpus: Corpus):
             return None
         note_egress(cfg)
     return OllamaEmbedder(cfg.llm_base_url, cfg.llm_allow_remote, cfg.embed_model)
+
+
+def ingest(
+    corpus: Corpus,
+    *,
+    adapter: str | None = None,
+    path: Path | None = None,
+) -> tuple[list[tuple[Any, Path]], int, int]:
+    """Resolve targets and load them. Returns (targets, before, after)."""
+    from dossier.ingest_run import run_ingest_targets
+
+    if adapter:
+        item = contribution(adapter)
+        if item is None:
+            raise ValueError(f"unknown adapter {adapter!r}")
+        target = path or default_path(item.name)
+        if target is None:
+            raise ValueError(f"{item.name}: no path")
+        targets: list[tuple[Any, Path]] = [(item, target)]
+        if path is None:
+            for extra in extra_paths(item.name):
+                if item.source.detect(extra):
+                    targets.append((item, extra))
+    elif path is not None:
+        matches = [c for c in CONTRIBUTIONS if c.source.detect(path)]
+        if not matches:
+            raise ValueError(f"no adapter owns {path}")
+        targets = [(item, path) for item in matches]
+    else:
+        targets = detected_targets()
+        if not targets:
+            raise FileNotFoundError("nothing to ingest")
+    before = len(corpus.records())
+    from dossier.ui import stage
+
+    stage("ingest", f"{len(targets)} source{'s' if len(targets) != 1 else ''}")
+    run_ingest_targets(targets, corpus)
+    return targets, before, len(corpus.records())
+
+
+def extract_cards(
+    cfg: Config,
+    corpus: Corpus,
+    *,
+    source: str | None,
+    limit: int | None,
+    strict_llm: bool,
+    budget: Any | None = None,
+    on_progress: Any | None = None,
+) -> tuple[int, bool]:
+    """Draft cards. Returns (count, used_llm)."""
+    from dossier.extract import extract_corpus
+    from dossier.llm import get_client, llm_egress_is_remote
+    from dossier.llm.budget import CallBudget
+    from dossier.llm.client import NullLLMClient, select_fast_model
+
+    use_llm = cfg.extract_llm and cfg.llm_enabled
+    client: LLMClient = NullLLMClient()
+    spent = budget
+    model = cfg.fast_model
+    if use_llm:
+        if llm_egress_is_remote(cfg):
+            note_egress(cfg)
+        client = get_client(cfg)
+        model, fast_note = select_fast_model(cfg, client)
+        if fast_note:
+            print(fast_note, file=sys.stderr)
+        ok_cfg, msg = client.check_config(model)
+        if not ok_cfg:
+            drafted = extract_corpus(
+                corpus,
+                NullLLMClient(),
+                model,
+                source=source,
+                limit=limit,
+                use_llm=False,
+                timeout_seconds=min(cfg.llm_timeout_seconds, 60.0),
+                chunk_chars=cfg.extract_chunk_chars,
+                max_chunks=cfg.extract_max_chunks,
+                max_num_ctx=cfg.llm_max_num_ctx,
+                on_progress=on_progress,
+            )
+            print(msg, file=sys.stderr)
+            if strict_llm:
+                raise LLMClientError(msg)
+            return len(drafted), False
+        if spent is None:
+            spent = CallBudget(cfg.llm_max_calls)
+        client = spent.wrap(client)
+    cards = extract_corpus(
+        corpus,
+        client,
+        model,
+        source=source,
+        limit=limit,
+        use_llm=use_llm,
+        timeout_seconds=min(cfg.llm_timeout_seconds, 60.0),
+        chunk_chars=cfg.extract_chunk_chars,
+        max_chunks=cfg.extract_max_chunks,
+        max_num_ctx=cfg.llm_max_num_ctx,
+        on_progress=on_progress,
+    )
+    return len(cards), use_llm
 
 
 def detected_targets_report(

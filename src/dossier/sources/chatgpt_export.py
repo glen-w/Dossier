@@ -8,10 +8,10 @@ from pathlib import Path
 
 from dossier.lists import excluded
 from dossier.store import Corpus, Record
+from dossier.text import with_lens_kind
 from dossier.util import record_id
 
 CHATGPT_LIMIT = 2000
-TEXT_CAP = 8000
 MIN_CHARS = 40
 _MAX_JSON = 80_000_000
 
@@ -54,7 +54,7 @@ def load_chatgpt_export(path: Path, corpus: Corpus) -> None:
                     source="chatgpt",
                     uri=uri,
                     title=heading,
-                    text=body[:TEXT_CAP],
+                    text=with_lens_kind(body, "delivered", "note"),
                     table="chatgpt.messages",
                 )
             )

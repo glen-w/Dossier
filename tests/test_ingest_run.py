@@ -18,10 +18,10 @@ class _StubSource:
     def __init__(self, n: int = 2) -> None:
         self.n = n
 
-    def detect(self, path) -> bool:  # noqa: ANN001
+    def detect(self, path) -> bool:
         return True
 
-    def load(self, path, corpus: Corpus) -> None:  # noqa: ANN001
+    def load(self, path, corpus: Corpus) -> None:
         for i in range(self.n):
             uri = f"stub://{path.name}/{i}"
             corpus.upsert_record(

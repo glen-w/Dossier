@@ -7,6 +7,7 @@ from pathlib import Path
 from dossier.lists import excluded
 from dossier.sources.warehouse import connect_readonly, has_table, resolve_warehouse
 from dossier.store import Corpus, Record
+from dossier.text import with_lens_kind
 from dossier.util import record_id
 
 _TABLES = (
@@ -59,7 +60,7 @@ class LinkedInSource:
                     ]
                     text = ". ".join(b.strip() for b in bits if b and str(b).strip())
                     if text:
-                        _put(corpus, uri, heading, text, "linkedin.positions")
+                        _put(corpus, uri, heading, text, "linkedin.positions", "delivered", "role")
             if has_table(conn, "linkedin.education"):
                 rows = conn.execute(
                     """
@@ -75,14 +76,14 @@ class LinkedInSource:
                     bits = [heading, f"{start or ''}–{end or ''}".strip("–"), notes or ""]
                     text = ". ".join(b.strip() for b in bits if b and str(b).strip())
                     if text:
-                        _put(corpus, uri, heading, text, "linkedin.education")
+                        _put(corpus, uri, heading, text, "linkedin.education", "skills", "degree")
             if has_table(conn, "linkedin.skills"):
                 rows = conn.execute("SELECT name FROM linkedin.skills").fetchall()
                 names = [str(r[0]).strip() for r in rows if r and r[0]]
                 if names:
                     uri = "linkedin://skills"
                     text = "Skills: " + ", ".join(names)
-                    _put(corpus, uri, "LinkedIn skills", text, "linkedin.skills")
+                    _put(corpus, uri, "LinkedIn skills", text, "linkedin.skills", "skills", "list")
             if has_table(conn, "linkedin.publications"):
                 rows = conn.execute(
                     """
@@ -96,7 +97,15 @@ class LinkedInSource:
                     bits = [heading, publisher or "", published or "", desc or ""]
                     text = ". ".join(b.strip() for b in bits if b and str(b).strip())
                     if text:
-                        _put(corpus, uri, heading, text, "linkedin.publications")
+                        _put(
+                            corpus,
+                            uri,
+                            heading,
+                            text,
+                            "linkedin.publications",
+                            "delivered",
+                            "paper",
+                        )
         finally:
             conn.close()
 
@@ -104,7 +113,15 @@ class LinkedInSource:
         return list(_TABLES)
 
 
-def _put(corpus: Corpus, uri: str, title: str, text: str, table: str) -> None:
+def _put(
+    corpus: Corpus,
+    uri: str,
+    title: str,
+    text: str,
+    table: str,
+    lens: str = "delivered",
+    kind: str = "note",
+) -> None:
     if excluded("linkedin", title):
         return
     corpus.upsert_record(
@@ -113,7 +130,7 @@ def _put(corpus: Corpus, uri: str, title: str, text: str, table: str) -> None:
             source="linkedin",
             uri=uri,
             title=title,
-            text=text,
+            text=with_lens_kind(text, lens, kind),
             table=table,
         )
     )

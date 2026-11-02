@@ -5,7 +5,12 @@ import pytest
 
 from dossier.config import Config
 from dossier.llm import EGRESS_NOTICE, get_client, llm_egress_is_remote
-from dossier.llm.client import CompletionRequest, LLMClientError, NullLLMClient, OllamaClient
+from dossier.llm.client import (
+    CompletionRequest,
+    LLMClientError,
+    NullLLMClient,
+    OllamaClient,
+)
 from dossier.llm.validate import LlmConfigError, validate_ollama_url
 
 
@@ -89,7 +94,7 @@ def test_ollama_think_flag_is_sent_only_when_set() -> None:
         def json(self) -> dict:
             return {"response": "ok"}
 
-    def _post(url: str, json: dict) -> _Resp:  # noqa: A002
+    def _post(url: str, json: dict) -> _Resp:
         captured["url"] = url
         captured["payload"] = json
         return _Resp()

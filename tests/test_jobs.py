@@ -7,7 +7,7 @@ import time
 import pytest
 
 from dossier import ui
-from dossier.jobs import LockerBusy, JobRunner
+from dossier.jobs import JobRunner, LockerBusy
 
 
 def test_progress_sink_receives_stage_and_bar(monkeypatch) -> None:
@@ -31,7 +31,7 @@ def test_job_runner_one_at_a_time() -> None:
     runner = JobRunner()
     gate = {"go": False}
 
-    def slow(job):  # noqa: ANN001
+    def slow(job):
         while not gate["go"]:
             time.sleep(0.01)
             job.push("note", text="waiting")

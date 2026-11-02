@@ -10,6 +10,8 @@ uv run dossier ingest --adapter mbox
 uv run dossier ingest --adapter meetings
 uv run dossier ingest --adapter employer
 uv run dossier ingest --adapter git
+uv run dossier ingest --adapter notes ./notes
+uv run dossier ingest --adapter ics ./talks.ics
 uv run dossier extract --source slack
 uv run dossier extract --limit 20
 uv run dossier extract
@@ -22,10 +24,20 @@ uv run dossier review
 uv run dossier gui
 uv run dossier span "synthetic paper on coastal governance"
 uv run dossier defend
+uv run dossier defend --refresh --dry-run
+uv run dossier audit-cards
+uv run dossier reopen --from-audit
+uv run dossier backup
+uv run dossier rebuild-index
+uv run dossier eval
+uv run dossier export --out ./cards.json
+uv run dossier import ./cards.json
+uv run dossier doctor --deep
 uv run dossier gaps
 uv run dossier packet
 uv run dossier tailor --posting ./posting.txt
 uv run dossier tailor --posting ./posting.txt --kind letter --arrange
+uv run dossier tailor --posting ./posting.txt --format json-resume
 uv run dossier match --posting ./posting.txt
 uv run dossier index
 uv run dossier ask "what did I write about coastal governance?"
@@ -73,25 +85,24 @@ as a match.
 `dossier review` opens the workbench review page (`127.0.0.1:8766/review`,
 override with `--port`). It needs the `[web]` extra, the same one as
 `dossier gui`. Approve, refuse, reopen, and defend live on that page. Defend
-stores the carrying sentence and does not change status. Gaps, packet, and
-tailor are workbench pages too. Tailor stays off the Match page; Match only
-links to it.
+stores the carrying sentence and does not change status.
 
-`dossier gui` serves the optional workbench on `127.0.0.1:8766` (override with
+`dossier gui` serves the workbench on `127.0.0.1:8766` (override with
 `--port`). It needs the `[web]` extra (`uv sync --extra web`). Pages sit in
 four rooms — Prepare, Decide, Use, and Settings — and still use the same URLs:
-locker, ingest, extract, review, ask, match, index, brief, run, effort, saved
-profiles, prompts, question packs, and phrase lists. Review can open as a
-one-card queue. Match keeps the pasted spec and links to Tailor with that
-posting; Tailor stays its own page. Live job progress uses Server-Sent
-Events; the job strip polls only while a job is busy. Ask, match, and tailor
-swap in the result when the job finishes and keep the text you submitted.
-Other pages reload. Failed jobs show the error only. Known `err=` query keys
-map to short blurbs. The CLI stays the scriptable surface; `dossier review`
-stays available without the extra. See [vocab](vocab.md).
+locker, sources, extract, index, review, gaps, ask, match, tailor, packet,
+brief, run, prove, referees, and settings (knobs, phrase lists, prompts,
+packs). Review can open as a one-card queue. Ask streams the cited answer
+when the job finishes. Match keeps the pasted spec and links to Tailor with
+that posting; Tailor stays its own page. Live job progress uses Server-Sent
+Events; the job strip polls only while a job is busy and can cancel. Failed
+jobs show the error only. Known `err=` query keys map to short blurbs. The
+CLI stays the scriptable surface. Screenshots: [workbench](workbench.md).
+See [vocab](vocab.md).
 
 `dossier tailor` writes CV or letter markdown under `data/drafts/` from
-approved cards that already have a span. `--arrange` is letter-only.
+approved cards that already have a span. `--format json-resume` writes JSON
+Resume data (not a rendered CV). `--arrange` is letter-only.
 
 `dossier match --posting` writes an ordered evidence list under
 `data/matches/`, one section per requirement. An empty file is an error.
@@ -162,12 +173,29 @@ Records stay on this machine. Text leaves only when a remote LLM is on, which is
 | `DOSSIER_MAIL_ACTIVITY_OFF` | Built-in activity phrases to turn off |
 | `DOSSIER_MAIL_SIGNALS` | Extra Gloda signal kinds to drop |
 | `DOSSIER_MAIL_SIGNALS_OFF` | Built-in signal kinds to stop dropping |
-| `DOSSIER_NAME_DROP` | Extra file or subject phrases that always count as logistics |
-| `DOSSIER_NAME_DROP_OFF` | Built-in drop phrases to turn off (`timesheet`, leave, payslip) |
-| `DOSSIER_NAME_KEEP` | Extra phrases that stay even when an exclude phrase matches (`frais`, `budget`) |
-| `DOSSIER_NAME_KEEP_OFF` | Built-in keep phrases to turn off |
-| `DOSSIER_NAME_EXCLUDE` | Extra logistics phrases. A keep wins over these. A drop wins over a keep |
-| `DOSSIER_NAME_EXCLUDE_OFF` | Built-in logistics phrases to turn off |
+| `DOSSIER_DATA` | Corpus directory (default `~/Documents/Dossier/data`) |
+| `DOSSIER_ASK_LIMIT` | Max hits shown for `ask` (default `5`) |
+| `DOSSIER_EXTRACT_CHUNK_CHARS` | Fast-model extract chunk size (default `4000`) |
+| `DOSSIER_EXTRACT_MAX_CHUNKS` | Max extract chunks per record (default `4`) |
+| `DOSSIER_EXTRACT_SPAN_MAX` | Max characters of a stored carrying sentence (default `320`) |
+| `DOSSIER_MAIL_BLOCKED_ROOTS` | Folder names that must not be walked as a mail tree (default `iddri`). Same as `[mail] blocked_roots` |
+| `DOSSIER_TWENTY_ALLOW_REMOTE` | Off by default. Set `true` to allow a non-loopback Twenty URL for the read-only referee query |
+| `DOSSIER_LEXICON` | Extra closed-set lens words for `ask` expansion |
+| `DOSSIER_LLM_TIMEOUT` | Completion timeout in seconds (default `300`) |
+| `DOSSIER_LLM_PROVIDER` | `ollama` (default), `litellm`, or `off` |
+| `DOSSIER_SCOPE_SOURCES` | Comma-separated source allowlist for ask/match/brief |
+| `DOSSIER_SCOPE_YEAR_FROM` | Inclusive year floor for that command |
+| `DOSSIER_SCOPE_YEAR_TO` | Inclusive year ceiling |
+| `DOSSIER_REFEREE_POLICY` | Path to a referee policy JSON file |
+| `DOSSIER_PEOPLE` | Path to a people JSON file for `referees` |
+| `DOSSIER_MBOX_MAX_BYTES` | Max mbox file size opened for a body fetch (default 200 MiB) |
+| `DOSSIER_TWENTY_COAUTHOR_FIELD` | Optional Twenty field name treated as a coauthor flag |
+| `DOSSIER_NAMES_DROP` | Extra file or subject phrases that always count as logistics |
+| `DOSSIER_NAMES_DROP_OFF` | Built-in drop phrases to turn off (`timesheet`, leave, payslip) |
+| `DOSSIER_NAMES_KEEP` | Extra phrases that stay even when an exclude phrase matches (`frais`, `budget`) |
+| `DOSSIER_NAMES_KEEP_OFF` | Built-in keep phrases to turn off |
+| `DOSSIER_NAMES_EXCLUDE` | Extra logistics phrases. A keep wins over these. A drop wins over a keep |
+| `DOSSIER_NAMES_EXCLUDE_OFF` | Built-in logistics phrases to turn off |
 | `DOSSIER_SLACK_USER_IDS` | Comma-separated Slack user ids or display names to treat as you |
 | `DOSSIER_SEEKER_PER_STRATUM` | Max hits per lens/kind/year (default 20) |
 | `DOSSIER_SEEKER_OVERALL` | Max seeker records per ingest (default 1000) |

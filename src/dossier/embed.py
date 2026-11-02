@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import struct
-
 from collections.abc import Callable
 
 import httpx
@@ -86,14 +85,15 @@ def index_passages(
     done = 0
     if on_batch is not None:
         on_batch(done, total)
-    for start in range(0, total, BATCH):
-        chunk = missing[start : start + BATCH]
-        vectors = embedder.embed([text for _uri, _ordinal, text in chunk])
-        for (uri, ordinal, _text), vector in zip(chunk, vectors, strict=True):
-            corpus.upsert_vector(uri, ordinal, model, vector)
-        done += len(chunk)
-        if on_batch is not None:
-            on_batch(done, total)
+    with corpus.batch():
+        for start in range(0, total, BATCH):
+            chunk = missing[start : start + BATCH]
+            vectors = embedder.embed([text for _uri, _ordinal, text in chunk])
+            for (uri, ordinal, _text), vector in zip(chunk, vectors, strict=True):
+                corpus.upsert_vector(uri, ordinal, model, vector)
+            done += len(chunk)
+            if on_batch is not None:
+                on_batch(done, total)
     return corpus.vector_count(model)
 
 
