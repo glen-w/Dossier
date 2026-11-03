@@ -6,16 +6,18 @@ Authority: Map of this guide. Behavior lives in [status](status.md).
 Dossier is a local-first locker for professional evidence. It turns records you
 already have into claim cards you could paste into a CV or letter. Each claim
 cites a record. If the record will not carry the sentence, the claim is refused.
-You approve a card before it is paste-ready.
+You approve a card, then defend the carrying sentence, before it is paste-ready.
 
 Ask-the-corpus — “what did I actually do?” — is `dossier ask`. It answers from
 records already in the locker and prints citation URIs. A pasted job spec
 becomes an ordered evidence list per requirement with `dossier match`. A
-posting-shaped CV or letter is `dossier tailor`. What each command includes
-is in [status](status.md).
+posting-shaped CV or letter is `dossier tailor`. When cited text changes,
+cards are marked stale and `dossier drift` lists them. What each command
+includes is in [status](status.md).
 
-The product page and this guide share one sticky header. Build both with
-`make pages-site`.
+The product page under `website/` and this guide share one sticky header
+(`website/chrome/`). Build both with `make pages-site` → `_site/` (landing at
+`/`, guide at `/guide/`).
 
 ```{toctree}
 :maxdepth: 2

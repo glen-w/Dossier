@@ -67,11 +67,12 @@
 
       <section class="section" id="product">
         <div class="wrap">
-          <h2>Locker, then interview</h2>
+          <h2>From locker to paste-ready</h2>
           <p class="section-lead">
-            Ingest only the adapters you have. Extract drafts cards from the
-            words already in a record. You approve before anything is paste-ready.
-            Ask quotes a span when that span carries the question. The
+            Ingest only the adapters you have. Extract drafts cards from words
+            already in a record. You approve, then defend the one carrying
+            sentence. Match a posting, tailor a CV or letter from those spans,
+            or ask with citation URIs. Drift notices when cited text moves. The
             workbench is that loop on loopback.
           </p>
           <p>
@@ -120,8 +121,9 @@
                 </svg>
               </span>
               <span>
-                <strong>Approve</strong> — the human gate. Nothing is copied into a
-                CV by the tool.
+                <strong>Approve / defend</strong> — the human gate, then the one
+                paste-sized sentence that carries the claim. Nothing is copied
+                into a CV by the tool.
               </span>
             </li>
             <li>
@@ -131,8 +133,9 @@
                 </svg>
               </span>
               <span>
-                <strong>Ask / packet</strong> — cited answers, or a refusal. Span
-                stores the carrying sentence.
+                <strong>Match / tailor / ask</strong> — evidence per requirement,
+                a posting-shaped CV or letter from stored spans, or a cited
+                answer. A refusal when the record will not carry the sentence.
               </span>
             </li>
           </ol>
@@ -144,17 +147,17 @@
           <h2>What you get</h2>
           <p class="section-lead">
             A buffet of pending and approved cards, markdown briefs, packets,
-            an evidence list for each requirement in a job spec, and a
-            posting-shaped CV or letter, plus a read-only referee shortlist
-            that is never auto-attached.
+            an evidence list for each requirement in a job spec, a
+            posting-shaped CV or letter, drift when evidence moves, plus a
+            read-only referee shortlist that is never auto-attached.
           </p>
           <ul class="outcomes">
             <li>Claim cards with citation URIs in a local SQLite corpus</li>
             <li><code>dossier ask</code> with exact / auto / rich modes</li>
             <li><code>dossier match</code> lists evidence for each requirement in a job spec. A request can limit sources, years, and effort; settings and profiles hold the defaults</li>
-            <li><code>span</code>, <code>defend</code>, <code>gaps</code>, <code>packet</code>, <code>tailor</code> (markdown, HTML, DOCX, or PDF)</li>
+            <li><code>span</code>, <code>defend</code>, <code>gaps</code>, <code>drift</code>, <code>packet</code>, <code>dossier tailor</code> (markdown, HTML, DOCX, or PDF)</li>
             <li><code>review</code> groups pending cards by source, lens, and kind</li>
-            <li><code>dossier gui</code> is the loopback workbench (locker, review, ask, match, tailor, prove, referees)</li>
+            <li><code>dossier gui</code> is the loopback workbench (locker, review, gaps, drift, ask, match, tailor, prove, referees)</li>
             <li><code>referees</code> from a JSON people file or Twenty read</li>
           </ul>
         </div>

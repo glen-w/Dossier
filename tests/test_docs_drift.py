@@ -55,3 +55,48 @@ def test_sdist_excludes_hypothesis_cache() -> None:
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     assert "/.hypothesis" in pyproject
     assert ".hypothesis/" in gitignore
+
+
+def test_sphinx_excludes_local_assessments() -> None:
+    conf = (ROOT / "docs" / "conf.py").read_text(encoding="utf-8")
+    assert re.search(
+        r"exclude_patterns\s*=\s*\[[^\]]*['\"]assessments['\"]",
+        conf,
+        flags=re.S,
+    )
+
+
+def test_guide_loads_shared_site_chrome() -> None:
+    conf = (ROOT / "docs" / "conf.py").read_text(encoding="utf-8")
+    assert "../website/chrome" in conf
+    chrome = ROOT / "website" / "chrome"
+    assert (chrome / "site_chrome.css").is_file()
+    assert (chrome / "site_nav.js").is_file()
+    template = (ROOT / "docs" / "_templates" / "page.html").read_text(encoding="utf-8")
+    assert "do-site-chrome" in template
+    assert "site-nav" in template
+
+
+def test_product_page_tracks_shipped_loop() -> None:
+    html = (ROOT / "website" / "index.html").read_text(encoding="utf-8")
+    for needle in (
+        "dossier ask",
+        "dossier match",
+        "dossier tailor",
+        "dossier gui",
+        "drift",
+        "gaps",
+        "./guide/",
+        "chrome/site_chrome.css",
+        "chrome/site_nav.js",
+    ):
+        assert needle in html, needle
+
+
+def test_workbench_guide_lists_nav_rooms() -> None:
+    from dossier.vocab import NAV_ROOMS
+
+    guide = (ROOT / "docs" / "workbench.md").read_text(encoding="utf-8")
+    for _room, keys in NAV_ROOMS:
+        for key in keys:
+            assert key in guide, f"workbench.md missing nav page {key!r}"

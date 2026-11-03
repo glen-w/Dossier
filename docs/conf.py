@@ -41,6 +41,9 @@ exclude_patterns = [
     "_build",
     "Thumbs.db",
     ".DS_Store",
+    # Local maintainer surveys (gitignored under assessments/); never ship in the guide.
+    "assessments",
+    "assessments/*",
 ]
 
 source_suffix = {

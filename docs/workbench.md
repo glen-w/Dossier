@@ -16,9 +16,9 @@ Nav is four rooms. Every key is still its own URL.
 | Room | Pages |
 | --- | --- |
 | Prepare | locker, sources, extract, index |
-| Decide | review, gaps |
+| Decide | review, gaps, drift |
 | Use | ask, match, tailor, packet, brief, run, prove, referees |
-| Settings | knobs, phrase lists, prompts, packs |
+| Settings | settings (knobs, phrase lists, prompts, packs) |
 
 Screenshots below use a synthetic locker. They are not a personal corpus.
 
@@ -52,9 +52,9 @@ Paste a question. Scope (sources, years, effort) stays on that request. The answ
 
 ![Ask](images/ask.png)
 
-## Match, gaps, prove, referees
+## Match, gaps, drift, prove, referees
 
-Match takes a pasted job spec and lists evidence per requirement. Gaps names empty lenses, unspanned cards, and records still waiting on extract; it does not run those commands. Prove and referees are the same read-only passes as the CLI.
+Match takes a pasted job spec and lists evidence per requirement. Gaps names empty lenses, unspanned cards, and records still waiting on extract; it does not run those commands. Drift lists approved cards marked stale when a cited record's text changed, exact duplicate sentences, and full-walk URIs the last ingest missed; it does not ingest, approve, or delete. Prove and referees are the same read-only passes as the CLI.
 
 ![Gaps](images/gaps.png)
 

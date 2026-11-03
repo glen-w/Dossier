@@ -29,7 +29,7 @@ Dossier 1.0 writes a posting-shaped CV or letter from spanned approved cards (`d
 - `referees` prints at most seven people for a posting. Rank is local (hiring-firm overlap, shared words, note, timeline, existing last-contact time, a coauthor flag, and a name already on an ingested pubs record unless `DOSSIER_REFEREE_PUBS=false`). It does not call a model. Under a name it may print up to two claims they could speak to. People come from `--people` / `DOSSIER_PEOPLE`, or from Twenty when both API env vars are set. That Twenty read sends a fixed people query, not the corpus. No people source exits without ranking. A policy file can skip names, warn on scarce names, and alias employers. Every line says to confirm before listing. The command does not write the corpus or Twenty, and it does not send mail.
 - Ollama on loopback by default. Text leaves the machine only for a remote LLM: provider `litellm`, or `DOSSIER_LLM_ALLOW_REMOTE` for a non-loopback Ollama. Both are off by default. The CLI prints an egress notice before the prompt is sent. A non-loopback pubs URL is not contacted.
 - Twelve adapters, registered by hand in `src/dossier/contributions.py`.
-- Product page under `website/` and Sphinx guide under `docs/` (`make pages-site`). The workbench tour is [workbench](workbench.md).
+- Product page under `website/` and Sphinx guide under `docs/` (`make pages-site` → `_site/`, guide at `/guide/`). Shared chrome is `website/chrome/`. The workbench tour is [workbench](workbench.md).
 
 ## Adapters, as they behave today
 
