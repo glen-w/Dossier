@@ -66,6 +66,17 @@ path = "src/dossier/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/dossier"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.hypothesis",
+    "/.pytest_cache",
+    "/.ruff_cache",
+    "/.mypy_cache",
+    "/.venv",
+    "/dist",
+    "/build",
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

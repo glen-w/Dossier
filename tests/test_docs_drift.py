@@ -48,3 +48,10 @@ def test_ci_installs_every_extra_the_tests_use() -> None:
     for extra in ("vec", "render", "office", "web", "dev"):
         assert f"--extra {extra}" in ci, extra
     assert "dossier eval --retrieval" in ci
+
+
+def test_sdist_excludes_hypothesis_cache() -> None:
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert "/.hypothesis" in pyproject
+    assert ".hypothesis/" in gitignore

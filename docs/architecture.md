@@ -55,4 +55,4 @@ Drafts, the human gate (`buffet`, `approve`, `refuse`, `reopen`, `review`), defe
 
 ## Roadmap
 
-Versioned waves; 0.11 shipped the paste-time span check, and 0.12 (wave 1.1) notices when a record's text changes. 1.0 remains second-machine acceptance. Later waves stay in [roadmap](roadmap.md).
+Versioned waves; 0.11 shipped the paste-time span check, 0.12 (wave 1.1) notices when a record's text changes, and 1.0 is the second-machine tag. Later waves stay in [roadmap](roadmap.md).

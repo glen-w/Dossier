@@ -75,7 +75,7 @@ The loop runs on this machine. These are the pressures the waves below take in o
 
 ### 1.1 — The locker notices when evidence moves
 
-Package 0.12. The 1.0 acceptance bar below does not move.
+Package 0.12, included in the 1.0 tag.
 
 - Every specific token must be in the evidence. The two half-overlap questions in the golden set are refusals.
 - Schema v3 stores a text hash. A text change marks citing cards `stale_reason=record_changed` and does not change status. `defend` keeps one previous span and clears the mark when it stores a new one.
@@ -84,28 +84,15 @@ Package 0.12. The 1.0 acceptance bar below does not move.
 - `match --postings` lists requirements that are gaps in two or more of up to 20 files.
 - A workbench job left `queued` or `running` is shown as interrupted on the next start. `scripts/release/second_machine.sh` migrates a v2 fixture, checks a backup, and runs drift. CI runs that script.
 
-## Waves
-
 ### 1.0 — Second machine
 
-**Pressure.** The workbench loop shipped in 0.10 and the paste checks in 0.11. 1.0 is that loop on a machine that is not this locker, including a thin install with no warehouse.
+The loop from the README on a machine that is not this locker, including a thin install with no warehouse. Install with `uv`, `doctor`, enable only adapters they have, then ingest → extract → approve → defend → ask → packet. Brief, tailor, match, and referees stay optional. `[web]` stays optional. The CLI finishes without the workbench.
 
-**Ships.** The path a stranger can finish from the README: install with `uv`, `doctor`, enable only adapters they have, then ingest → extract → approve → defend → ask → packet. Brief, tailor, match, and referees stay optional steps on that same path. `[web]` stays optional. The CLI finishes without the workbench.
+`scripts/release/second_machine.sh` is the synthetic form: span cap, renderer read-back, `dossier eval --retrieval` with the provider off, a v2 migrate, backup, restore check, and drift. CI runs it. `doctor` on a default config prints `egress: no`. `python3 scripts/release/check_gitignore.py` is the push gate.
 
-`scripts/release/second_machine.sh` stays the synthetic form. It keeps asserting the span cap, renderer read-back, and `dossier eval --retrieval` with the provider off. It is not the acceptance. Acceptance is a person, on a checkout that did not already contain `data/evidence.db`.
+A warehouse `make prove` on a real locker stays a human step. The ledger stays under the data directory.
 
-The 0.6 warehouse spot-check closes here as a human step: `make prove` (or `dossier prove`) on a real locker, ledger read, refusals and spanned lines checked, nothing committed. The ledger stays under the data directory.
-
-**Done when.**
-
-- A thin install and a warehouse install use the same commands. Two enabled adapters are enough to reach a buffet.
-- Refusals that should refuse do refuse. Citations in an accepted answer resolve to hits. Every quoted span is at or under `SPAN_MAX` and still in its record.
-- `dossier eval` passes. `doctor` on a default config prints `egress: no`. A remote completion prints the egress notice first.
-- Twenty, when used, is the fixed people read. The client has no write of Tasks, Opportunities, Notes, or last-contacted.
-- `python3 scripts/release/check_gitignore.py` passes on the tree that would be pushed. The real-locker prove ledger is not in that tree.
-- The release is refused if a dump, an evidence DB, or a secret is tracked; if default config would leave egress on; if an adapter loads from an entry point; or if the image-less install in [install](install.md) has been replaced by a container.
-
-**Holds.** 1.0 does not add accounts, sync, a plugin directory, a template gallery, or a required GUI. Office text stays capped record text. `sqlite-vec` and the PDF library stay optional extras. Pure Python is the floor.
+## Waves
 
 ### 1.1 — The quote remembers the record
 

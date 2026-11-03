@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0
+
+Second-machine release of the locker loop.
+
+- A thin install and a warehouse install use the same commands. `scripts/release/second_machine.sh` is the synthetic path: ingest through packet, golden eval, a v2 migrate, backup, restore check, and drift. CI runs it.
+- `python3 scripts/release/check_gitignore.py` is required before every push. Default `doctor` prints `egress: no`.
+- The 0.12 locker is in this tag: tighter carry, stale cards, `drift`, checked `restore`, and the renderer.
+- A warehouse `make prove` on a real locker stays a human step. Its ledger stays off git.
+
 ## 0.12.0
 
 The locker notices when evidence moves.

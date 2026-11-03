@@ -40,11 +40,20 @@ jobs:
         with:
           python-version: "3.13"
       - name: Build
-        run: uv build --wheel
+        run: |
+          rm -rf dist
+          uv build --wheel
       - name: Install the wheel in a clean environment
+        shell: bash
         run: |
           uv venv /tmp/wheel-env
-          uv pip install --python /tmp/wheel-env/bin/python "$(ls dist/*.whl | tail -1)[web,render,office,vec]"
+          wheels=(dist/*.whl)
+          if [ "${#wheels[@]}" -ne 1 ]; then
+            echo "expected one wheel in dist/, got ${#wheels[@]}"
+            ls -la dist || true
+            exit 1
+          fi
+          uv pip install --python /tmp/wheel-env/bin/python "${wheels[0]}[web,render,office,vec]"
       - name: Bundled files ship in the wheel
         run: |
           /tmp/wheel-env/bin/python - <<'PY'

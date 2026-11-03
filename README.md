@@ -69,14 +69,14 @@ Records stay on this machine. The only way text leaves is a remote LLM, and that
 
 ## Later
 
-`tailor` writes markdown, HTML, DOCX, PDF, or JSON Resume data from approved spans, and adds no prose. A portal CV is still outside this repo. Own publications are the Zotero collection named in config. Next is a second person installing from this README. `scripts/release/second_machine.sh` is the synthetic form of that path, not the acceptance. Later waves are in [Roadmap](docs/roadmap.md).
+`tailor` writes markdown, HTML, DOCX, PDF, or JSON Resume data from approved spans, and adds no prose. A portal CV is still outside this repo. Own publications are the Zotero collection named in config. 1.0 is a second install from this README. `scripts/release/second_machine.sh` is the synthetic form of that path. Later waves are in [Roadmap](docs/roadmap.md).
 
 ## Docs
 
-- [Changelog](CHANGELOG.md) — 0.4 through 0.12
+- [Changelog](CHANGELOG.md) — 0.4 through 1.0
 - [Status](docs/status.md) — what this version does
 - [Workbench](docs/workbench.md) — loopback GUI, with screenshots
-- [Roadmap](docs/roadmap.md) — 1.0 is second-machine acceptance; later waves follow it
+- [Roadmap](docs/roadmap.md) — 1.0 is the second-machine tag; later waves follow it
 - [Architecture](docs/architecture.md) — pipeline and where an adapter plugs in
 - [Seekers](docs/seekers.md) — mail, Slack, meetings
 - [Prior art](docs/prior-art.md) — what this borrows
