@@ -16,7 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "httpx>=0.27",
-    "duckdb>=1.1",
+    "duckdb>=2.0.0",
 ]
 
 [project.optional-dependencies]
